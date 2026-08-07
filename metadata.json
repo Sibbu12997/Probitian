@@ -1,0 +1,6 @@
+{
+  "name": "ProBItian - Master Business Intelligence",
+  "description": "Modern learning platform focused on Data Analytics, Power BI, SQL, Excel, AI and Career Growth.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
