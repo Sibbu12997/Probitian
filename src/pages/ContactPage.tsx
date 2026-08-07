@@ -6,21 +6,28 @@ export const ContactPage: React.FC = () => {
   const [formData, setFormData] = useState({ name: '', email: '', subject: '', message: '' });
   const [submitted, setSubmitted] = useState(false);
   const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name || !formData.email || !formData.message) return;
     setSending(true);
+    setError(null);
 
     try {
-      await cmsService.submitContactMessage(formData);
-      setSubmitted(true);
-      setTimeout(() => {
-        setSubmitted(false);
+      const res = await cmsService.submitContactMessage(formData);
+      if (res.success) {
+        setSubmitted(true);
         setFormData({ name: '', email: '', subject: '', message: '' });
-      }, 5000);
-    } catch (err) {
+        setTimeout(() => {
+          setSubmitted(false);
+        }, 6000);
+      } else {
+        setError(res.error || 'Failed to submit message. Please check connection and try again.');
+      }
+    } catch (err: any) {
       console.error('Error submitting contact form:', err);
+      setError(err?.message || 'An unexpected error occurred while submitting.');
     } finally {
       setSending(false);
     }
@@ -48,12 +55,18 @@ export const ContactPage: React.FC = () => {
             <MessageSquare className="w-5 h-5 text-purple-600" /> Send a Message
           </h2>
 
+          {error && (
+            <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-600 dark:text-red-400 text-xs font-semibold">
+              {error}
+            </div>
+          )}
+
           {submitted ? (
             <div className="p-6 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 text-center space-y-3">
               <CheckCircle className="w-10 h-10 text-emerald-500 mx-auto" />
               <h3 className="text-lg font-bold text-emerald-800 dark:text-emerald-200">Thank You!</h3>
               <p className="text-xs text-emerald-700 dark:text-emerald-300">
-                Your message has been sent directly to Shivam Baghel at <strong className="font-semibold">Probitianofficial@gmail.com</strong>. We will reply shortly.
+                Your message has been saved and sent directly to Shivam Baghel at <strong className="font-semibold">Probitianofficial@gmail.com</strong>. We will reply shortly.
               </p>
             </div>
           ) : (
@@ -117,10 +130,11 @@ export const ContactPage: React.FC = () => {
 
               <button
                 type="submit"
-                className="btn-radius w-full py-3.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold shadow-soft flex items-center justify-center gap-2 transition-all"
+                disabled={sending}
+                className="btn-radius w-full py-3.5 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white text-xs font-bold shadow-soft flex items-center justify-center gap-2 transition-all cursor-pointer"
               >
                 <Send className="w-4 h-4" />
-                <span>Send Message</span>
+                <span>{sending ? 'Sending Message...' : 'Send Message'}</span>
               </button>
             </form>
           )}

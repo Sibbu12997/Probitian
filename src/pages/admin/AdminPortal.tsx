@@ -16,6 +16,7 @@ import {
   Database, 
   LogOut, 
   ExternalLink, 
+  ArrowLeft,
   X,
   ChevronRight,
   ShieldCheck,
@@ -132,10 +133,12 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ userEmail, onLogout, o
         <div className="flex items-center gap-3">
           <button
             onClick={() => onNavigateFront('home')}
-            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold border border-slate-700 transition-all cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-semibold border border-slate-700 hover:border-slate-600 transition-all cursor-pointer shadow-sm"
+            title="Navigate to Website Homepage"
           >
-            <ExternalLink className="w-3.5 h-3.5 text-amber-400" />
-            <span>View Public Site</span>
+            <ArrowLeft className="w-4 h-4 text-amber-400" />
+            <span className="hidden xs:inline">← Back to Website</span>
+            <span className="xs:hidden">Website</span>
           </button>
 
           <div className="h-4 w-[1px] bg-slate-800 hidden sm:block" />

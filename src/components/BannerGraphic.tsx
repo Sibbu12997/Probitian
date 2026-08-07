@@ -4,9 +4,10 @@ import { BarChart3, Database, Table, Filter, BrainCircuit, Sparkles, TrendingUp,
 interface BannerGraphicProps {
   type?: 'hero' | 'about' | 'logo';
   className?: string;
+  bannerUrl?: string;
 }
 
-export const BannerGraphic: React.FC<BannerGraphicProps> = ({ type = 'hero', className = '' }) => {
+export const BannerGraphic: React.FC<BannerGraphicProps> = ({ type = 'hero', className = '', bannerUrl }) => {
   if (type === 'logo') {
     return (
       <div className={`relative inline-flex items-center justify-center ${className}`}>
@@ -146,13 +147,20 @@ export const BannerGraphic: React.FC<BannerGraphicProps> = ({ type = 'hero', cla
   }
 
   // Hero Main Banner Graphic - Official ProBItian Brand Banner
+  const imgSrc = bannerUrl || '/banner.svg';
+
   return (
-    <div className={`relative w-full rounded-[24px] overflow-hidden bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-soft-lg ${className}`}>
-      <div className="relative w-full aspect-[12/5] sm:aspect-[12/4.5] min-h-[220px] sm:min-h-[300px]">
+    <div className={`relative w-full rounded-2xl sm:rounded-3xl overflow-hidden bg-slate-900 border border-slate-800 shadow-xl transition-all duration-300 ${className}`}>
+      {/* Background Subtle Gradient Overlay */}
+      <div className="absolute inset-0 bg-gradient-to-tr from-purple-950/40 via-transparent to-amber-500/10 pointer-events-none" />
+
+      <div className="relative w-full p-2 sm:p-4 flex items-center justify-center">
         <img 
-          src="/banner.svg" 
+          src={imgSrc} 
           alt="ProBItian Official Brand Banner - Master Business Intelligence" 
-          className="w-full h-full object-cover sm:object-contain bg-slate-50 dark:bg-slate-900"
+          decoding="async"
+          loading="eager"
+          className="w-full h-auto max-h-[380px] object-contain rounded-xl drop-shadow-md transition-transform duration-500 hover:scale-[1.01]"
         />
       </div>
     </div>

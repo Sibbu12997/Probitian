@@ -119,7 +119,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate, onSelectProject,
 
           {/* Right Column: Hero Banner Showcase */}
           <div className="lg:col-span-6">
-            <BannerGraphic type="hero" />
+            <BannerGraphic type="hero" bannerUrl={homeConfig?.banner_url} />
           </div>
         </div>
       </section>
@@ -441,15 +441,25 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate, onSelectProject,
               href="https://youtube.com/@probitian"
               target="_blank"
               rel="noopener noreferrer"
-              className="btn-radius px-8 py-3.5 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs sm:text-sm font-bold shadow-lg transition-all duration-300 flex items-center gap-2"
+              className="btn-radius w-full sm:w-auto px-8 py-3.5 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs sm:text-sm font-bold shadow-lg transition-all duration-300 flex items-center justify-center gap-2.5 group cursor-pointer"
             >
-              <Youtube className="w-4 h-4 fill-current text-slate-950" />
+              <svg 
+                className="w-5 h-5 shrink-0 group-hover:scale-110 transition-transform duration-200" 
+                viewBox="0 0 24 24" 
+                aria-hidden="true"
+              >
+                <path
+                  fill="#FF0000"
+                  d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814z"
+                />
+                <path fill="#FFFFFF" d="M9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
+              </svg>
               <span>Watch on YouTube</span>
             </a>
 
             <button
               onClick={() => onNavigate('learn')}
-              className="btn-radius px-8 py-3.5 bg-white/10 hover:bg-white/20 text-white text-xs sm:text-sm font-semibold border border-white/20 backdrop-blur-md transition-all duration-300"
+              className="btn-radius w-full sm:w-auto px-8 py-3.5 bg-white/10 hover:bg-white/20 text-white text-xs sm:text-sm font-semibold border border-white/20 backdrop-blur-md transition-all duration-300 cursor-pointer"
             >
               Browse Course Catalog
             </button>

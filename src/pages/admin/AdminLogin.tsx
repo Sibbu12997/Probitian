@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Lock, Mail, ShieldCheck, ArrowRight, Sparkles, Key } from 'lucide-react';
+import { Lock, Mail, ShieldCheck, ArrowRight, Key } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 
 interface AdminLoginProps {
@@ -10,7 +10,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess }) => {
   const [email, setEmail] = useState('admin@probitian.com');
   const [password, setPassword] = useState('');
   const [passkey, setPasskey] = useState('');
-  const [usePasskey, setUsePasskey] = useState(false);
+  const [usePasskey, setUsePasskey] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -19,46 +19,43 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess }) => {
     setError(null);
     setLoading(true);
 
-    if (usePasskey) {
-      // Passkey / Master Key direct authentication mode
-      const validPasskey = import.meta.env.VITE_ADMIN_PASSKEY || 'ProBItian2026Admin!';
-      if (passkey === validPasskey || passkey === 'admin' || passkey === 'ProBItian2026Admin!') {
-        onLoginSuccess('admin@probitian.com');
-      } else {
-        setError('Invalid Admin Master Passkey. Try: ProBItian2026Admin!');
+    try {
+      if (usePasskey) {
+        // Passkey authentication mode
+        const validPasskey = import.meta.env.VITE_ADMIN_PASSKEY;
+        if (validPasskey && passkey.trim() === validPasskey.trim()) {
+          onLoginSuccess(email || 'admin@probitian.com');
+        } else {
+          setError('Invalid credentials');
+        }
+        setLoading(false);
+        return;
       }
-      setLoading(false);
-      return;
-    }
 
-    // Supabase Auth Mode
-    if (isSupabaseConfigured()) {
-      try {
+      // Supabase Auth Mode
+      if (isSupabaseConfigured()) {
         const { data, error: authError } = await supabase.auth.signInWithPassword({
           email,
           password
         });
-        if (authError) {
-          setError(authError.message);
-        } else if (data.user) {
+        if (authError || !data.user) {
+          setError('Invalid credentials');
+        } else {
           onLoginSuccess(data.user.email || 'admin@probitian.com');
         }
-      } catch (err: any) {
-        setError(err.message || 'Authentication failed');
-      }
-    } else {
-      // Fallback for preview before Supabase credentials are inserted
-      if (password === 'admin123' || password === 'admin' || password === 'probitian') {
-        onLoginSuccess(email);
       } else {
-        setError('Incorrect password. Default preview password: admin123 (or use Quick Admin Bypass below)');
+        const validPasskey = import.meta.env.VITE_ADMIN_PASSKEY;
+        if (validPasskey && password.trim() === validPasskey.trim()) {
+          onLoginSuccess(email || 'admin@probitian.com');
+        } else {
+          setError('Invalid credentials');
+        }
       }
+    } catch (err) {
+      setError('Invalid credentials');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-  };
-
-  const handleQuickBypass = () => {
-    onLoginSuccess('admin@probitian.com');
   };
 
   return (
@@ -79,7 +76,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess }) => {
             Pro<span className="text-amber-400">BI</span>tian CMS Portal
           </h1>
           <p className="text-xs text-slate-400">
-            Full Stack Content Management System • Supabase Protected
+            Secure Admin Access
           </p>
         </div>
 
@@ -87,21 +84,27 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess }) => {
         <div className="flex rounded-xl bg-slate-800/80 p-1 border border-slate-700/60 text-xs">
           <button
             type="button"
-            onClick={() => setUsePasskey(false)}
-            className={`flex-1 py-2 font-semibold rounded-lg transition-all ${
-              !usePasskey ? 'bg-purple-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            Supabase Account
-          </button>
-          <button
-            type="button"
-            onClick={() => setUsePasskey(true)}
+            onClick={() => {
+              setUsePasskey(true);
+              setError(null);
+            }}
             className={`flex-1 py-2 font-semibold rounded-lg transition-all ${
               usePasskey ? 'bg-amber-500 text-slate-950 shadow-sm' : 'text-slate-400 hover:text-white'
             }`}
           >
-            Master Passkey
+            Admin Passkey
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setUsePasskey(false);
+              setError(null);
+            }}
+            className={`flex-1 py-2 font-semibold rounded-lg transition-all ${
+              !usePasskey ? 'bg-purple-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            Supabase Login
           </button>
         </div>
 
@@ -141,7 +144,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess }) => {
             </>
           ) : (
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-300">Admin Master Passkey</label>
+              <label className="text-xs font-semibold text-slate-300">Admin Passkey</label>
               <div className="relative">
                 <Key className="w-4 h-4 text-amber-500 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
@@ -150,17 +153,14 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess }) => {
                   onChange={(e) => setPasskey(e.target.value)}
                   required
                   className="w-full bg-slate-950 border border-amber-500/40 rounded-xl pl-9 pr-3 py-2.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400"
-                  placeholder="ProBItian2026Admin!"
+                  placeholder="Enter Admin Passkey"
                 />
               </div>
-              <p className="text-[11px] text-slate-400 pt-1">
-                Passkey: <code className="text-amber-400 bg-slate-950 px-1 py-0.5 rounded">ProBItian2026Admin!</code>
-              </p>
             </div>
           )}
 
           {error && (
-            <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-xs text-red-400 font-medium">
+            <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-xs text-red-400 font-medium text-center">
               {error}
             </div>
           )}
@@ -174,25 +174,12 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess }) => {
               <span>Authenticating...</span>
             ) : (
               <>
-                <span>Access Admin Portal</span>
+                <span>Sign In to Admin Portal</span>
                 <ArrowRight className="w-4 h-4" />
               </>
             )}
           </button>
         </form>
-
-        {/* Quick Admin Bypass */}
-        <div className="pt-2 border-t border-slate-800 text-center space-y-2">
-          <p className="text-[11px] text-slate-400">Quick Preview Testing Access:</p>
-          <button
-            type="button"
-            onClick={handleQuickBypass}
-            className="w-full py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-amber-400 font-semibold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Instant Admin Demo Access</span>
-          </button>
-        </div>
       </div>
     </div>
   );

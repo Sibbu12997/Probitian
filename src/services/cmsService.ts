@@ -537,15 +537,7 @@ export const cmsService = {
 
   // --- CONTACT MESSAGES ---
   async getMessages(): Promise<ContactMessage[]> {
-    if (isSupabaseConfigured()) {
-      try {
-        const { data } = await supabase.from('messages').select('*').order('created_at', { ascending: false });
-        if (data && data.length > 0) {
-          return data as ContactMessage[];
-        }
-      } catch (e) {}
-    }
-    return getLocal(STORAGE_KEYS.MESSAGES, [
+    const localMsgs = getLocal<ContactMessage[]>(STORAGE_KEYS.MESSAGES, [
       {
         id: 'msg-1',
         name: 'Rahul Verma',
@@ -566,9 +558,38 @@ export const cmsService = {
         created_at: new Date(Date.now() - 3600000 * 28).toISOString()
       }
     ]);
+
+    if (isSupabaseConfigured()) {
+      try {
+        const { data, error } = await supabase.from('messages').select('*').order('created_at', { ascending: false });
+        if (!error && data) {
+          const sbMsgs: ContactMessage[] = data.map((m: any) => ({
+            id: String(m.id || ('msg-' + m.created_at)),
+            name: m.name || '',
+            email: m.email || '',
+            subject: m.subject || '',
+            message: m.message || '',
+            status: m.status || 'new',
+            created_at: m.created_at || new Date().toISOString(),
+            admin_notes: m.admin_notes || ''
+          }));
+
+          const map = new Map<string, ContactMessage>();
+          localMsgs.forEach(m => map.set(m.id, m));
+          sbMsgs.forEach(m => map.set(m.id, m));
+
+          return Array.from(map.values()).sort(
+            (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+          );
+        }
+      } catch (e) {
+        console.error('Error fetching messages from Supabase:', e);
+      }
+    }
+    return localMsgs;
   },
 
-  async submitContactMessage(msg: { name: string; email: string; subject: string; message: string }): Promise<boolean> {
+  async submitContactMessage(msg: { name: string; email: string; subject: string; message: string }): Promise<{ success: boolean; error?: string }> {
     const newMsg: ContactMessage = {
       id: 'msg-' + Date.now(),
       name: msg.name,
@@ -578,21 +599,32 @@ export const cmsService = {
       status: 'new',
       created_at: new Date().toISOString()
     };
-    const list = await this.getMessages();
-    setLocal(STORAGE_KEYS.MESSAGES, [newMsg, ...list]);
+
+    const list = getLocal<ContactMessage[]>(STORAGE_KEYS.MESSAGES, []);
+    const updated = [newMsg, ...list];
+    setLocal(STORAGE_KEYS.MESSAGES, updated);
 
     if (isSupabaseConfigured()) {
       try {
-        await supabase.from('messages').insert({
+        const { error } = await supabase.from('messages').insert({
           name: msg.name,
           email: msg.email,
           subject: msg.subject,
           message: msg.message,
           status: 'new'
         });
-      } catch (e) {}
+
+        if (error) {
+          console.error('Error inserting message into Supabase:', error);
+          return { success: false, error: error.message };
+        }
+      } catch (e: any) {
+        console.error('Exception submitting contact message:', e);
+        return { success: false, error: e.message || 'Failed to submit message to database' };
+      }
     }
-    return true;
+
+    return { success: true };
   },
 
   async updateMessageStatus(id: string, status: ContactMessage['status'], adminNotes?: string): Promise<boolean> {
@@ -625,16 +657,35 @@ export const cmsService = {
 
   // --- NEWSLETTER SUBSCRIBERS ---
   async getNewsletterSubscribers(): Promise<NewsletterSubscriber[]> {
-    if (isSupabaseConfigured()) {
-      try {
-        const { data } = await supabase.from('newsletter').select('*').order('created_at', { ascending: false });
-        if (data && data.length > 0) return data as NewsletterSubscriber[];
-      } catch (e) {}
-    }
-    return getLocal(STORAGE_KEYS.NEWSLETTER, [
+    const localSubs = getLocal<NewsletterSubscriber[]>(STORAGE_KEYS.NEWSLETTER, [
       { id: 'sub-1', email: 'data.enthusiast@gmail.com', status: 'active', created_at: new Date(Date.now() - 86400000 * 2).toISOString() },
       { id: 'sub-2', email: 'powerbi.user@outlook.com', status: 'active', created_at: new Date(Date.now() - 86400000 * 5).toISOString() }
     ]);
+
+    if (isSupabaseConfigured()) {
+      try {
+        const { data, error } = await supabase.from('newsletter').select('*').order('created_at', { ascending: false });
+        if (!error && data) {
+          const sbSubs: NewsletterSubscriber[] = data.map((s: any) => ({
+            id: String(s.id || ('sub-' + s.created_at)),
+            email: s.email || '',
+            status: s.status || 'active',
+            created_at: s.created_at || new Date().toISOString()
+          }));
+
+          const subMap = new Map<string, NewsletterSubscriber>();
+          localSubs.forEach(s => subMap.set(s.email.toLowerCase(), s));
+          sbSubs.forEach(s => subMap.set(s.email.toLowerCase(), s));
+
+          return Array.from(subMap.values()).sort(
+            (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+          );
+        }
+      } catch (e) {
+        console.error('Error fetching subscribers from Supabase:', e);
+      }
+    }
+    return localSubs;
   },
 
   async subscribeNewsletter(email: string): Promise<{ success: boolean; message: string }> {
