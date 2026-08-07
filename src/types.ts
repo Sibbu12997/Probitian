@@ -94,10 +94,16 @@ export interface ContactMessage {
   id: string;
   name: string;
   email: string;
-  subject: string;
+  phone: string;
+  course_interested?: string;
+  subject?: string;
   message: string;
   status: 'new' | 'read' | 'replied' | 'archived';
   admin_notes?: string;
+  reply_message?: string;
+  replied_at?: string;
+  reply_status?: 'none' | 'sent' | 'failed';
+  email_sent_status?: string;
   created_at: string;
 }
 

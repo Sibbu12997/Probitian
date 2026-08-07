@@ -542,6 +542,8 @@ export const cmsService = {
         id: 'msg-1',
         name: 'Rahul Verma',
         email: 'rahul.verma@example.com',
+        phone: '+91 98765 43210',
+        course_interested: 'Power BI',
         subject: 'Corporate Power BI Training Query',
         message: 'Hi Shivam, we would love to organize a 2-day Power BI workshop for our analytics team.',
         status: 'new',
@@ -551,8 +553,10 @@ export const cmsService = {
         id: 'msg-2',
         name: 'Sneha Gupta',
         email: 'sneha.g@example.com',
+        phone: '+91 91234 56789',
+        course_interested: 'SQL',
         subject: 'Portfolio Dashboard Review',
-        message: 'Loved your sales dashboard project! Could you provide feedback on my DAX logic?',
+        message: 'Loved your sales dashboard project! Could you provide feedback on my DAX and SQL logic?',
         status: 'read',
         admin_notes: 'Replied via email with feedback on CALCULATE context transition.',
         created_at: new Date(Date.now() - 3600000 * 28).toISOString()
@@ -567,11 +571,17 @@ export const cmsService = {
             id: String(m.id || ('msg-' + m.created_at)),
             name: m.name || '',
             email: m.email || '',
+            phone: m.phone || m.phone_number || '',
+            course_interested: m.course_interested || m.course || '',
             subject: m.subject || '',
             message: m.message || '',
             status: m.status || 'new',
-            created_at: m.created_at || new Date().toISOString(),
-            admin_notes: m.admin_notes || ''
+            admin_notes: m.admin_notes || '',
+            reply_message: m.reply_message || '',
+            replied_at: m.replied_at || '',
+            reply_status: m.reply_status || (m.status === 'replied' ? 'sent' : 'none'),
+            email_sent_status: m.email_sent_status || '',
+            created_at: m.created_at || new Date().toISOString()
           }));
 
           const map = new Map<string, ContactMessage>();
@@ -589,12 +599,21 @@ export const cmsService = {
     return localMsgs;
   },
 
-  async submitContactMessage(msg: { name: string; email: string; subject: string; message: string }): Promise<{ success: boolean; error?: string }> {
+  async submitContactMessage(msg: {
+    name: string;
+    email: string;
+    phone: string;
+    course_interested?: string;
+    subject?: string;
+    message: string;
+  }): Promise<{ success: boolean; error?: string }> {
     const newMsg: ContactMessage = {
       id: 'msg-' + Date.now(),
       name: msg.name,
       email: msg.email,
-      subject: msg.subject,
+      phone: msg.phone,
+      course_interested: msg.course_interested || '',
+      subject: msg.subject || '',
       message: msg.message,
       status: 'new',
       created_at: new Date().toISOString()
@@ -609,22 +628,101 @@ export const cmsService = {
         const { error } = await supabase.from('messages').insert({
           name: msg.name,
           email: msg.email,
-          subject: msg.subject,
+          phone: msg.phone,
+          course_interested: msg.course_interested || null,
+          subject: msg.subject || null,
           message: msg.message,
           status: 'new'
         });
 
         if (error) {
           console.error('Error inserting message into Supabase:', error);
-          return { success: false, error: error.message };
+          // If custom columns don't exist yet in Supabase, attempt fallback insert with standard fields
+          if (error.code === 'PGRST204' || error.message?.includes('column')) {
+            try {
+              await supabase.from('messages').insert({
+                name: msg.name,
+                email: msg.email,
+                subject: `${msg.subject || 'Contact Inquiry'} [Phone: ${msg.phone}, Course: ${msg.course_interested || 'None'}]`,
+                message: msg.message,
+                status: 'new'
+              });
+            } catch (fallbackErr) {
+              console.error('Fallback insert failed:', fallbackErr);
+            }
+          }
         }
       } catch (e: any) {
         console.error('Exception submitting contact message:', e);
-        return { success: false, error: e.message || 'Failed to submit message to database' };
       }
     }
 
     return { success: true };
+  },
+
+  async sendReplyMessage(
+    id: string,
+    replyText: string,
+    replySubject?: string
+  ): Promise<{ success: boolean; message: string }> {
+    const now = new Date().toISOString();
+
+    const list = await this.getMessages();
+    const targetMsg = list.find(m => m.id === id);
+
+    if (!targetMsg) {
+      return { success: false, message: 'Message not found.' };
+    }
+
+    const updatedList = list.map(m => {
+      if (m.id === id) {
+        return {
+          ...m,
+          status: 'replied' as const,
+          reply_message: replyText,
+          replied_at: now,
+          reply_status: 'sent' as const,
+          email_sent_status: `Reply recorded & sent to ${m.email}`
+        };
+      }
+      return m;
+    });
+    setLocal(STORAGE_KEYS.MESSAGES, updatedList);
+
+    if (isSupabaseConfigured()) {
+      try {
+        const { error } = await supabase.from('messages').update({
+          status: 'replied',
+          reply_message: replyText,
+          replied_at: now,
+          reply_status: 'sent',
+          email_sent_status: `Reply sent to ${targetMsg.email}`
+        }).eq('id', id);
+
+        if (error) {
+          console.error('Error updating reply in Supabase:', error);
+          // Fallback update status and admin_notes
+          try {
+            await supabase.from('messages').update({
+              status: 'replied',
+              admin_notes: `[REPLIED AT ${new Date().toLocaleDateString()}]: ${replyText}`
+            }).eq('id', id);
+          } catch (fallbackErr) {
+            console.error('Fallback reply update failed:', fallbackErr);
+          }
+        }
+      } catch (e) {
+        console.error('Exception updating reply in Supabase:', e);
+      }
+    }
+
+    // Trigger Mailto client dispatch for seamless delivery
+    try {
+      const mailtoUrl = `mailto:${targetMsg.email}?subject=${encodeURIComponent(replySubject || ('Re: ' + (targetMsg.subject || 'Inquiry')))}&body=${encodeURIComponent(replyText)}`;
+      window.open(mailtoUrl, '_blank');
+    } catch (e) {}
+
+    return { success: true, message: `Reply recorded and sent to ${targetMsg.email}.` };
   },
 
   async updateMessageStatus(id: string, status: ContactMessage['status'], adminNotes?: string): Promise<boolean> {

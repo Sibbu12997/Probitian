@@ -20,7 +20,9 @@ import {
   X,
   ChevronRight,
   ShieldCheck,
-  Sparkles
+  Sparkles,
+  Sun,
+  Moon
 } from 'lucide-react';
 
 import { DashboardOverview } from './modules/DashboardOverview';
@@ -40,11 +42,19 @@ import { BackupManager } from './modules/BackupManager';
 
 interface AdminPortalProps {
   userEmail: string;
+  isDarkMode?: boolean;
+  onToggleDarkMode?: () => void;
   onLogout: () => void;
   onNavigateFront: (page: string) => void;
 }
 
-export const AdminPortal: React.FC<AdminPortalProps> = ({ userEmail, onLogout, onNavigateFront }) => {
+export const AdminPortal: React.FC<AdminPortalProps> = ({
+  userEmail,
+  isDarkMode = true,
+  onToggleDarkMode,
+  onLogout,
+  onNavigateFront
+}) => {
   const [activeModule, setActiveModule] = useState<string>('overview');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
@@ -106,13 +116,13 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ userEmail, onLogout, o
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-purple-500 selection:text-white">
+    <div className="min-h-screen bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans selection:bg-purple-500 selection:text-white transition-colors duration-200">
       {/* Top Navbar */}
-      <header className="h-16 bg-slate-900/90 border-b border-slate-800 sticky top-0 z-40 backdrop-blur-xl flex items-center justify-between px-4 lg:px-8">
+      <header className="h-16 bg-white dark:bg-slate-900/90 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-40 backdrop-blur-xl flex items-center justify-between px-4 lg:px-8 shadow-sm">
         <div className="flex items-center gap-3">
           <button
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="lg:hidden p-2 rounded-xl bg-slate-800 text-slate-300 hover:text-white"
+            className="lg:hidden p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
           >
             <MenuIcon className="w-5 h-5" />
           </button>
@@ -122,35 +132,46 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ userEmail, onLogout, o
               PB
             </div>
             <div className="hidden sm:block">
-              <span className="font-black text-white text-base tracking-tight">Pro<span className="text-amber-400">BI</span>tian</span>
-              <span className="text-[10px] bg-amber-400/10 text-amber-400 border border-amber-400/20 px-1.5 py-0.5 rounded font-mono ml-2">
+              <span className="font-black text-slate-900 dark:text-white text-base tracking-tight">Pro<span className="text-amber-500 dark:text-amber-400">BI</span>tian</span>
+              <span className="text-[10px] bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 px-1.5 py-0.5 rounded font-mono ml-2 font-bold">
                 ADMIN CMS
               </span>
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           <button
             onClick={() => onNavigateFront('home')}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-semibold border border-slate-700 hover:border-slate-600 transition-all cursor-pointer shadow-sm"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white text-xs font-semibold border border-slate-200 dark:border-slate-700 transition-all cursor-pointer shadow-sm"
             title="Navigate to Website Homepage"
           >
-            <ArrowLeft className="w-4 h-4 text-amber-400" />
+            <ArrowLeft className="w-4 h-4 text-amber-500 dark:text-amber-400" />
             <span className="hidden xs:inline">← Back to Website</span>
             <span className="xs:hidden">Website</span>
           </button>
 
-          <div className="h-4 w-[1px] bg-slate-800 hidden sm:block" />
+          {/* Theme Toggle Button */}
+          {onToggleDarkMode && (
+            <button
+              onClick={onToggleDarkMode}
+              className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-amber-400 border border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all cursor-pointer shadow-sm"
+              title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+            >
+              {isDarkMode ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-700" />}
+            </button>
+          )}
 
-          <div className="flex items-center gap-2 text-xs font-medium text-slate-300 bg-slate-950/60 border border-slate-800 px-3 py-1.5 rounded-xl">
-            <ShieldCheck className="w-4 h-4 text-emerald-400" />
+          <div className="h-4 w-[1px] bg-slate-200 dark:bg-slate-800 hidden sm:block" />
+
+          <div className="flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 px-3 py-1.5 rounded-xl">
+            <ShieldCheck className="w-4 h-4 text-emerald-500 dark:text-emerald-400" />
             <span className="hidden md:inline">{userEmail}</span>
           </div>
 
           <button
             onClick={onLogout}
-            className="p-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 transition-all cursor-pointer"
+            className="p-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-500/20 transition-all cursor-pointer"
             title="Log Out"
           >
             <LogOut className="w-4 h-4" />
@@ -161,21 +182,21 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ userEmail, onLogout, o
       <div className="flex-1 flex overflow-hidden">
         {/* Sidebar */}
         <aside
-          className={`fixed inset-y-0 left-0 z-50 w-64 bg-slate-900 border-r border-slate-800 transform transition-transform duration-200 ease-in-out lg:static lg:translate-x-0 ${
+          className={`fixed inset-y-0 left-0 z-50 w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 transform transition-transform duration-200 ease-in-out lg:static lg:translate-x-0 ${
             isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
-          } flex flex-col justify-between p-4 overflow-y-auto`}
+          } flex flex-col justify-between p-4 overflow-y-auto shadow-sm lg:shadow-none`}
         >
           <div className="space-y-6">
-            <div className="flex items-center justify-between lg:hidden border-b border-slate-800 pb-3">
-              <span className="font-bold text-sm text-white">Navigation</span>
-              <button onClick={() => setIsSidebarOpen(false)} className="text-slate-400">
+            <div className="flex items-center justify-between lg:hidden border-b border-slate-200 dark:border-slate-800 pb-3">
+              <span className="font-bold text-sm text-slate-900 dark:text-white">Navigation</span>
+              <button onClick={() => setIsSidebarOpen(false)} className="text-slate-500 dark:text-slate-400">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {navGroups.map((group) => (
               <div key={group.group} className="space-y-2">
-                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-3">
+                <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider px-3">
                   {group.group}
                 </p>
                 <div className="space-y-1">
@@ -191,8 +212,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ userEmail, onLogout, o
                         }}
                         className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                           isActive
-                            ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/20'
-                            : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                            ? 'bg-purple-600 text-white shadow-md shadow-purple-600/20'
+                            : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60'
                         }`}
                       >
                         <div className="flex items-center gap-2.5">
@@ -208,14 +229,14 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ userEmail, onLogout, o
             ))}
           </div>
 
-          <div className="pt-6 border-t border-slate-800 space-y-2 text-[11px] text-slate-500">
-            <p className="font-semibold text-slate-400">ProBItian CMS v2.5</p>
-            <p>Supabase Auth & Database Supported</p>
+          <div className="pt-6 border-t border-slate-200 dark:border-slate-800 space-y-1 text-[11px] text-slate-500 dark:text-slate-500">
+            <p className="font-semibold text-slate-700 dark:text-slate-400">ProBItian CMS v2.5</p>
+            <p>Supabase Auth & DB Configured</p>
           </div>
         </aside>
 
         {/* Main Workspace */}
-        <main className="flex-1 overflow-y-auto p-4 md:p-8 bg-slate-950">
+        <main className="flex-1 overflow-y-auto p-4 md:p-8 bg-slate-50 dark:bg-slate-950">
           <div className="max-w-7xl mx-auto">
             {renderModule()}
           </div>
@@ -224,3 +245,4 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ userEmail, onLogout, o
     </div>
   );
 };
+

@@ -1,16 +1,17 @@
 import React, { useState } from 'react';
-import { Lock, Mail, ShieldCheck, ArrowRight, Key } from 'lucide-react';
+import { Lock, Mail, ShieldCheck, ArrowRight, ArrowLeft, Key } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 
 interface AdminLoginProps {
   onLoginSuccess: (userEmail: string) => void;
+  onNavigateHome?: () => void;
 }
 
-export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess }) => {
-  const [email, setEmail] = useState('admin@probitian.com');
+export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, onNavigateHome }) => {
+  const [loginMode, setLoginMode] = useState<'passkey' | 'supabase'>('passkey');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [passkey, setPasskey] = useState('');
-  const [usePasskey, setUsePasskey] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -19,39 +20,39 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess }) => {
     setError(null);
     setLoading(true);
 
-    try {
-      if (usePasskey) {
-        // Passkey authentication mode
-        const validPasskey = import.meta.env.VITE_ADMIN_PASSKEY;
-        if (validPasskey && passkey.trim() === validPasskey.trim()) {
-          onLoginSuccess(email || 'admin@probitian.com');
-        } else {
-          setError('Invalid credentials');
-        }
-        setLoading(false);
-        return;
-      }
+    const userEmail = email.trim() || 'admin@probitian.com';
 
-      // Supabase Auth Mode
-      if (isSupabaseConfigured()) {
-        const { data, error: authError } = await supabase.auth.signInWithPassword({
-          email,
-          password
-        });
-        if (authError || !data.user) {
-          setError('Invalid credentials');
+    try {
+      if (loginMode === 'passkey') {
+        // Passkey authentication
+        const configuredPasskey = import.meta.env.VITE_ADMIN_PASSKEY;
+        const enteredPasskey = passkey.trim();
+
+        if (configuredPasskey && enteredPasskey === configuredPasskey.trim()) {
+          onLoginSuccess(userEmail);
         } else {
-          onLoginSuccess(data.user.email || 'admin@probitian.com');
+          setError('Invalid credentials');
         }
       } else {
-        const validPasskey = import.meta.env.VITE_ADMIN_PASSKEY;
-        if (validPasskey && password.trim() === validPasskey.trim()) {
-          onLoginSuccess(email || 'admin@probitian.com');
+        // Supabase authentication
+        if (!isSupabaseConfigured()) {
+          setError('Invalid credentials');
+          setLoading(false);
+          return;
+        }
+
+        const { data, error: authError } = await supabase.auth.signInWithPassword({
+          email: userEmail,
+          password: password.trim()
+        });
+
+        if (!authError && data?.user) {
+          onLoginSuccess(data.user.email || userEmail);
         } else {
           setError('Invalid credentials');
         }
       }
-    } catch (err) {
+    } catch {
       setError('Invalid credentials');
     } finally {
       setLoading(false);
@@ -61,59 +62,96 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess }) => {
   return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 relative overflow-hidden">
       {/* Background glow graphics */}
-      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-600/20 rounded-full blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-amber-500/15 rounded-full blur-[120px] pointer-events-none" />
+      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-600/10 rounded-full blur-[120px] pointer-events-none" />
+      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-amber-500/10 rounded-full blur-[120px] pointer-events-none" />
 
-      <div className="w-full max-w-md bg-slate-900/90 border border-slate-800 rounded-2xl p-8 shadow-2xl backdrop-blur-xl relative z-10 space-y-6">
+      <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl relative z-10 space-y-6">
         {/* Brand Header */}
         <div className="text-center space-y-2">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-600 to-amber-500 p-0.5 shadow-lg shadow-purple-500/20 mb-2">
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-600 to-amber-500 p-0.5 shadow-md shadow-purple-500/20 mb-2">
             <div className="w-full h-full bg-slate-900 rounded-[14px] flex items-center justify-center">
-              <ShieldCheck className="w-7 h-7 text-amber-400" />
+              <ShieldCheck className="w-6 h-6 text-amber-400" />
             </div>
           </div>
           <h1 className="text-2xl font-black text-white tracking-tight">
-            Pro<span className="text-amber-400">BI</span>tian CMS Portal
+            Pro<span className="text-amber-400">BI</span>tian CMS
           </h1>
           <p className="text-xs text-slate-400">
-            Secure Admin Access
+            Admin Authentication
           </p>
         </div>
 
-        {/* Mode Toggle */}
-        <div className="flex rounded-xl bg-slate-800/80 p-1 border border-slate-700/60 text-xs">
+        {/* Authentication Mode Switcher Tabs */}
+        <div className="grid grid-cols-2 gap-1 p-1 bg-slate-950 rounded-xl border border-slate-800">
           <button
             type="button"
             onClick={() => {
-              setUsePasskey(true);
+              setLoginMode('passkey');
               setError(null);
             }}
-            className={`flex-1 py-2 font-semibold rounded-lg transition-all ${
-              usePasskey ? 'bg-amber-500 text-slate-950 shadow-sm' : 'text-slate-400 hover:text-white'
+            className={`py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+              loginMode === 'passkey'
+                ? 'bg-purple-600 text-white shadow-md'
+                : 'text-slate-400 hover:text-white'
             }`}
           >
-            Admin Passkey
+            <Key className="w-3.5 h-3.5" />
+            <span>Passkey</span>
           </button>
           <button
             type="button"
             onClick={() => {
-              setUsePasskey(false);
+              setLoginMode('supabase');
               setError(null);
             }}
-            className={`flex-1 py-2 font-semibold rounded-lg transition-all ${
-              !usePasskey ? 'bg-purple-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'
+            className={`py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+              loginMode === 'supabase'
+                ? 'bg-purple-600 text-white shadow-md'
+                : 'text-slate-400 hover:text-white'
             }`}
           >
-            Supabase Login
+            <Lock className="w-3.5 h-3.5" />
+            <span>Supabase Auth</span>
           </button>
         </div>
 
         {/* Form */}
         <form onSubmit={handleAuthSubmit} className="space-y-4">
-          {!usePasskey ? (
+          {loginMode === 'passkey' ? (
             <>
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-300">Admin Email</label>
+                <label className="text-xs font-semibold text-slate-300">Admin Passkey *</label>
+                <div className="relative">
+                  <Key className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="password"
+                    value={passkey}
+                    onChange={(e) => setPasskey(e.target.value)}
+                    required
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
+                    placeholder="Enter admin passkey..."
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-300">Admin Email (Optional)</label>
+                <div className="relative">
+                  <Mail className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
+                    placeholder="admin@probitian.com"
+                  />
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-300">Email Address *</label>
                 <div className="relative">
                   <Mail className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
                   <input
@@ -128,7 +166,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess }) => {
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-300">Password</label>
+                <label className="text-xs font-semibold text-slate-300">Password *</label>
                 <div className="relative">
                   <Lock className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
                   <input
@@ -142,25 +180,10 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess }) => {
                 </div>
               </div>
             </>
-          ) : (
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-300">Admin Passkey</label>
-              <div className="relative">
-                <Key className="w-4 h-4 text-amber-500 absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="password"
-                  value={passkey}
-                  onChange={(e) => setPasskey(e.target.value)}
-                  required
-                  className="w-full bg-slate-950 border border-amber-500/40 rounded-xl pl-9 pr-3 py-2.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400"
-                  placeholder="Enter Admin Passkey"
-                />
-              </div>
-            </div>
           )}
 
           {error && (
-            <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-xs text-red-400 font-medium text-center">
+            <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-xs text-red-400 font-semibold text-center">
               {error}
             </div>
           )}
@@ -168,18 +191,32 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess }) => {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-purple-600/30 flex items-center justify-center gap-2 transition-all disabled:opacity-50 cursor-pointer"
+            className="w-full py-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-lg shadow-purple-600/30 flex items-center justify-center gap-2 transition-all disabled:opacity-50 cursor-pointer"
           >
             {loading ? (
               <span>Authenticating...</span>
             ) : (
               <>
-                <span>Sign In to Admin Portal</span>
+                <span>Sign In via {loginMode === 'passkey' ? 'Passkey' : 'Supabase'}</span>
                 <ArrowRight className="w-4 h-4" />
               </>
             )}
           </button>
         </form>
+
+        {/* Back to Website Button */}
+        {onNavigateHome && (
+          <div className="pt-2 border-t border-slate-800/80 text-center">
+            <button
+              type="button"
+              onClick={onNavigateHome}
+              className="inline-flex items-center gap-2 text-xs font-semibold text-slate-400 hover:text-white transition-colors cursor-pointer py-1"
+            >
+              <ArrowLeft className="w-4 h-4 text-amber-400" />
+              <span>Back to Website</span>
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

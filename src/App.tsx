@@ -109,11 +109,18 @@ export default function App() {
         return <TermsPage onNavigate={handleNavigate} />;
       case 'admin':
         if (!adminUser) {
-          return <AdminLogin onLoginSuccess={handleAdminLoginSuccess} />;
+          return (
+            <AdminLogin
+              onLoginSuccess={handleAdminLoginSuccess}
+              onNavigateHome={() => handleNavigate('home')}
+            />
+          );
         }
         return (
           <AdminPortal
             userEmail={adminUser}
+            isDarkMode={isDarkMode}
+            onToggleDarkMode={handleToggleDarkMode}
             onLogout={handleAdminLogout}
             onNavigateFront={(page) => handleNavigate(page as NavPage)}
           />
@@ -141,7 +148,7 @@ export default function App() {
 
   if (currentPage === 'admin') {
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-100">
+      <div className="min-h-screen bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-200">
         <SEO title={getPageTitle()} />
         {renderPage()}
       </div>
