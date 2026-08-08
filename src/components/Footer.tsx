@@ -1,12 +1,53 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavPage } from '../types';
-import { Youtube, Instagram, Facebook, Github, Mail, ArrowUpRight } from 'lucide-react';
+import { Youtube, Instagram, Facebook, Github, Mail, ArrowUpRight, Send, CheckCircle2 } from 'lucide-react';
+import { trackSocialClick, trackContactClick, trackCtaClick, trackNewsletterSubscribe } from '../lib/analytics';
+import { cmsService } from '../services/cmsService';
 
 interface FooterProps {
   onNavigate: (page: NavPage) => void;
 }
 
 export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
+  const [logoUrl, setLogoUrl] = useState<string>('/logo.svg');
+  const [newsletterEmail, setNewsletterEmail] = useState('');
+  const [newsletterSubmitting, setNewsletterSubmitting] = useState(false);
+  const [newsletterSuccess, setNewsletterSuccess] = useState(false);
+
+  const loadLogo = async () => {
+    try {
+      const settings = await cmsService.getGeneralSettings();
+      if (settings?.logo_url) {
+        setLogoUrl(settings.logo_url);
+      }
+    } catch (e) {}
+  };
+
+  useEffect(() => {
+    loadLogo();
+    const handleBrandingUpdate = () => loadLogo();
+    window.addEventListener('probitian_branding_updated', handleBrandingUpdate);
+    return () => window.removeEventListener('probitian_branding_updated', handleBrandingUpdate);
+  }, []);
+
+  const handleNewsletterSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newsletterEmail || !newsletterEmail.includes('@')) return;
+
+    setNewsletterSubmitting(true);
+    try {
+      await cmsService.subscribeNewsletter(newsletterEmail);
+      trackNewsletterSubscribe('footer_form');
+      setNewsletterSuccess(true);
+      setNewsletterEmail('');
+      setTimeout(() => setNewsletterSuccess(false), 5000);
+    } catch (err) {
+      console.error('Newsletter subscribe error:', err);
+    } finally {
+      setNewsletterSubmitting(false);
+    }
+  };
+
   return (
     <footer className="bg-slate-900 text-white pt-16 pb-12 border-t border-slate-800 relative overflow-hidden">
       {/* Background Accent Mesh */}
@@ -22,7 +63,12 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
               className="flex items-center gap-3 text-left focus:outline-none group"
             >
               <div className="w-10 h-10 rounded-full bg-slate-800 p-0.5 border border-purple-500/40 group-hover:scale-105 transition-transform overflow-hidden flex items-center justify-center">
-                <img src="/logo.svg" alt="ProBItian Official Logo" className="w-full h-full object-contain" />
+                <img 
+                  src={logoUrl} 
+                  alt="ProBItian Official Logo" 
+                  className="w-full h-full object-contain" 
+                  onError={(e) => { e.currentTarget.src = '/logo.svg'; }}
+                />
               </div>
               <span className="text-2xl font-extrabold tracking-tight text-white">
                 Pro<span className="text-amber-500 font-black">BI</span>tian
@@ -38,6 +84,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
                 href="https://youtube.com/@probitian"
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={() => trackSocialClick('youtube', 'https://youtube.com/@probitian')}
                 className="p-2.5 rounded-xl bg-slate-800 hover:bg-red-600/20 hover:text-red-400 text-slate-300 border border-slate-700/60 transition-all"
                 aria-label="YouTube Channel"
               >
@@ -47,6 +94,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
                 href="https://instagram.com/probitian"
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={() => trackSocialClick('instagram', 'https://instagram.com/probitian')}
                 className="p-2.5 rounded-xl bg-slate-800 hover:bg-pink-600/20 hover:text-pink-400 text-slate-300 border border-slate-700/60 transition-all"
                 aria-label="Instagram Account"
               >
@@ -56,6 +104,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
                 href="https://facebook.com/probitian"
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={() => trackSocialClick('facebook', 'https://facebook.com/probitian')}
                 className="p-2.5 rounded-xl bg-slate-800 hover:bg-blue-600/20 hover:text-blue-400 text-slate-300 border border-slate-700/60 transition-all"
                 aria-label="Facebook Page"
               >
@@ -65,6 +114,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
                 href="https://github.com/probitian"
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={() => trackSocialClick('github', 'https://github.com/probitian')}
                 className="p-2.5 rounded-xl bg-slate-800 hover:bg-purple-600/20 hover:text-purple-400 text-slate-300 border border-slate-700/60 transition-all"
                 aria-label="GitHub Profile"
               >
@@ -72,11 +122,42 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
               </a>
               <a
                 href="mailto:Probitianofficial@gmail.com"
+                onClick={() => trackContactClick('footer_email')}
                 className="p-2.5 rounded-xl bg-slate-800 hover:bg-emerald-600/20 hover:text-emerald-400 text-slate-300 border border-slate-700/60 transition-all"
                 aria-label="Direct Email"
               >
                 <Mail className="w-4 h-4" />
               </a>
+            </div>
+
+            {/* Newsletter Subscription Box */}
+            <div className="pt-4 space-y-2 max-w-sm">
+              <p className="text-xs font-bold text-slate-300">Subscribe for Free DAX & SQL Guides</p>
+              {newsletterSuccess ? (
+                <div className="p-2.5 rounded-xl bg-emerald-950/60 border border-emerald-800 text-emerald-300 text-xs flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span>Subscribed! Check your inbox soon.</span>
+                </div>
+              ) : (
+                <form onSubmit={handleNewsletterSubmit} className="flex gap-2">
+                  <input
+                    type="email"
+                    required
+                    placeholder="Enter your email"
+                    value={newsletterEmail}
+                    onChange={(e) => setNewsletterEmail(e.target.value)}
+                    className="flex-1 px-3 py-2 text-xs bg-slate-800 rounded-xl border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
+                  />
+                  <button
+                    type="submit"
+                    disabled={newsletterSubmitting}
+                    className="px-3 py-2 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold rounded-xl transition-colors flex items-center gap-1.5 shrink-0"
+                  >
+                    <span>{newsletterSubmitting ? '...' : 'Subscribe'}</span>
+                    <Send className="w-3 h-3" />
+                  </button>
+                </form>
+              )}
             </div>
           </div>
 
@@ -136,6 +217,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
             <p className="text-xs text-slate-400 mb-3">Have questions or project inquiries? Reach out directly:</p>
             <a
               href="mailto:Probitianofficial@gmail.com"
+              onClick={() => trackContactClick('footer_direct_link')}
               className="inline-flex items-center gap-2 text-xs font-semibold text-amber-400 hover:text-amber-300 transition-colors"
             >
               <Mail className="w-3.5 h-3.5" /> Probitianofficial@gmail.com
@@ -145,6 +227,10 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
                 href="https://youtube.com/@probitian"
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={() => {
+                  trackSocialClick('youtube', 'https://youtube.com/@probitian');
+                  trackCtaClick('Join YouTube Community', 'https://youtube.com/@probitian');
+                }}
                 className="btn-radius w-full py-2.5 px-4 bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold flex items-center justify-center gap-2 transition-all shadow-sm"
               >
                 <span>Join YouTube Community</span>

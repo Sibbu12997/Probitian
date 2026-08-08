@@ -4,6 +4,7 @@ import { FEATURE_CARDS, PROJECTS, YOUTUBE_VIDEOS, BLOG_ARTICLES, WHY_PROBITIAN_C
 import { cmsService } from '../services/cmsService';
 import { BannerGraphic } from '../components/BannerGraphic';
 import { Youtube, Instagram, ArrowRight, Play, Sparkles, BarChart3, Database, Table, Filter, BrainCircuit, GraduationCap, Briefcase, HeartHandshake, TrendingUp, CheckCircle, ExternalLink } from 'lucide-react';
+import { trackSocialClick, trackCtaClick, trackCourseClick, trackProjectClick, trackBlogClick } from '../lib/analytics';
 
 interface HomePageProps {
   onNavigate: (page: NavPage) => void;
@@ -19,6 +20,9 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate, onSelectProject,
 
   useEffect(() => {
     loadCmsData();
+    const handleBrandingUpdate = () => loadCmsData();
+    window.addEventListener('probitian_branding_updated', handleBrandingUpdate);
+    return () => window.removeEventListener('probitian_branding_updated', handleBrandingUpdate);
   }, []);
 
   const loadCmsData = async () => {
@@ -87,6 +91,10 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate, onSelectProject,
                 href="https://youtube.com/@probitian"
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={() => {
+                  trackSocialClick('youtube', 'https://youtube.com/@probitian');
+                  trackCtaClick('Start Learning', 'https://youtube.com/@probitian');
+                }}
                 className="btn-radius px-6 py-3.5 bg-purple-600 hover:bg-purple-700 text-white text-xs sm:text-sm font-semibold shadow-soft hover:shadow-soft-lg transition-all duration-300 flex items-center gap-2 group"
               >
                 <Play className="w-4 h-4 fill-current text-white group-hover:scale-110 transition-transform" />
@@ -97,6 +105,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate, onSelectProject,
                 href="https://instagram.com/probitian"
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={() => trackSocialClick('instagram', 'https://instagram.com/probitian')}
                 className="btn-radius px-6 py-3.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 text-xs sm:text-sm font-semibold border border-slate-200 dark:border-slate-700 transition-all duration-300 flex items-center gap-2"
               >
                 <Instagram className="w-4 h-4 text-pink-500" />
@@ -157,7 +166,10 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate, onSelectProject,
           {FEATURE_CARDS.map((card) => (
             <div
               key={card.id}
-              onClick={() => onNavigate('learn')}
+              onClick={() => {
+                trackCourseClick(card.title, 'HomePage Feature');
+                onNavigate('learn');
+              }}
               className="card-radius bg-white dark:bg-slate-800/90 p-6 border border-slate-200 dark:border-slate-700/80 shadow-soft hover:shadow-soft-lg hover:-translate-y-1 transition-all duration-300 cursor-pointer space-y-4 group relative overflow-hidden"
             >
               <div className="flex items-center justify-between">
@@ -249,7 +261,10 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate, onSelectProject,
                     </div>
 
                     <button
-                      onClick={() => onSelectProject(project)}
+                      onClick={() => {
+                        trackProjectClick(project.title);
+                        onSelectProject(project);
+                      }}
                       className="btn-radius w-full py-2.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold shadow-sm flex items-center justify-center gap-1.5 transition-all"
                     >
                       <span>View Project Details</span>
@@ -301,6 +316,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate, onSelectProject,
                 href={video.url}
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={() => trackSocialClick('youtube', video.url)}
                 className="card-radius bg-white dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 shadow-soft hover:shadow-soft-lg hover:-translate-y-1 transition-all duration-300 overflow-hidden flex flex-col justify-between group"
               >
                 <div className="relative h-44 overflow-hidden bg-slate-950">
@@ -354,7 +370,10 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate, onSelectProject,
             {blogs.slice(0, 4).map((article) => (
               <div
                 key={article.id}
-                onClick={() => onSelectBlog(article)}
+                onClick={() => {
+                  trackBlogClick(article.title);
+                  onSelectBlog(article);
+                }}
                 className="card-radius bg-white dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 shadow-soft hover:shadow-soft-lg hover:-translate-y-1 transition-all duration-300 overflow-hidden flex flex-col justify-between cursor-pointer group"
               >
                 <div className="relative h-36 overflow-hidden bg-slate-950">
@@ -441,6 +460,10 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate, onSelectProject,
               href="https://youtube.com/@probitian"
               target="_blank"
               rel="noopener noreferrer"
+              onClick={() => {
+                trackSocialClick('youtube', 'https://youtube.com/@probitian');
+                trackCtaClick('Watch on YouTube', 'https://youtube.com/@probitian');
+              }}
               className="btn-radius w-full sm:w-auto px-8 py-3.5 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs sm:text-sm font-bold shadow-lg transition-all duration-300 flex items-center justify-center gap-2.5 group cursor-pointer"
             >
               <svg 
@@ -458,7 +481,10 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate, onSelectProject,
             </a>
 
             <button
-              onClick={() => onNavigate('learn')}
+              onClick={() => {
+                trackCtaClick('Browse Course Catalog', 'learn');
+                onNavigate('learn');
+              }}
               className="btn-radius w-full sm:w-auto px-8 py-3.5 bg-white/10 hover:bg-white/20 text-white text-xs sm:text-sm font-semibold border border-white/20 backdrop-blur-md transition-all duration-300 cursor-pointer"
             >
               Browse Course Catalog

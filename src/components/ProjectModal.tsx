@@ -1,6 +1,7 @@
 import React from 'react';
 import { ProjectItem } from '../types';
 import { X, ExternalLink, BarChart2, CheckCircle, Cpu, Download } from 'lucide-react';
+import { trackSocialClick, trackCtaClick, trackDatasetDownloadClick } from '../lib/analytics';
 
 interface ProjectModalProps {
   project: ProjectItem | null;
@@ -110,15 +111,32 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({ project, onClose }) 
 
         {/* Modal Actions */}
         <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-4">
-          <a
-            href="https://youtube.com/@probitian"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="btn-radius px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold shadow-soft flex items-center gap-2 transition-all"
-          >
-            <span>Watch Full Project Tutorial</span>
-            <ExternalLink className="w-4 h-4" />
-          </a>
+          <div className="flex flex-wrap items-center gap-3">
+            <a
+              href="https://youtube.com/@probitian"
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => {
+                trackSocialClick('youtube', 'https://youtube.com/@probitian');
+                trackCtaClick(`Project Tutorial: ${project.title}`, 'https://youtube.com/@probitian');
+              }}
+              className="btn-radius px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold shadow-soft flex items-center gap-2 transition-all"
+            >
+              <span>Watch Full Project Tutorial</span>
+              <ExternalLink className="w-4 h-4" />
+            </a>
+
+            <button
+              onClick={() => {
+                trackDatasetDownloadClick(`${project.title} Dataset`, project.title);
+                alert(`Downloading ${project.title} PBIX & Star Schema Dataset...`);
+              }}
+              className="btn-radius px-5 py-3 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 text-xs font-semibold flex items-center gap-2 transition-colors"
+            >
+              <Download className="w-4 h-4 text-purple-600" />
+              <span>Download Star Schema Dataset</span>
+            </button>
+          </div>
 
           <button
             onClick={onClose}

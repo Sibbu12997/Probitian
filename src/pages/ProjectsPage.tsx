@@ -3,6 +3,7 @@ import { ProjectItem } from '../types';
 import { PROJECTS } from '../data/mockData';
 import { cmsService } from '../services/cmsService';
 import { ExternalLink, Filter, Search } from 'lucide-react';
+import { trackProjectClick } from '../lib/analytics';
 
 interface ProjectsPageProps {
   onSelectProject: (project: ProjectItem) => void;
@@ -137,7 +138,10 @@ export const ProjectsPage: React.FC<ProjectsPageProps> = ({ onSelectProject }) =
                 </div>
 
                 <button
-                  onClick={() => onSelectProject(project)}
+                  onClick={() => {
+                    trackProjectClick(project.title);
+                    onSelectProject(project);
+                  }}
                   className="btn-radius w-full py-2.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold shadow-sm flex items-center justify-center gap-1.5 transition-all"
                 >
                   <span>View Full Architecture</span>

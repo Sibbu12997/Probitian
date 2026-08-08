@@ -1,19 +1,43 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { BarChart3, Database, Table, Filter, BrainCircuit, Sparkles, TrendingUp, CheckCircle2, ArrowUpRight } from 'lucide-react';
+import { cmsService } from '../services/cmsService';
 
 interface BannerGraphicProps {
   type?: 'hero' | 'about' | 'logo';
   className?: string;
   bannerUrl?: string;
+  logoUrl?: string;
 }
 
-export const BannerGraphic: React.FC<BannerGraphicProps> = ({ type = 'hero', className = '', bannerUrl }) => {
+export const BannerGraphic: React.FC<BannerGraphicProps> = ({ type = 'hero', className = '', bannerUrl, logoUrl }) => {
+  const [dynamicLogo, setDynamicLogo] = useState<string>('/logo.svg');
+  const [dynamicBanner, setDynamicBanner] = useState<string>('/banner.svg');
+
+  const loadBranding = async () => {
+    try {
+      const settings = await cmsService.getGeneralSettings();
+      if (settings?.logo_url) setDynamicLogo(settings.logo_url);
+      if (settings?.banner_url) setDynamicBanner(settings.banner_url);
+    } catch (e) {}
+  };
+
+  useEffect(() => {
+    loadBranding();
+    const handleBrandingUpdate = () => loadBranding();
+    window.addEventListener('probitian_branding_updated', handleBrandingUpdate);
+    return () => window.removeEventListener('probitian_branding_updated', handleBrandingUpdate);
+  }, []);
+
+  const activeLogo = logoUrl || dynamicLogo;
+  const activeBanner = bannerUrl || dynamicBanner;
+
   if (type === 'logo') {
     return (
       <div className={`relative inline-flex items-center justify-center ${className}`}>
         <img 
-          src="/logo.svg" 
+          src={activeLogo} 
           alt="ProBItian Logo" 
+          onError={(e) => { e.currentTarget.src = '/logo.svg'; }}
           className="w-full h-full object-contain filter drop-shadow-sm transition-transform duration-300 hover:scale-105"
         />
       </div>
@@ -147,7 +171,7 @@ export const BannerGraphic: React.FC<BannerGraphicProps> = ({ type = 'hero', cla
   }
 
   // Hero Main Banner Graphic - Official ProBItian Brand Banner
-  const imgSrc = bannerUrl || '/banner.svg';
+  const imgSrc = activeBanner || '/banner.svg';
 
   return (
     <div className={`relative w-full rounded-2xl sm:rounded-3xl overflow-hidden bg-slate-900 border border-slate-800 shadow-xl transition-all duration-300 ${className}`}>
@@ -160,6 +184,7 @@ export const BannerGraphic: React.FC<BannerGraphicProps> = ({ type = 'hero', cla
           alt="ProBItian Official Brand Banner - Master Business Intelligence" 
           decoding="async"
           loading="eager"
+          onError={(e) => { e.currentTarget.src = '/banner.svg'; }}
           className="w-full h-auto max-h-[380px] object-contain rounded-xl drop-shadow-md transition-transform duration-500 hover:scale-[1.01]"
         />
       </div>

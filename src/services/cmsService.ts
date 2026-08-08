@@ -141,9 +141,22 @@ function setLocal<T>(key: string, value: T): void {
 export const cmsService = {
   // --- GENERAL SETTINGS ---
   async getGeneralSettings(): Promise<WebsiteGeneralSettings> {
+    try {
+      const res = await fetch('/api/cms/settings/general');
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.logo_url) {
+          setLocal(STORAGE_KEYS.SETTINGS_GENERAL, data);
+          return data as WebsiteGeneralSettings;
+        }
+      }
+    } catch (e) {
+      console.warn('Server settings fetch failed, checking local/supabase fallback');
+    }
+
     if (isSupabaseConfigured()) {
       try {
-        const { data, error } = await supabase.from('settings').select('value').eq('key', 'general').single();
+        const { data } = await supabase.from('settings').select('value').eq('key', 'general').single();
         if (data?.value) return data.value as WebsiteGeneralSettings;
       } catch (err) {
         console.warn('Supabase fetch general settings error, using fallback:', err);
@@ -154,6 +167,17 @@ export const cmsService = {
 
   async saveGeneralSettings(settings: WebsiteGeneralSettings): Promise<boolean> {
     setLocal(STORAGE_KEYS.SETTINGS_GENERAL, settings);
+
+    try {
+      await fetch('/api/cms/settings/general', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(settings)
+      });
+    } catch (e) {
+      console.error('Failed to post general settings to server store:', e);
+    }
+
     if (isSupabaseConfigured()) {
       try {
         await supabase.from('settings').upsert({ key: 'general', value: settings, updated_at: new Date().toISOString() });
@@ -187,6 +211,19 @@ export const cmsService = {
 
   // --- HOME PAGE CONFIG ---
   async getHomePageConfig(): Promise<HomePageConfig> {
+    try {
+      const res = await fetch('/api/cms/settings/home');
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.banner_url) {
+          setLocal(STORAGE_KEYS.HOME_PAGE, data);
+          return data as HomePageConfig;
+        }
+      }
+    } catch (e) {
+      console.warn('Server home config fetch failed, checking local/supabase fallback');
+    }
+
     if (isSupabaseConfigured()) {
       try {
         const { data } = await supabase.from('pages').select('*').eq('page_key', 'home').single();
@@ -209,6 +246,17 @@ export const cmsService = {
 
   async saveHomePageConfig(config: HomePageConfig): Promise<boolean> {
     setLocal(STORAGE_KEYS.HOME_PAGE, config);
+
+    try {
+      await fetch('/api/cms/settings/home', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(config)
+      });
+    } catch (e) {
+      console.error('Failed to post home config to server store:', e);
+    }
+
     if (isSupabaseConfigured()) {
       try {
         await supabase.from('pages').upsert({

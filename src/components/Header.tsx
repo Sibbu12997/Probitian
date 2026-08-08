@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { NavPage } from '../types';
 import { Youtube, Sun, Moon, Menu, X, ArrowUpRight } from 'lucide-react';
+import { cmsService } from '../services/cmsService';
 
 interface HeaderProps {
   currentPage: NavPage;
@@ -17,6 +18,23 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [logoUrl, setLogoUrl] = useState<string>('/logo.svg');
+
+  const loadLogo = async () => {
+    try {
+      const settings = await cmsService.getGeneralSettings();
+      if (settings?.logo_url) {
+        setLogoUrl(settings.logo_url);
+      }
+    } catch (e) {}
+  };
+
+  useEffect(() => {
+    loadLogo();
+    const handleBrandingUpdate = () => loadLogo();
+    window.addEventListener('probitian_branding_updated', handleBrandingUpdate);
+    return () => window.removeEventListener('probitian_branding_updated', handleBrandingUpdate);
+  }, []);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -59,7 +77,12 @@ export const Header: React.FC<HeaderProps> = ({
             aria-label="ProBItian Home"
           >
             <div className="relative w-10 h-10 rounded-full bg-white dark:bg-slate-800 p-0.5 shadow-sm border border-purple-200 dark:border-purple-800/40 group-hover:scale-105 transition-transform duration-300 flex items-center justify-center overflow-hidden">
-              <img src="/logo.svg" alt="ProBItian Official Logo" className="w-full h-full object-contain" />
+              <img 
+                src={logoUrl} 
+                alt="ProBItian Official Logo" 
+                className="w-full h-full object-contain" 
+                onError={(e) => { e.currentTarget.src = '/logo.svg'; }}
+              />
             </div>
             <div>
               <span className="text-xl font-extrabold tracking-tight text-slate-900 dark:text-white group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">

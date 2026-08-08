@@ -3,6 +3,7 @@ import { BlogArticle } from '../types';
 import { BLOG_ARTICLES } from '../data/mockData';
 import { cmsService } from '../services/cmsService';
 import { Search, Calendar, Clock, User, ChevronLeft, ChevronRight, ArrowRight } from 'lucide-react';
+import { trackBlogClick } from '../lib/analytics';
 
 interface BlogPageProps {
   onSelectBlog: (article: BlogArticle) => void;
@@ -105,7 +106,10 @@ export const BlogPage: React.FC<BlogPageProps> = ({ onSelectBlog }) => {
         {paginatedArticles.map((article) => (
           <div
             key={article.id}
-            onClick={() => onSelectBlog(article)}
+            onClick={() => {
+              trackBlogClick(article.title);
+              onSelectBlog(article);
+            }}
             className="card-radius bg-white dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 shadow-soft hover:shadow-soft-lg hover:-translate-y-1 transition-all duration-300 overflow-hidden flex flex-col justify-between cursor-pointer group"
           >
             <div className="relative h-56 overflow-hidden bg-slate-950">

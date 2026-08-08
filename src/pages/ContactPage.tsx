@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Mail, MapPin, Send, CheckCircle, Youtube, Instagram, Facebook, Github, MessageSquare, User, Phone, GraduationCap, FileText, AlertCircle } from 'lucide-react';
 import { cmsService } from '../services/cmsService';
+import { trackContactFormSubmit, trackSocialClick } from '../lib/analytics';
 
 export const ContactPage: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -51,6 +52,9 @@ export const ContactPage: React.FC = () => {
     try {
       const res = await cmsService.submitContactMessage(formData);
       if (res.success) {
+        // Send GA4 tracking event AFTER successful Supabase insertion (NO PII)
+        trackContactFormSubmit(formData.course_interested, 'contact_page');
+
         setSubmitted(true);
         setFormData({
           name: '',
@@ -246,6 +250,7 @@ export const ContactPage: React.FC = () => {
             <div className="space-y-4 text-xs text-slate-300">
               <a
                 href="mailto:Probitianofficial@gmail.com"
+                onClick={() => trackSocialClick('email', 'mailto:Probitianofficial@gmail.com')}
                 className="flex items-center gap-3 p-3 rounded-xl bg-slate-800/80 border border-slate-700/60 hover:text-amber-400 transition-colors"
               >
                 <Mail className="w-5 h-5 text-amber-400 shrink-0" />
@@ -271,6 +276,7 @@ export const ContactPage: React.FC = () => {
                   href="https://youtube.com/@probitian"
                   target="_blank"
                   rel="noopener noreferrer"
+                  onClick={() => trackSocialClick('youtube', 'https://youtube.com/@probitian')}
                   className="p-2.5 rounded-xl bg-slate-800 hover:bg-red-600/20 hover:text-red-400 border border-slate-700 text-xs font-semibold flex items-center gap-2 transition-colors"
                 >
                   <Youtube className="w-4 h-4 text-red-500" /> YouTube
@@ -279,6 +285,7 @@ export const ContactPage: React.FC = () => {
                   href="https://instagram.com/probitian"
                   target="_blank"
                   rel="noopener noreferrer"
+                  onClick={() => trackSocialClick('instagram', 'https://instagram.com/probitian')}
                   className="p-2.5 rounded-xl bg-slate-800 hover:bg-pink-600/20 hover:text-pink-400 border border-slate-700 text-xs font-semibold flex items-center gap-2 transition-colors"
                 >
                   <Instagram className="w-4 h-4 text-pink-500" /> Instagram
@@ -287,6 +294,7 @@ export const ContactPage: React.FC = () => {
                   href="https://facebook.com/probitian"
                   target="_blank"
                   rel="noopener noreferrer"
+                  onClick={() => trackSocialClick('facebook', 'https://facebook.com/probitian')}
                   className="p-2.5 rounded-xl bg-slate-800 hover:bg-blue-600/20 hover:text-blue-400 border border-slate-700 text-xs font-semibold flex items-center gap-2 transition-colors"
                 >
                   <Facebook className="w-4 h-4 text-blue-500" /> Facebook
@@ -295,6 +303,7 @@ export const ContactPage: React.FC = () => {
                   href="https://github.com/probitian"
                   target="_blank"
                   rel="noopener noreferrer"
+                  onClick={() => trackSocialClick('github', 'https://github.com/probitian')}
                   className="p-2.5 rounded-xl bg-slate-800 hover:bg-purple-600/20 hover:text-purple-400 border border-slate-700 text-xs font-semibold flex items-center gap-2 transition-colors"
                 >
                   <Github className="w-4 h-4 text-purple-400" /> GitHub

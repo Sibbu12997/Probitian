@@ -16,6 +16,7 @@ import { TermsPage } from './pages/TermsPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { AdminLogin } from './pages/admin/AdminLogin';
 import { AdminPortal } from './pages/admin/AdminPortal';
+import { trackPageView, trackNavigationClick } from './lib/analytics';
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState<NavPage>('home');
@@ -77,7 +78,15 @@ export default function App() {
     setCurrentPage(page);
     window.location.hash = page === 'home' ? '/' : `/${page}`;
     window.scrollTo({ top: 0, behavior: 'smooth' });
+    trackNavigationClick(page);
   };
+
+  // GA4 Page View Tracking Effect
+  useEffect(() => {
+    const pagePath = currentPage === 'home' ? '/' : `/${currentPage}`;
+    const title = getPageTitle();
+    trackPageView(pagePath, title);
+  }, [currentPage]);
 
   const handleToggleDarkMode = () => {
     setIsDarkMode((prev) => !prev);

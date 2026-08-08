@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { 
   LayoutDashboard, 
+  BarChart3,
   Home, 
   FolderKanban, 
   Newspaper, 
@@ -25,7 +26,10 @@ import {
   Moon
 } from 'lucide-react';
 
+import { Palette } from 'lucide-react';
+import { BrandingManager } from './modules/BrandingManager';
 import { DashboardOverview } from './modules/DashboardOverview';
+import { AnalyticsManager } from './modules/AnalyticsManager';
 import { HomePageManager } from './modules/HomePageManager';
 import { ProjectsManager } from './modules/ProjectsManager';
 import { BlogManager } from './modules/BlogManager';
@@ -62,7 +66,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     {
       group: 'Analytics & Overview',
       items: [
-        { id: 'overview', label: 'Dashboard', icon: LayoutDashboard }
+        { id: 'overview', label: 'Dashboard', icon: LayoutDashboard },
+        { id: 'analytics', label: 'GA4 Analytics', icon: BarChart3 }
       ]
     },
     {
@@ -86,6 +91,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     {
       group: 'Site Settings & Admin',
       items: [
+        { id: 'branding', label: 'Website Branding', icon: Palette },
         { id: 'social', label: 'Social Links', icon: Share2 },
         { id: 'navigation', label: 'Navigation Menu', icon: MenuIcon },
         { id: 'seo', label: 'SEO & Meta Tags', icon: SearchIcon },
@@ -98,6 +104,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const renderModule = () => {
     switch (activeModule) {
       case 'overview': return <DashboardOverview onNavigate={(m) => setActiveModule(m)} />;
+      case 'analytics': return <AnalyticsManager />;
       case 'homepage': return <HomePageManager />;
       case 'projects': return <ProjectsManager />;
       case 'blog': return <BlogManager />;
@@ -106,6 +113,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       case 'media': return <MediaLibraryManager />;
       case 'messages': return <MessagesManager />;
       case 'subscribers': return <SubscribersManager />;
+      case 'branding': return <BrandingManager />;
       case 'social': return <SocialLinksManager />;
       case 'navigation': return <NavigationManager />;
       case 'seo': return <SeoManager />;

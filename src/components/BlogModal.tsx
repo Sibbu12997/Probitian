@@ -1,6 +1,7 @@
 import React from 'react';
 import { BlogArticle } from '../types';
 import { X, Calendar, Clock, User, Share2, Youtube, ArrowLeft } from 'lucide-react';
+import { trackSocialClick, trackCtaClick } from '../lib/analytics';
 
 interface BlogModalProps {
   article: BlogArticle | null;
@@ -81,6 +82,10 @@ export const BlogModal: React.FC<BlogModalProps> = ({ article, onClose }) => {
             href="https://youtube.com/@probitian"
             target="_blank"
             rel="noopener noreferrer"
+            onClick={() => {
+              trackSocialClick('youtube', 'https://youtube.com/@probitian');
+              trackCtaClick(`Blog Video: ${article.title}`, 'https://youtube.com/@probitian');
+            }}
             className="btn-radius px-5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold shadow-soft flex items-center gap-2"
           >
             <Youtube className="w-4 h-4 text-red-400" />

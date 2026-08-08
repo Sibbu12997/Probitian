@@ -3,6 +3,7 @@ import { LearnTopic } from '../types';
 import { LEARN_TOPICS } from '../data/mockData';
 import { cmsService } from '../services/cmsService';
 import { BarChart3, Database, Table, Cpu, Play, CheckCircle2, BookOpen, Clock, Download, Sparkles, ExternalLink } from 'lucide-react';
+import { trackCourseClick, trackSocialClick, trackCtaClick, trackEvent } from '../lib/analytics';
 
 export const LearnPage: React.FC = () => {
   const [topicsList, setTopicsList] = useState<LearnTopic[]>(LEARN_TOPICS);
@@ -54,7 +55,10 @@ export const LearnPage: React.FC = () => {
         {topicsList.map((topic) => (
           <button
             key={topic.id}
-            onClick={() => setSelectedTopic(topic)}
+            onClick={() => {
+              trackCourseClick(topic.title, topic.level);
+              setSelectedTopic(topic);
+            }}
             className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
               selectedTopic.id === topic.id
                 ? 'bg-purple-600 text-white shadow-md'
@@ -109,6 +113,10 @@ export const LearnPage: React.FC = () => {
               href="https://youtube.com/@probitian"
               target="_blank"
               rel="noopener noreferrer"
+              onClick={() => {
+                trackSocialClick('youtube', 'https://youtube.com/@probitian');
+                trackCtaClick(`Start Course: ${selectedTopic.title}`, 'https://youtube.com/@probitian');
+              }}
               className="btn-radius w-full py-3 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold shadow-soft flex items-center justify-center gap-2"
             >
               <Play className="w-4 h-4 text-amber-400 fill-current" />
@@ -116,7 +124,10 @@ export const LearnPage: React.FC = () => {
             </a>
 
             <button
-              onClick={() => alert('Starter Datasets & Exercise Workbook files downloaded!')}
+              onClick={() => {
+                trackEvent('dataset_download_click', { course_title: selectedTopic.title });
+                alert('Starter Datasets & Exercise Workbook files downloaded!');
+              }}
               className="btn-radius w-full py-3 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 text-xs font-semibold flex items-center justify-center gap-2 transition-colors"
             >
               <Download className="w-4 h-4 text-purple-600" />
