@@ -8,7 +8,7 @@ import { createServer as createViteServer } from 'vite';
 dotenv.config();
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
 app.use(express.json({ limit: '10mb' }));
 
@@ -579,6 +579,10 @@ app.get('/api/analytics/report', async (req, res) => {
     });
   }
 });
+
+// Serve public directory and documentation assets
+app.use('/docs', express.static(path.join(process.cwd(), 'public', 'docs')));
+app.use(express.static(path.join(process.cwd(), 'public')));
 
 // Start Express and Vite server
 async function startServer() {
