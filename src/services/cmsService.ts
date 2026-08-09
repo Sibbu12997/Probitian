@@ -9,6 +9,8 @@ import {
   YouTubeVideo,
   ContactMessage,
   NewsletterSubscriber,
+  EmailCampaign,
+  EmailCampaignRecipient,
   SocialLinkItem,
   NavigationItem,
   MediaItem,
@@ -37,6 +39,7 @@ const STORAGE_KEYS = {
   VIDEOS: 'probitian_cms_videos',
   MESSAGES: 'probitian_cms_messages',
   NEWSLETTER: 'probitian_cms_newsletter',
+  CAMPAIGNS: 'probitian_cms_campaigns',
   SOCIAL_LINKS: 'probitian_cms_social_links',
   NAVIGATION: 'probitian_cms_navigation',
   MEDIA: 'probitian_cms_media',
@@ -989,6 +992,154 @@ export const cmsService = {
       } catch (e) {}
     }
     return true;
+  },
+
+  // --- EMAIL CAMPAIGNS ---
+  async getCampaignAudienceCount(): Promise<{ count: number; providerConfigured: boolean }> {
+    try {
+      const res = await fetch('/api/admin/email-campaigns/audience-count');
+      if (res.ok) {
+        const data = await res.json();
+        return { count: data.count || 0, providerConfigured: Boolean(data.providerConfigured) };
+      }
+    } catch (e) {}
+
+    const subs = await this.getNewsletterSubscribers();
+    const activeCount = subs.filter(s => s.status === 'active').length;
+    return { count: activeCount, providerConfigured: false };
+  },
+
+  async getCampaigns(): Promise<EmailCampaign[]> {
+    try {
+      const res = await fetch('/api/admin/email-campaigns');
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setLocal(STORAGE_KEYS.CAMPAIGNS, data);
+          return data as EmailCampaign[];
+        }
+      }
+    } catch (e) {}
+
+    if (isSupabaseConfigured()) {
+      try {
+        const { data } = await supabase.from('email_campaigns').select('*').order('created_at', { ascending: false });
+        if (data && data.length > 0) return data as EmailCampaign[];
+      } catch (e) {}
+    }
+
+    return getLocal<EmailCampaign[]>(STORAGE_KEYS.CAMPAIGNS, []);
+  },
+
+  async getCampaignById(id: string): Promise<(EmailCampaign & { recipients?: EmailCampaignRecipient[] }) | null> {
+    try {
+      const res = await fetch(`/api/admin/email-campaigns/${id}`);
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch (e) {}
+
+    const campaigns = await this.getCampaigns();
+    return campaigns.find(c => c.id === id) || null;
+  },
+
+  async saveCampaign(campaign: Partial<EmailCampaign>): Promise<{ success: boolean; campaign?: EmailCampaign }> {
+    try {
+      const res = await fetch('/api/admin/email-campaigns', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(campaign)
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.campaign) {
+          const list = await this.getCampaigns();
+          const idx = list.findIndex(c => c.id === data.campaign.id);
+          if (idx >= 0) list[idx] = data.campaign;
+          else list.unshift(data.campaign);
+          setLocal(STORAGE_KEYS.CAMPAIGNS, list);
+          return { success: true, campaign: data.campaign };
+        }
+      }
+    } catch (e) {}
+
+    const fullCampaign: EmailCampaign = {
+      id: campaign.id || ('camp-' + Date.now()),
+      name: campaign.name || 'Untitled Campaign',
+      subject: campaign.subject || '',
+      preview_text: campaign.preview_text || '',
+      content: campaign.content || '',
+      status: campaign.status || 'draft',
+      audience_type: campaign.audience_type || 'all_active',
+      scheduled_at: campaign.scheduled_at,
+      total_recipients: campaign.total_recipients || 0,
+      successful_count: campaign.successful_count || 0,
+      failed_count: campaign.failed_count || 0,
+      created_at: campaign.created_at || new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+
+    const list = await this.getCampaigns();
+    const idx = list.findIndex(c => c.id === fullCampaign.id);
+    if (idx >= 0) list[idx] = fullCampaign;
+    else list.unshift(fullCampaign);
+    setLocal(STORAGE_KEYS.CAMPAIGNS, list);
+
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase.from('email_campaigns').upsert(fullCampaign);
+      } catch (e) {}
+    }
+
+    return { success: true, campaign: fullCampaign };
+  },
+
+  async deleteCampaign(id: string): Promise<boolean> {
+    try {
+      await fetch(`/api/admin/email-campaigns/${id}`, { method: 'DELETE' });
+    } catch (e) {}
+
+    const list = await this.getCampaigns();
+    const filtered = list.filter(c => c.id !== id);
+    setLocal(STORAGE_KEYS.CAMPAIGNS, filtered);
+
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase.from('email_campaigns').delete().eq('id', id);
+      } catch (e) {}
+    }
+
+    return true;
+  },
+
+  async sendTestCampaign(id: string, testEmail: string): Promise<{ success: boolean; message: string }> {
+    try {
+      const res = await fetch(`/api/admin/email-campaigns/${id}/test`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ testEmail })
+      });
+      const data = await res.json();
+      return { success: data.success, message: data.message || 'Test request processed.' };
+    } catch (e: any) {
+      return { success: false, message: e?.message || 'Failed to trigger test email.' };
+    }
+  },
+
+  async sendBulkCampaign(id: string): Promise<{ success: boolean; message: string; campaign?: EmailCampaign }> {
+    try {
+      const res = await fetch(`/api/admin/email-campaigns/${id}/send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const data = await res.json();
+      if (data.campaign) {
+        await this.getCampaigns();
+      }
+      return { success: data.success, message: data.message || 'Send request completed.', campaign: data.campaign };
+    } catch (e: any) {
+      return { success: false, message: e?.message || 'Failed to dispatch bulk campaign.' };
+    }
   },
 
   // --- SOCIAL LINKS ---

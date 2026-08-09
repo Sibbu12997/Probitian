@@ -342,6 +342,17 @@ The Admin Portal contains **17 integrated management modules**:
   - Search subscribers by domain or date.
   - Export subscriber lists to CSV format for email campaigns.
 
+### 18. Email Campaign & Newsletter Manager
+- **Function**: Draft, test, schedule, and broadcast email newsletters to active subscribers via Resend API.
+- **Workflow**:
+  - View total active subscribers count and delivery provider status (Resend API).
+  - Create new email campaigns or edit existing draft campaigns.
+  - Set Campaign Name, Email Subject Line, Preheader Preview Text, and HTML/Formatted Body Content.
+  - Use Media Library insert tools and call-to-action button snippets.
+  - Send instant **Test Emails** to any verified email address.
+  - Execute **Bulk Campaign Broadcasts** to all active newsletter subscribers with live progress reporting.
+  - Automated inclusion of compliant **Unsubscribe links** allowing recipients to unsubscribe with one click.
+
 ### 11. Website Branding Manager
 - **Function**: Configure site logos, banners, theme colors, and brand identity.
 - **Workflow**:

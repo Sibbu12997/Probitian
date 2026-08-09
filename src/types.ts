@@ -189,3 +189,32 @@ export interface AdminUser {
   full_name: string;
   role: 'admin' | 'editor' | 'user';
 }
+
+export interface EmailCampaign {
+  id: string;
+  name: string;
+  subject: string;
+  preview_text?: string;
+  content: string;
+  status: 'draft' | 'scheduled' | 'sending' | 'sent' | 'partially_sent' | 'failed' | 'cancelled';
+  audience_type: 'all_active' | 'custom_segment';
+  scheduled_at?: string;
+  created_at: string;
+  updated_at: string;
+  sent_at?: string;
+  total_recipients: number;
+  successful_count: number;
+  failed_count: number;
+  error_log?: string;
+}
+
+export interface EmailCampaignRecipient {
+  id: string;
+  campaign_id: string;
+  subscriber_id?: string;
+  email: string;
+  status: 'pending' | 'sent' | 'failed';
+  provider_message_id?: string;
+  sent_at?: string;
+  error_message?: string;
+}

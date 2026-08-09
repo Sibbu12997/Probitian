@@ -45,6 +45,8 @@ import { SeoManager } from './modules/SeoManager';
 import { SettingsManager } from './modules/SettingsManager';
 import { LegalManager } from './modules/LegalManager';
 import { BackupManager } from './modules/BackupManager';
+import { CampaignsManager } from './modules/CampaignsManager';
+import { Send } from 'lucide-react';
 
 interface AdminPortalProps {
   userEmail: string;
@@ -87,7 +89,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       group: 'User Communication',
       items: [
         { id: 'messages', label: 'Contact Messages', icon: Mail },
-        { id: 'subscribers', label: 'Subscribers', icon: Users }
+        { id: 'subscribers', label: 'Subscribers', icon: Users },
+        { id: 'campaigns', label: 'Email Campaigns', icon: Send }
       ]
     },
     {
@@ -116,6 +119,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       case 'media': return <MediaLibraryManager />;
       case 'messages': return <MessagesManager />;
       case 'subscribers': return <SubscribersManager />;
+      case 'campaigns': return <CampaignsManager />;
       case 'branding': return <BrandingManager />;
       case 'social': return <SocialLinksManager />;
       case 'navigation': return <NavigationManager />;

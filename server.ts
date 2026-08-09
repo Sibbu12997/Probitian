@@ -145,6 +145,7 @@ async function getGA4AccessToken(clientEmail: string, privateKey: string): Promi
 // NEWSLETTER & MESSAGES API
 // ----------------------------------------------------
 import { emailService } from './src/services/emailService';
+import { campaignEmailService } from './src/services/campaignEmailService';
 
 app.post('/api/newsletter', async (req, res) => {
   const { email } = req.body;
@@ -839,6 +840,373 @@ app.delete('/api/cms/subscribers/:id', async (req, res) => {
   }
 
   return res.json({ success: true });
+});
+
+// ----------------------------------------------------
+// EMAIL CAMPAIGNS API ENDPOINTS
+// ----------------------------------------------------
+
+// Audience Count
+app.get('/api/admin/email-campaigns/audience-count', async (req, res) => {
+  let count = 0;
+  if (serverSupabase) {
+    try {
+      const { data, error } = await serverSupabase.from('newsletter').select('id').eq('status', 'active');
+      if (!error && data) {
+        count = data.length;
+        return res.json({ success: true, count, providerConfigured: campaignEmailService.isConfigured() });
+      }
+    } catch (e) {}
+  }
+  const data = readCmsData();
+  const subs = data.subscribers || [];
+  count = subs.filter((s: any) => s.status === 'active').length;
+  return res.json({ success: true, count, providerConfigured: campaignEmailService.isConfigured() });
+});
+
+// GET All Campaigns
+app.get('/api/admin/email-campaigns', async (req, res) => {
+  if (serverSupabase) {
+    try {
+      const { data, error } = await serverSupabase.from('email_campaigns').select('*').order('created_at', { ascending: false });
+      if (!error && data) {
+        return res.json(data);
+      }
+    } catch (e) {}
+  }
+  const data = readCmsData();
+  return res.json(data.campaigns || []);
+});
+
+// GET Single Campaign
+app.get('/api/admin/email-campaigns/:id', async (req, res) => {
+  const { id } = req.params;
+  if (serverSupabase) {
+    try {
+      const { data, error } = await serverSupabase.from('email_campaigns').select('*').eq('id', id).single();
+      if (!error && data) {
+        const { data: recipients } = await serverSupabase.from('email_campaign_recipients').select('*').eq('campaign_id', id);
+        return res.json({ ...data, recipients: recipients || [] });
+      }
+    } catch (e) {}
+  }
+  const data = readCmsData();
+  const campaign = (data.campaigns || []).find((c: any) => c.id === id);
+  if (campaign) {
+    const recipients = (data.campaign_recipients || []).filter((r: any) => r.campaign_id === id);
+    return res.json({ ...campaign, recipients });
+  }
+  return res.status(404).json({ error: 'Campaign not found' });
+});
+
+// POST Create / Save Campaign
+app.post('/api/admin/email-campaigns', async (req, res) => {
+  const payload = req.body;
+  if (!payload || !payload.name || !payload.subject || !payload.content) {
+    return res.status(400).json({ error: 'Name, subject, and content are required' });
+  }
+
+  const campaign = {
+    id: payload.id || ('camp-' + Date.now()),
+    name: payload.name,
+    subject: payload.subject,
+    preview_text: payload.preview_text || '',
+    content: payload.content,
+    status: payload.status || 'draft',
+    audience_type: payload.audience_type || 'all_active',
+    scheduled_at: payload.scheduled_at || null,
+    total_recipients: payload.total_recipients || 0,
+    successful_count: payload.successful_count || 0,
+    failed_count: payload.failed_count || 0,
+    created_at: payload.created_at || new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  };
+
+  const data = readCmsData();
+  data.campaigns = data.campaigns || [];
+  const idx = data.campaigns.findIndex((c: any) => c.id === campaign.id);
+  if (idx >= 0) {
+    data.campaigns[idx] = campaign;
+  } else {
+    data.campaigns.unshift(campaign);
+  }
+  writeCmsData(data);
+
+  if (serverSupabase) {
+    try {
+      await serverSupabase.from('email_campaigns').upsert(campaign);
+    } catch (e) {
+      console.warn('[Supabase POST Campaign Warning]', e);
+    }
+  }
+
+  return res.json({ success: true, campaign });
+});
+
+// PATCH Update Campaign
+app.patch('/api/admin/email-campaigns/:id', async (req, res) => {
+  const { id } = req.params;
+  const updates = req.body;
+  updates.updated_at = new Date().toISOString();
+
+  const data = readCmsData();
+  data.campaigns = data.campaigns || [];
+  const idx = data.campaigns.findIndex((c: any) => c.id === id);
+  if (idx >= 0) {
+    data.campaigns[idx] = { ...data.campaigns[idx], ...updates };
+    writeCmsData(data);
+  }
+
+  if (serverSupabase) {
+    try {
+      await serverSupabase.from('email_campaigns').update(updates).eq('id', id);
+    } catch (e) {}
+  }
+
+  return res.json({ success: true, campaign: data.campaigns[idx] || updates });
+});
+
+// DELETE Campaign
+app.delete('/api/admin/email-campaigns/:id', async (req, res) => {
+  const { id } = req.params;
+  const data = readCmsData();
+  if (data.campaigns) {
+    data.campaigns = data.campaigns.filter((c: any) => c.id !== id);
+    writeCmsData(data);
+  }
+
+  if (serverSupabase) {
+    try {
+      await serverSupabase.from('email_campaigns').delete().eq('id', id);
+    } catch (e) {}
+  }
+
+  return res.json({ success: true });
+});
+
+// POST Send Test Email
+app.post('/api/admin/email-campaigns/:id/test', async (req, res) => {
+  const { id } = req.params;
+  const { testEmail } = req.body;
+
+  if (!testEmail || !testEmail.includes('@')) {
+    return res.status(400).json({ success: false, message: 'Valid test email is required' });
+  }
+
+  const data = readCmsData();
+  let campaign = (data.campaigns || []).find((c: any) => c.id === id);
+
+  if (!campaign && serverSupabase) {
+    try {
+      const { data: sbCamp } = await serverSupabase.from('email_campaigns').select('*').eq('id', id).single();
+      if (sbCamp) campaign = sbCamp;
+    } catch (e) {}
+  }
+
+  if (!campaign) {
+    return res.status(404).json({ success: false, message: 'Campaign not found' });
+  }
+
+  const reqProtocol = req.headers['x-forwarded-proto'] || req.protocol;
+  const reqHost = req.headers['x-forwarded-host'] || req.headers.host;
+  const unsubscribeUrl = `${reqProtocol}://${reqHost}/api/newsletter/unsubscribe?email=${encodeURIComponent(testEmail)}`;
+
+  const result = await campaignEmailService.sendTestEmail({
+    testEmail,
+    subject: campaign.subject,
+    previewText: campaign.preview_text,
+    contentHtml: campaign.content,
+    unsubscribeUrl
+  });
+
+  return res.json(result);
+});
+
+// POST Send Bulk Campaign to Active Subscribers
+app.post('/api/admin/email-campaigns/:id/send', async (req, res) => {
+  const { id } = req.params;
+  const data = readCmsData();
+  let campaign = (data.campaigns || []).find((c: any) => c.id === id);
+
+  if (!campaign && serverSupabase) {
+    try {
+      const { data: sbCamp } = await serverSupabase.from('email_campaigns').select('*').eq('id', id).single();
+      if (sbCamp) campaign = sbCamp;
+    } catch (e) {}
+  }
+
+  if (!campaign) {
+    return res.status(404).json({ success: false, message: 'Campaign record not found' });
+  }
+
+  // Check Resend Configuration
+  if (!campaignEmailService.isConfigured()) {
+    return res.status(400).json({
+      success: false,
+      message: 'RESEND_API_KEY environment variable is not configured on the server. Please set RESEND_API_KEY in server environment to enable live bulk email delivery.'
+    });
+  }
+
+  // Retrieve Active Subscribers ONLY
+  let activeSubscribers: any[] = [];
+  if (serverSupabase) {
+    try {
+      const { data: sbSubs } = await serverSupabase.from('newsletter').select('*').eq('status', 'active');
+      if (sbSubs && sbSubs.length > 0) activeSubscribers = sbSubs;
+    } catch (e) {}
+  }
+
+  if (activeSubscribers.length === 0) {
+    const subs = data.subscribers || [];
+    activeSubscribers = subs.filter((s: any) => s.status === 'active');
+  }
+
+  if (activeSubscribers.length === 0) {
+    return res.status(400).json({
+      success: false,
+      message: 'No active subscribers found in database to receive this campaign.'
+    });
+  }
+
+  const reqProtocol = req.headers['x-forwarded-proto'] || req.protocol;
+  const reqHost = req.headers['x-forwarded-host'] || req.headers.host;
+  const baseUrl = `${reqProtocol}://${reqHost}`;
+
+  let successfulCount = 0;
+  let failedCount = 0;
+  const recipientsLog: any[] = [];
+
+  for (const subscriber of activeSubscribers) {
+    const subEmail = subscriber.email;
+    const unsubUrl = `${baseUrl}/api/newsletter/unsubscribe?email=${encodeURIComponent(subEmail)}`;
+
+    const sendRes = await campaignEmailService.sendSingleRecipient({
+      toEmail: subEmail,
+      subject: campaign.subject,
+      previewText: campaign.preview_text,
+      contentHtml: campaign.content,
+      unsubscribeUrl: unsubUrl
+    });
+
+    const recipientRecord = {
+      id: 'rec-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+      campaign_id: campaign.id,
+      subscriber_id: subscriber.id,
+      email: subEmail,
+      status: sendRes.success ? 'sent' : 'failed',
+      provider_message_id: sendRes.messageId || null,
+      error_message: sendRes.error || null,
+      sent_at: new Date().toISOString()
+    };
+
+    recipientsLog.push(recipientRecord);
+
+    if (sendRes.success) {
+      successfulCount++;
+    } else {
+      failedCount++;
+    }
+  }
+
+  // Update Campaign Status
+  const sentAt = new Date().toISOString();
+  const finalStatus = failedCount === 0 ? 'sent' : (successfulCount > 0 ? 'partially_sent' : 'failed');
+
+  campaign.status = finalStatus;
+  campaign.sent_at = sentAt;
+  campaign.total_recipients = activeSubscribers.length;
+  campaign.successful_count = successfulCount;
+  campaign.failed_count = failedCount;
+  campaign.updated_at = sentAt;
+
+  // Save to CMS Data
+  data.campaigns = data.campaigns || [];
+  const cIdx = data.campaigns.findIndex((c: any) => c.id === campaign.id);
+  if (cIdx >= 0) data.campaigns[cIdx] = campaign;
+
+  data.campaign_recipients = data.campaign_recipients || [];
+  data.campaign_recipients.push(...recipientsLog);
+  writeCmsData(data);
+
+  // Save to Supabase
+  if (serverSupabase) {
+    try {
+      await serverSupabase.from('email_campaigns').upsert(campaign);
+      await serverSupabase.from('email_campaign_recipients').insert(recipientsLog);
+    } catch (e) {
+      console.warn('[Supabase Campaign Send Update Warning]', e);
+    }
+  }
+
+  return res.json({
+    success: true,
+    message: `Campaign broadcast completed! ${successfulCount} sent successfully, ${failedCount} failed out of ${activeSubscribers.length} active subscribers.`,
+    campaign
+  });
+});
+
+// PUBLIC UNSUBSCRIBE ENDPOINT
+app.get('/api/newsletter/unsubscribe', async (req, res) => {
+  const email = (req.query.email || req.query.token || '').toString().trim();
+
+  if (!email || !email.includes('@')) {
+    return res.status(400).send(`
+      <!DOCTYPE html>
+      <html>
+        <head><title>Unsubscribe - ProBitian</title><style>body{font-family:sans-serif;text-align:center;padding:50px;background:#f8fafc;color:#1e293b;}.card{max-width:480px;margin:auto;background:white;padding:32px;border-radius:12px;border:1px solid #e2e8f0;}</style></head>
+        <body>
+          <div class="card">
+            <h2 style="color:#ef4444;">Invalid Unsubscribe Request</h2>
+            <p>No valid subscriber email address was provided in the unsubscribe request.</p>
+          </div>
+        </body>
+      </html>
+    `);
+  }
+
+  // Update in local file store
+  const data = readCmsData();
+  data.subscribers = data.subscribers || [];
+  const target = data.subscribers.find((s: any) => s.email.toLowerCase() === email.toLowerCase());
+  if (target) {
+    target.status = 'unsubscribed';
+    writeCmsData(data);
+  }
+
+  // Update in Supabase
+  if (serverSupabase) {
+    try {
+      await serverSupabase.from('newsletter').update({ status: 'unsubscribed' }).eq('email', email);
+    } catch (e) {}
+  }
+
+  return res.status(200).send(`
+    <!DOCTYPE html>
+    <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <title>Unsubscribed - ProBitian</title>
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #0f172a; color: #f8fafc; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; }
+          .card { background-color: #1e293b; border: 1px solid #334155; border-radius: 16px; max-width: 500px; width: 100%; padding: 40px; text-align: center; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5); }
+          .badge { display: inline-block; background-color: #f59e0b; color: #0f172a; font-weight: 900; padding: 6px 12px; border-radius: 8px; font-size: 16px; margin-bottom: 16px; }
+          h1 { color: #ffffff; font-size: 24px; font-weight: 800; margin-bottom: 12px; }
+          p { color: #94a3b8; font-size: 15px; line-height: 1.6; margin-bottom: 24px; }
+          .email-highlight { color: #a78bfa; font-weight: 600; }
+          .btn { display: inline-block; background-color: #7c3aed; color: #ffffff; font-weight: 700; padding: 12px 24px; border-radius: 8px; text-decoration: none; transition: all 0.2s; }
+          .btn:hover { background-color: #6d28d9; }
+        </style>
+      </head>
+      <body>
+        <div class="card">
+          <div class="badge">PB</div>
+          <h1>You Have Been Unsubscribed</h1>
+          <p><span class="email-highlight">${email}</span> has been removed from ProBitian newsletter and community campaign emails. You will no longer receive marketing or tutorial updates from us.</p>
+          <a href="/" class="btn">Return to ProBitian Homepage</a>
+        </div>
+      </body>
+    </html>
+  `);
 });
 
 // SOCIAL LINKS
