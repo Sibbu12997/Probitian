@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { jsPDF } from 'jspdf';
 
-// Ensure directories exist
+// Ensure public/docs directory exists
 const docsDir = path.join(process.cwd(), 'public', 'docs');
 if (!fs.existsSync(docsDir)) {
   fs.mkdirSync(docsDir, { recursive: true });
@@ -29,7 +29,7 @@ function createPdfFromMarkdown(title, subtitle, content, outputPath) {
 
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(22);
+  doc.setFontSize(20);
   doc.text(title, margin, 40);
 
   doc.setFont('helvetica', 'normal');
@@ -61,7 +61,7 @@ function createPdfFromMarkdown(title, subtitle, content, outputPath) {
       y += 12;
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(16);
-      doc.setTextColor(15, 23, 42); // slate-900
+      doc.setTextColor(15, 23, 42);
       doc.text(trimmed.replace('# ', ''), margin, y);
       y += 8;
       doc.setDrawColor(124, 58, 237);
@@ -72,14 +72,14 @@ function createPdfFromMarkdown(title, subtitle, content, outputPath) {
       y += 10;
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(13);
-      doc.setTextColor(30, 41, 59); // slate-800
+      doc.setTextColor(30, 41, 59);
       doc.text(trimmed.replace('## ', ''), margin, y);
       y += 12;
     } else if (trimmed.startsWith('### ')) {
       y += 8;
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(11);
-      doc.setTextColor(71, 85, 105); // slate-600
+      doc.setTextColor(71, 85, 105);
       doc.text(trimmed.replace('### ', ''), margin, y);
       y += 10;
     } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
@@ -116,7 +116,7 @@ function createPdfFromMarkdown(title, subtitle, content, outputPath) {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
     doc.setTextColor(148, 163, 184);
-    doc.text(`ProBitian Platform Documentation — Generated Official User Guide`, margin, pageHeight - 20);
+    doc.text(`ProBitian Platform Documentation — Official User Guide`, margin, pageHeight - 20);
     doc.text(`Page ${i} of ${totalPages}`, pageWidth - margin - 40, pageHeight - 20);
   }
 
@@ -124,56 +124,59 @@ function createPdfFromMarkdown(title, subtitle, content, outputPath) {
   console.log(`Generated PDF: ${outputPath}`);
 }
 
-// Build Guide 1 Content
+// Build Guide 1 Content: Public Website User Guide
 const websiteGuideMd = `# ProBitian Website — User Guide
 
 Official User & Learner Guide for the ProBitian Business Intelligence & Data Analytics Platform.
 
 ## 1. Introduction & Platform Overview
-ProBitian is a premium, end-to-end Business Intelligence and Data Analytics learning ecosystem founded by Shivam Baghel. The platform is designed to help students, data analysts, BI developers, and technology enthusiasts master practical skills in Power BI, SQL, Python, Excel, Financial Modeling, and AI-assisted analytics.
+ProBitian is a premium, end-to-end Business Intelligence and Data Analytics learning ecosystem founded by **Shivam Baghel**. The platform is designed to help students, data analysts, BI developers, and technology enthusiasts master practical skills in Power BI, SQL, Python, Advanced Excel, Financial Modeling, and AI-assisted analytics.
 
 ### Core Objectives
-- Hands-On Learning: Interactive access to skill modules, video tutorials, and real-world project portfolios.
-- Portfolio Building: Downloadable dataset files (CSV, XLSX) allowing learners to build verified resume projects.
-- Industry Insights: In-depth blog articles on DAX formulas, data engineering, and career growth strategies.
-- Direct Engagement: Seamless contact forms and newsletter channels for personalized career guidance.
+- **Hands-On Learning**: Access interactive skill modules, video tutorials, and real-world project portfolios.
+- **Portfolio Building**: Download raw dataset files (CSV, XLSX) allowing learners to build verified resume projects.
+- **Industry Insights**: Read in-depth technical articles on DAX formulas, SQL optimization, and data engineering.
+- **Direct Engagement**: Connect directly via contact forms and newsletter subscription channels.
 
-## 2. Website Navigation & Layout
-The ProBitian website features an intuitive single-page application (SPA) architecture with hash-based route navigation for instantaneous page transitions.
+## 2. Getting Started & Website Navigation
+The ProBitian website features a single-page application (SPA) architecture with hash-based route navigation (#/, #/learn, #/projects, etc.) for instantaneous page transitions.
 
 ### Header Navigation Bar
-- ProBitian Logo: Click anytime to return to the Home page.
-- Navigation Links: Home, Learn, Projects, Blog, About, Contact.
-- Theme Switcher: Sun/Moon icon in the top right toggles between Light Mode and Dark Mode.
-- Responsive Mobile Menu: On mobile devices, a hamburger icon opens a full-screen mobile menu.
+- **ProBitian Logo**: Click anytime to return to the Home page.
+- **Navigation Links**: Home, Learn, Projects, Blog, YouTube, About, Contact.
+- **Theme Switcher**: Sun/Moon icon in the top header bar toggles between Light Mode and Dark Mode.
+- **Responsive Mobile Menu**: On mobile screens (<768px), a hamburger icon opens a full-screen mobile menu.
 
-### Navigation Routes
-- Home (#/): Platform overview, hero stats, top courses, featured portfolio projects, and YouTube highlights.
-- Learn (#/learn): Complete course catalog, categorised skill paths, and interactive curriculum modals.
-- Projects (#/projects): Interactive gallery of real-world Power BI & SQL dashboards with live demos and dataset links.
-- Blog (#/blog): Technical articles, DAX optimization guides, and BI career frameworks.
-- About (#/about): Mission statement, founder bio, business impact metrics, and learning roadmap.
-- Contact (#/contact): Direct message portal for course inquiries, mentorship, or project collaborations.
+### Public Website Pages & Routes
+- **Home (#/)**: Platform overview, hero statistics, core features, top courses, featured portfolio projects, and YouTube highlights.
+- **Learn (#/learn)**: Complete course catalog with filter tabs, skill level badges, video lessons, PDF cheat sheets, and dataset downloads.
+- **Projects (#/projects)**: Portfolio gallery of real-world Power BI & SQL dashboards featuring problem statements, live interactive demos, GitHub repos, and raw sample dataset downloads.
+- **Blog (#/blog)**: Technical articles, DAX optimization guides, and BI career frameworks with code snippets and video walk-throughs.
+- **YouTube (#/youtube)**: Curated repository of video tutorials, playlists, and channel subscription highlights.
+- **About (#/about)**: Founder profile (Shivam Baghel), platform mission statement, impact metrics, and learning roadmap.
+- **Contact (#/contact)**: Direct message portal for course inquiries, mentorship, or project collaborations, plus official ProBitian Community Hub location.
+- **Terms of Service (#/terms)**: Platform usage terms, intellectual property, and learner guidelines.
+- **Privacy Policy (#/privacy-policy / #/privacy)**: Data handling practices, cookie policies, user rights, and privacy controls.
 
 ## 3. Home Page Guide
 The Home page serves as the entry point to the ProBitian ecosystem.
 
 ### Key Sections & Interactions
-1. Hero Banner: Displays core tagline, interactive "Start Learning" button (navigates to #/learn) and "Explore Projects" button (navigates to #/projects).
-2. Value Proposition Cards: Highlights key pillars—Master Power BI, SQL Querying, Advanced Excel, and AI integration.
-3. Featured Course Cards: Direct enrollment buttons opening detailed course curriculum modals.
-4. Featured Project Showcase: Interactive cards displaying project badges, tools used, and direct modal popups.
-5. Latest Blog Articles: Quick-read summaries with direct links to full technical posts.
-6. YouTube Community Highlights: Direct links to video tutorials and channel subscription links.
-7. Footer & Newsletter: Instant subscription box for receiving weekly dataset drops and tips.
+1. **Hero Banner**: Features primary headline, tagline, "Start Learning" CTA (#/learn), and "Explore Projects" CTA (#/projects).
+2. **Value Proposition Cards**: Highlights core skill pillars—Power BI Mastery, SQL Querying, Advanced Excel, and AI Tools for Data Professionals.
+3. **Featured Course Cards**: Direct buttons opening detailed course curriculum modals.
+4. **Featured Project Showcase**: Interactive cards displaying project badges, tools used, and direct modal popups.
+5. **Latest Blog Articles**: Quick-read summaries with direct links to full technical posts.
+6. **YouTube Community Highlights**: Direct links to video tutorials and channel subscription links.
+7. **Footer & Newsletter**: Instant subscription box for receiving weekly dataset drops and tips.
 
 ## 4. Learn Page Guide
-The Learn page hosts the structured curriculum for data professionals.
+The Learn page hosts structured learning paths for data professionals.
 
 ### Course Directory Features
-- Category Tabs: Filter by All, Power BI, SQL, Excel, Python, or AI.
-- Skill Level Indicators: Clearly marked as Beginner, Intermediate, or Advanced.
-- Interactive Course Modals: Click any course card to open the modal containing:
+- **Category Tabs**: Filter courses by All, Power BI, SQL, Excel, Python, or AI.
+- **Skill Level Indicators**: Marked as Beginner, Intermediate, or Advanced.
+- **Interactive Course Modals**: Click any course card to open the curriculum modal containing:
   - Full course overview & learning outcomes.
   - Video lesson links and YouTube tutorials.
   - PDF downloadable guides and cheat sheets.
@@ -183,182 +186,249 @@ The Learn page hosts the structured curriculum for data professionals.
 The Projects page offers production-grade portfolio projects designed for resume enhancement.
 
 ### Project Gallery Features
-- Filter Options: Power BI, SQL, Python, Financial Dashboards, Executive Analytics.
-- Project Modal Views:
+- **Filter Options**: Power BI, SQL, Python, Financial Dashboards, Executive Analytics.
+- **Project Modal Views**:
   - Problem Statement & Business Solution.
-  - Tools & Technologies Used (e.g. Power BI Desktop, DAX, PostgreSQL, Python).
-  - External Action Buttons:
-    - Live Interactive Demo: Launches embedded or hosted web dashboard.
-    - GitHub Repository: Inspect clean SQL queries and Python scripts.
-    - YouTube Tutorial: Step-by-step video walkthrough.
-    - Dataset Download: Instant access to sample raw data.
+  - Tools & Technologies Used (Power BI Desktop, DAX, PostgreSQL, Python, etc.).
+  - Action Buttons:
+    - **Live Interactive Demo**: Launches embedded or hosted web dashboard.
+    - **GitHub Repository**: Inspect clean SQL queries and Python scripts.
+    - **YouTube Tutorial**: Step-by-step video walkthrough.
+    - **Dataset Download**: Instant access to sample raw data files.
 
 ## 6. Blog Page Guide
 The Blog section contains technical tutorials and industry insights.
 
 ### Article Reader Experience
-- Category & Tag Filters: DAX, Data Modeling, SQL Optimization, AI Tools.
-- Article Modals: Clean typography with code snippets, key takeaways, and embedded YouTube video links.
+- **Category & Tag Filters**: DAX, Data Modeling, SQL Optimization, AI Tools.
+- **Article Modals**: Clean typography with code snippets, key takeaways, and embedded YouTube video walkthroughs.
 
-## 7. About Page Guide
-Learn about the driving force behind ProBitian.
-
-### Highlights
-- Founder Profile: Shivam Baghel's background in Business Intelligence and Data Engineering.
-- Impact Metrics: Over 10,000+ learners reached, 50+ projects created, 100+ articles published.
-- Mission: Democratizing high-quality, practical data education.
-
-## 8. Contact Page Guide
+## 7. Contact Page Guide & Community Hub Location
 Get in touch with Shivam Baghel or the ProBitian support team.
 
-### How to Submit an Inquiry
-1. Fill in your Full Name, Email Address, and optional Phone Number.
-2. Select your Subject or Interested Course (e.g., Power BI Mastery, SQL Bootcamp).
-3. Type your Message in the message box.
-4. Click "Send Message".
-5. Receive immediate on-screen confirmation.
+### How to Submit an Enquiry
+1. Navigate to **Contact** (#/contact).
+2. Enter your **Full Name**, **Email Address**, and optional **Phone Number**.
+3. Select your **Subject or Interested Course** (e.g., Power BI Mastery, SQL Bootcamp).
+4. Type your message in the text box.
+5. Click **Send Message**.
+6. Receive immediate on-screen confirmation. Your message is saved securely to Supabase and dispatches an automated notification email via server-side Gmail SMTP / Nodemailer. Expect a reply within 24-48 hours.
 
-## 9. Newsletter Subscription
-- Located in the global website footer.
-- Enter your email address and click "Subscribe".
-- Receive immediate confirmation without page reloads.
+### Official Community Hub Location
+- **Name**: ProBitian Community Hub
+- **Address**: M93M+688, Salaiya, Madhya Pradesh 486440, India
+- **Plus Code**: M93M+688 Salaiya, Madhya Pradesh
+- **Latitude / Longitude**: 24.6030, 81.2833 (informational)
+- **Google Maps Share URL**: https://maps.app.goo.gl/T4426JADcNHHFPqb7
+- **Action**: Click "View on Google Maps ->" to open the location in a new browser tab (target="_blank" rel="noopener noreferrer").
 
-## 10. Social Channels & Community
-- YouTube: Direct links to @probitian for free full-length courses.
-- Instagram: Quick DAX tips, infographic summaries, and Q&A sessions.
-- Facebook & GitHub: Community discussions and open-source project code.
+## 8. Newsletter Subscription
+- Located in the global website footer on every page.
+- Enter your email address and click **Subscribe**.
+- Immediate on-screen confirmation without full page reloads.
 
-## 11. Mobile Experience
-- Responsive Breakpoints: Optimized for all screens from mobile phones (320px+) to 4K displays.
-- Touch Targets: Minimum 44px touch areas for error-free mobile navigation.
+## 9. Legal & Policy Pages
+- **Terms of Service (#/terms)**: Outlines user conduct, intellectual property, course access, and liability limits.
+- **Privacy Policy (#/privacy-policy)**: Explains data collection, cookie usage, email communication preferences, and security measures.
 
-## 12. Troubleshooting & FAQ
-- Q: How do I download sample datasets?
-  - A: Click the "Download Dataset" button inside any Project or Course modal. If blocked, check pop-up settings.
-- Q: Are all courses free?
-  - A: Yes, ProBitian offers free access to public video modules and downloadable datasets.
-- Q: How do I toggle Dark Mode?
-  - A: Click the Sun/Moon icon in the top navigation bar at any time.
+## 10. Light / Dark Theme & Mobile Experience
+- **Theme Support**: Seamlessly toggle between Light Mode and Dark Mode using the sun/moon button in the top navigation bar. Theme choice persists across sessions.
+- **Mobile Responsiveness**: Designed with responsive layouts and touch targets exceeding 44px for effortless mobile browsing.
 
-## 13. Privacy Statement
-ProBitian respects visitor privacy. Anonymous website analytics are tracked strictly to improve user experience. Personal contact information is kept confidential and never shared with third parties.
+## 11. FAQ & Troubleshooting
+- **Q: How do I download sample datasets?**
+  - **A**: Click "Download Dataset" inside any Project or Course modal.
+- **Q: Are all learning resources free?**
+  - **A**: Yes, ProBitian provides free public access to course curriculum guides, video links, and sample datasets.
+- **Q: How do I open the Community Hub location on Google Maps?**
+  - **A**: Go to the Contact page (#/contact) and click "View on Google Maps ->" on the Community Hub card.
 `;
 
-// Build Guide 2 Content
+// Build Guide 2 Content: Admin Control Center User Guide
 const adminGuideMd = `# ProBitian Admin Control Center — User Guide
 
 Official Administrative Management Guide for Authorized ProBitian Portal Administrators.
 
-## 1. Introduction & Security Responsibilities
-The ProBitian Admin Control Center is a secure, single-pane management dashboard designed for authorized administrators to manage site content, monitor GA4 analytics, track contact inquiries, review subscribers, and update branding assets.
+## 1. Introduction & Security Guidance
+The ProBitian Admin Control Center (#/admin) is a secure management portal for authorized administrators to control website content, analyze GA4 traffic, manage contact inquiries, send email responses, maintain subscribers, and configure brand settings.
 
-### Security Responsibilities
-- Confidentiality: Never share the Admin Passkey or login URL.
-- Key Isolation: API credentials, GA4 private keys, and service account tokens are stored server-side only.
-- Session Hygiene: Always log out when completing administrative tasks.
+### Critical Security Instructions
+- **Never Share Credentials**: Do not share the Admin Passkey or login URL.
+- **Server-Side Secret Isolation**: Secret environment variables (ADMIN_PASSKEY, SUPABASE_SECRET_KEY, SUPABASE_SERVICE_ROLE_KEY, GMAIL_APP_PASSWORD, GEMINI_API_KEY) must remain strictly server-side.
+- **No Client Secrets**: Never place server secrets in frontend code, git commits, README files, or public documentation.
 
 ## 2. Admin Authentication & Access Control
 ### Accessing the Admin Portal
-- URL: Append #/admin to the website address (e.g., https://probitian.ai.studio/#/admin).
-- Passkey Screen: Enter the authorized Admin Passkey.
-- Navigation Controls:
-  - "Back to Website": Instantly returns to the public site without ending session.
-  - "Logout": Clears admin session token and returns to login screen.
+1. Append #/admin to the website URL (e.g., https://probitian.com/#/admin).
+2. Enter the authorized **Admin Passkey**.
+3. Click **Unlock Admin Portal**.
+4. The server validates the passkey via POST /api/admin/verify-passkey against process.env.ADMIN_PASSKEY and issues an authenticated session token.
 
-## 3. Admin Dashboard Overview
-Upon authenticating, administrators are greeted with the Command Center overview:
-- KPI Metrics Cards:
-  - Active Users Now (Real-Time GA4 data).
-  - Total Visitors Today, Last 7 Days, and Last 30 Days.
-  - Pending Contact Messages.
-  - Active Newsletter Subscribers.
-- Quick Launchpad: One-click shortcuts to Add Blog, Manage Courses, Branding Settings, and GA4 Analytics.
+### Navigation Controls
+- **Back to Website**: Returns to the public site without terminating the session.
+- **Logout**: Instantly clears the admin session token and redirects to the login screen.
 
-## 4. CMS Content Management Workflow
-ProBitian utilizes a unified CMS model for managing site content.
+## 3. Comprehensive Admin Modules Guide
+The Admin Portal contains **17 integrated management modules**:
 
-### Content Lifecycle
-1. Draft Mode: Content is stored in the system but hidden from public views.
-2. Published Mode: Instantly visible across the live website.
-3. Edit / Archive: Modify existing items or toggle visibility instantly.
+### 1. Dashboard Overview
+- **Function**: Command center summary and quick launchpad.
+- **Features**: KPI metrics (Active Users Now, Today's Visitors, Pending Inquiries, Total Subscribers), quick shortcuts to core CMS actions, and recent activity logs.
 
-## 5. Projects Management Module
-- Add New Project: Enter Title, Category, Short Summary, Detailed Description, and Tools Used.
-- Link Attachments: Add Live Demo URL, GitHub Repository, YouTube Tutorial link, and Dataset download link.
-- Featured Toggle: Mark key projects to appear on the Home page hero grid.
+### 2. GA4 Analytics Command Center
+- **Function**: Real-time traffic, audience engagement, and conversion tracking via Google Analytics 4 API.
+- **Features**: Active visitors count, date range filters (7D, 30D, 90D, Custom), total page views, average session duration, top pages report, traffic referral sources, device types, visitor country map, and event conversion counters (contact_form_submit, newsletter_subscribe, dataset_download_click, etc.).
 
-## 6. Blog Management Module
-- Article Editor: Configure Title, Slug, Excerpt, Full Content, Read Time, and Tags.
-- Visual Assets: Attach Cover Image URL and optional YouTube Walkthrough URL.
-- Publishing Status: Toggle between Draft and Published.
+### 3. Home Page Editor
+- **Function**: Edit hero section, headlines, statistics, and value proposition cards on the public Home page.
+- **Workflow**:
+  - Edit hero headline, subheadline, CTA text, and CTA links.
+  - Modify platform key stats (e.g. "10K+ Learners", "50+ Dashboards").
+  - Update feature cards and value pillars.
+  - Click **Save Changes** -> Persists to Supabase and reflects immediately on the live Home page.
 
-## 7. Courses & Learn Management Module
-- Course Profile: Set Title, Subtitle, Category (Power BI, SQL, etc.), Level, and Duration.
-- Resource Links: Attach YouTube Video IDs, PDF Documentation links, and Dataset URLs.
+### 4. Projects Portfolio Manager
+- **Function**: Create, edit, publish, order, and tag portfolio projects.
+- **Workflow**:
+  - Click **Add New Project** or select an existing project to edit.
+  - Set Title, Category, Summary, Full Description, and Tools Used.
+  - Attach Live Demo URL, GitHub Repository, YouTube Tutorial link, and Dataset download link.
+  - Toggle **Featured** to display on the Home page grid.
+  - Click **Save Project** -> Updates Supabase and reflects instantly on #/projects.
 
-## 8. Contact Messages & Inbox Management
-- Viewing Inquiries: Real-time table displaying sender Name, Email, Phone, Course Interest, and Timestamp.
-- Status Badges: Mark messages as Unread, Read, or Replied.
-- One-Click Email Reply: Click "Reply via Email" to open your native email client with pre-filled recipient address.
-- Admin Notes: Attach private internal notes to individual messages.
+### 5. Blog & Articles Manager
+- **Function**: Draft, schedule, publish, or edit technical articles and guides.
+- **Workflow**:
+  - Set Article Title, URL Slug, Category, Read Time, and Tags.
+  - Enter Excerpt and full Markdown content.
+  - Attach Cover Image URL and optional YouTube video walkthrough link.
+  - Set status to **Draft** or **Published**.
+  - Click **Save Article** -> Updates Supabase and reflects on #/blog.
 
-## 9. Newsletter Subscribers Module
-- Subscriber Roster: View full list of subscriber emails and signup timestamps.
-- Search & Export: Search subscribers by domain or date.
+### 6. Learn & Courses Manager
+- **Function**: Manage skill paths, course modules, video links, PDFs, and dataset resources.
+- **Workflow**:
+  - Set Course Title, Subtitle, Category (Power BI, SQL, Excel, Python, AI), Skill Level, and Duration.
+  - Attach YouTube Video IDs, PDF Documentation links, and raw dataset download URLs.
+  - Click **Save Course** -> Updates Supabase and reflects on #/learn.
 
-## 10. Website Branding Management
-- Custom SVG Upload: Upload custom Logo SVG and Banner SVG files.
-- Security Sanitization: Automated backend sanitizer strips inline scripts and dangerous XML constructs prior to storage.
-- Real-Time Live Preview: Inspect new logo and banner assets side-by-side before committing.
-- Reset to Default: One-click restoration of factory ProBitian branding assets.
+### 7. YouTube Showcase Manager
+- **Function**: Organize YouTube video tutorials, playlists, and channel highlights.
+- **Workflow**:
+  - Add Video Title, YouTube URL, Thumbnail URL, Category, Description, and Duration.
+  - Edit or delete existing videos.
+  - Click **Save** -> Updates Supabase and reflects on #/youtube.
 
-## 11. Analytics Command Center (GA4 Integration)
-Real-time integration with Google Analytics 4 Data API and Realtime API.
+### 8. Media Library Engine
+- **Function**: Asset manager for site graphics, logos, banners, thumbnails, and PDF files.
+- **Workflow**:
+  - Upload media files (PNG, JPG, SVG, WebP, PDF).
+  - SVG files undergo automated server-side **DOMPurify sanitization** before saving to eliminate script injection.
+  - Preview media items, copy URLs, or **select existing media assets** directly when editing Branding, Projects, Blog, or Courses.
+  - **Asset Reuse**: Re-use existing Media Library items instead of uploading duplicate files.
 
-### Tracked Analytics Metrics
-- Active Users Now: Live active sessions from GA4 Realtime API.
-- Historical Visitors: Breakdown by Today, 7 Days, and 30 Days.
-- Engagement Metrics: Page Views, Total Sessions, Engagement Rate (%), Average Engagement Time.
-- Deduplicated Top Pages Report: Aggregates duplicate dimension paths into unique page rows.
-- Traffic Sources & Geographic Demographics: Referrers, Devices, Browsers, and Visitor Countries.
-- Custom Event Conversion Cards:
-  - youtube_click
-  - instagram_click
-  - facebook_click
-  - github_click
-  - course_click
-  - project_click
-  - blog_click
-  - contact_click
-  - contact_form_submit
+### 9. Contact Messages & Inbox Manager
+- **Function**: Review visitor inquiries, organize status, and send email replies via Gmail SMTP / Nodemailer.
+- **Workflow**:
+  - View inbox table with sender Name, Email, Phone, Course Interest, Message, and Timestamp.
+  - Update status badges (**Unread**, **Read**, **Replied**, **Archived**).
+  - Add internal **Admin Notes** for team reference.
+  - Click **Reply via Email**: Sends an email response directly from the portal via server-side **Gmail SMTP / Nodemailer** (GMAIL_USER and GMAIL_APP_PASSWORD).
 
-## 12. General Settings & Navigation Management
-- General Settings: Edit Site Name, Tagline, Contact Email, and Footer Copyright.
-- Navigation Links: Toggle header and footer link visibility and custom display order.
-- Social Links: Manage external URLs for YouTube, Instagram, Facebook, and GitHub.
+### 10. Subscribers Manager
+- **Function**: Manage newsletter email subscriptions.
+- **Workflow**:
+  - View full subscriber email roster and signup timestamps.
+  - Search subscribers by domain or date.
+  - Export subscriber lists to CSV format for email campaigns.
 
-## 13. Light / Dark Theme Support
-Switch between Light and Dark mode using the sun/moon icon in the Admin portal top header bar.
+### 11. Website Branding Manager
+- **Function**: Configure site logos, banners, theme colors, and brand identity.
+- **Workflow**:
+  - **Choose Logo & Banner from Media Library** or upload custom SVG assets.
+  - Set Site Name, Tagline, and Theme Accents.
+  - Preview new assets side-by-side before publishing.
+  - Click **Reset to Factory Default** to restore original ProBitian branding assets if needed.
 
-## 14. Admin Troubleshooting & FAQ
-- Q: I uploaded a logo SVG but it looks cut off.
-  - A: Ensure your SVG uses a viewBox aspect ratio suitable for header display (e.g. 200x50px).
-- Q: How do I refresh GA4 Analytics?
-  - A: Click the "Refresh Analytics" button in the Analytics Command Center header.
-- Q: What happens when I click "Reset to Default" branding?
-  - A: The system immediately restores the default ProBitian logo and banner assets on both development and production servers.
+### 12. Social Links Manager
+- **Function**: Control social profiles displayed across header and footer.
+- **Workflow**:
+  - Manage links for YouTube, Instagram, Facebook, GitHub, LinkedIn, etc.
+  - Toggle active status and adjust display order.
+  - Click **Save Social Links** -> Updates Supabase and reflects globally.
+
+### 13. Navigation Menu Manager
+- **Function**: Customize top navigation links, paths, icons, and visibility.
+- **Workflow**:
+  - Toggle navigation link visibility (e.g. show/hide Learn or YouTube).
+  - Adjust order of menu items.
+  - Click **Save Navigation** -> Updates Supabase and reflects in header.
+
+### 14. SEO & Meta Tags Manager
+- **Function**: Configure search engine optimization settings and social share tags.
+- **Workflow**:
+  - Edit Meta Title, Meta Description, Keywords, and Canonical URL.
+  - Set Open Graph (OG) Title, OG Description, and OG Image URL.
+  - Configure Twitter Handle and robots.txt indexing directives.
+  - Click **Save SEO Settings** -> Updates Supabase and injects meta tags into index.html.
+
+### 15. Website Settings (Including Community Hub Location)
+- **Function**: Manage global site parameters and official physical location details.
+- **Workflow**:
+  - Edit Site Name, Tagline, Official Contact Email, and Footer Copyright.
+  - **Community Hub Location Settings**:
+    - **Community Hub Name**: Default ProBitian Community Hub
+    - **Hub Physical Address**: Default M93M+688, Salaiya, Madhya Pradesh 486440, India
+    - **Google Maps URL**: Default https://maps.app.goo.gl/T4426JADcNHHFPqb7
+  - Click **Save Settings** -> Updates Supabase. Changes immediately update the Contact page (#/contact).
+
+### 16. Backup & Restore Manager
+- **Function**: Full CMS database backup and disaster recovery.
+- **Workflow**:
+  - Click **Export JSON Backup** to download a complete, time-stamped JSON snapshot of all CMS tables, settings, messages, and subscribers.
+  - Click **Restore Database** to upload a backup JSON file and restore CMS state on demand.
+
+### 17. Legal & Policies Manager
+- **Function**: Edit Terms of Service and Privacy Policy pages.
+- **Workflow**:
+  - Edit Terms of Service and Privacy Policy text sections.
+  - Set Effective Date, Contact Address, and Governing Jurisdiction clauses.
+  - Click **Save Legal Settings** -> Updates Supabase. Public pages #/terms and #/privacy-policy update in real time.
+
+## 4. Multi-Tier Data Persistence Architecture
+ProBitian uses a high-availability, multi-tiered data storage model:
+1. **Supabase PostgreSQL (Production Source of Truth)**: Primary cloud database storing all CMS tables, settings, messages, subscribers, and legal documents.
+2. **data/cms_settings.json (Server-Side Fallback)**: Persistent file-based store ensuring continuity during cloud network disruptions.
+3. **localStorage (Client-Side Cache)**: Caches theme preferences and general settings for instant rendering without layout shift.
+4. **mockData (Seed Defaults)**: Baseline fallback data used during brand initialization or factory resets.
+
+## 5. Email System Architecture (Gmail SMTP / Nodemailer)
+Contact enquiries and admin email replies pass through server-side Express routes using **Nodemailer** over **Gmail SMTP**:
+- Outgoing contact alerts and subscriber welcome emails.
+- Admin reply dispatch directly from the Messages Inbox modal.
+- Configured via server environment variables (GMAIL_USER and GMAIL_APP_PASSWORD).
+
+## 6. Admin Troubleshooting & FAQ
+- **Issue: Changes made in Admin are not appearing on the public site.**
+  - **Solution**: Verify you clicked "Save". Check Supabase connection in browser dev tools console. Refresh the public page.
+- **Issue: Uploaded image or logo is not displaying.**
+  - **Solution**: Ensure the file was uploaded into the Media Library. Verify the media URL in Branding or content settings. Click "Save".
+- **Issue: Contact reply email is failing to send.**
+  - **Solution**: Verify server environment variables GMAIL_USER and GMAIL_APP_PASSWORD are valid. Check server log output.
+- **Issue: Admin login failed.**
+  - **Solution**: Confirm the passkey entered matches ADMIN_PASSKEY configured in the server environment.
 `;
 
-// Save Markdown files
+// Save Markdown files in public/docs and root
 fs.writeFileSync(path.join(docsDir, 'ProBitian_Website_User_Guide.md'), websiteGuideMd);
 fs.writeFileSync(path.join(docsDir, 'ProBitian_Admin_Control_Center_User_Guide.md'), adminGuideMd);
 
 fs.writeFileSync(path.join(process.cwd(), 'ProBitian_Website_User_Guide.md'), websiteGuideMd);
 fs.writeFileSync(path.join(process.cwd(), 'ProBitian_Admin_Control_Center_User_Guide.md'), adminGuideMd);
 
-console.log('Saved Markdown files');
+console.log('Saved Markdown files successfully.');
 
-// Generate PDFs
+// Generate PDFs in public/docs
 createPdfFromMarkdown(
   'ProBitian Website',
   'User & Learner Guide',

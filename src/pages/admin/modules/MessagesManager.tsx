@@ -174,11 +174,11 @@ export const MessagesManager: React.FC = () => {
       {/* Header & Stats Bar */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+          <h2 className="text-xl sm:text-2xl font-black bg-gradient-to-r from-purple-600 via-indigo-600 to-amber-500 bg-clip-text text-transparent flex items-center gap-2">
             <MessageSquare className="w-6 h-6 text-purple-600 dark:text-purple-400" />
             <span>Contact Messages & Inquiries</span>
           </h2>
-          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
             Manage inquiries, view contact details, filter courses, and compose direct replies.
           </p>
         </div>
@@ -193,7 +193,7 @@ export const MessagesManager: React.FC = () => {
           </button>
           <button
             onClick={handleExportCsv}
-            className="px-4 py-2.5 rounded-xl bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 dark:hover:bg-slate-700 text-amber-400 font-bold text-xs border border-slate-700/80 flex items-center gap-2 cursor-pointer shadow-sm transition-all"
+            className="px-4 py-2.5 rounded-xl bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 dark:hover:bg-slate-700 text-amber-400 font-bold text-xs border border-slate-700 flex items-center gap-2 cursor-pointer shadow-sm transition-all"
           >
             <Download className="w-4 h-4" />
             <span>Export CSV ({messages.length})</span>
@@ -251,7 +251,7 @@ export const MessagesManager: React.FC = () => {
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-white text-xs font-bold"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-900 dark:hover:text-white text-xs font-bold"
               >
                 Clear
               </button>
@@ -442,7 +442,7 @@ export const MessagesManager: React.FC = () => {
 
       {/* Message View & Reply Modal */}
       {activeMessage && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-2xl p-6 space-y-5 shadow-2xl my-8 relative">
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
@@ -454,7 +454,7 @@ export const MessagesManager: React.FC = () => {
               </div>
               <button
                 onClick={() => setActiveMessage(null)}
-                className="text-slate-400 hover:text-slate-600 dark:hover:text-white p-1 rounded-lg transition-colors cursor-pointer"
+                className="text-slate-400 hover:text-slate-900 dark:hover:text-white p-1 rounded-lg transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -554,7 +554,7 @@ export const MessagesManager: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setReplyMode(false)}
-                    className="text-xs text-slate-500 hover:text-slate-800 dark:hover:text-white"
+                    className="text-xs text-slate-500 hover:text-slate-900 dark:hover:text-white"
                   >
                     Cancel Reply
                   </button>

@@ -12,11 +12,13 @@ import {
   Check, 
   X,
   FileCode,
-  ArrowRight
+  ArrowRight,
+  FolderOpen
 } from 'lucide-react';
 import { cmsService } from '../../../services/cmsService';
 import { WebsiteGeneralSettings, HomePageConfig } from '../../../types';
 import { sanitizeSvgContent } from '../../../lib/svgSanitizer';
+import { MediaPicker } from '../../../components/admin/MediaPicker';
 
 export const BrandingManager: React.FC = () => {
   const [settings, setSettings] = useState<WebsiteGeneralSettings | null>(null);
@@ -25,7 +27,11 @@ export const BrandingManager: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  // Staged pending SVGs (Data URIs or Raw SVG string)
+  // Media Library Pickers
+  const [showLogoPicker, setShowLogoPicker] = useState(false);
+  const [showBannerPicker, setShowBannerPicker] = useState(false);
+
+  // Staged pending SVGs / Media URLs
   const [pendingLogo, setPendingLogo] = useState<string | null>(null);
   const [pendingLogoName, setPendingLogoName] = useState<string | null>(null);
   const [pendingBanner, setPendingBanner] = useState<string | null>(null);
@@ -287,7 +293,9 @@ export const BrandingManager: React.FC = () => {
             <span className="p-2 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
               <Sparkles className="w-5 h-5" />
             </span>
-            <h2 className="text-xl font-bold text-slate-900 dark:text-white">Website Branding</h2>
+            <h2 className="text-xl md:text-2xl font-black bg-gradient-to-r from-purple-600 via-indigo-600 to-amber-500 bg-clip-text text-transparent">
+              Website Branding
+            </h2>
           </div>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
             Upload, preview, and manage SVG brand vector assets for the ProBitian logo and official banner.
@@ -298,7 +306,7 @@ export const BrandingManager: React.FC = () => {
           <button
             type="button"
             onClick={handleResetToDefault}
-            className="px-4 py-2.5 rounded-xl bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs flex items-center gap-2 transition-colors cursor-pointer"
+            className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs flex items-center gap-2 transition-colors cursor-pointer border border-slate-200 dark:border-slate-700"
           >
             <RotateCcw className="w-3.5 h-3.5" />
             <span>Reset to Default</span>
@@ -308,10 +316,10 @@ export const BrandingManager: React.FC = () => {
             type="button"
             disabled={!hasPendingChanges || saving}
             onClick={handleSaveBranding}
-            className={`px-5 py-2.5 rounded-xl font-bold text-xs shadow-lg flex items-center gap-2 transition-all cursor-pointer ${
+            className={`px-5 py-2.5 rounded-xl font-bold text-xs shadow-md flex items-center gap-2 transition-all cursor-pointer ${
               hasPendingChanges
                 ? 'bg-purple-600 hover:bg-purple-500 text-white shadow-purple-600/30 ring-2 ring-purple-400'
-                : 'bg-slate-300 dark:bg-slate-800 text-slate-500 dark:text-slate-500 cursor-not-allowed'
+                : 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed'
             }`}
           >
             <Save className="w-4 h-4" />
@@ -424,16 +432,16 @@ export const BrandingManager: React.FC = () => {
                 className="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs flex items-center gap-2 shadow-sm transition-colors cursor-pointer"
               >
                 <Upload className="w-4 h-4" />
-                <span>Upload SVG Logo</span>
+                <span>Upload New Logo</span>
               </button>
 
               <button
                 type="button"
-                onClick={() => logoFileInputRef.current?.click()}
-                className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-xs border border-slate-200 dark:border-slate-700 flex items-center gap-2 transition-colors cursor-pointer"
+                onClick={() => setShowLogoPicker(true)}
+                className="px-4 py-2.5 rounded-xl bg-purple-50 dark:bg-purple-950/40 hover:bg-purple-100 dark:hover:bg-purple-900/60 text-purple-700 dark:text-purple-300 font-bold text-xs border border-purple-200 dark:border-purple-800 flex items-center gap-2 transition-colors cursor-pointer"
               >
-                <FileCode className="w-4 h-4 text-purple-500" />
-                <span>Replace Logo</span>
+                <FolderOpen className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                <span>Choose from Media Library</span>
               </button>
 
               <button
@@ -509,16 +517,16 @@ export const BrandingManager: React.FC = () => {
                 className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center gap-2 shadow-sm transition-colors cursor-pointer"
               >
                 <Upload className="w-4 h-4" />
-                <span>Upload SVG Banner</span>
+                <span>Upload New Banner</span>
               </button>
 
               <button
                 type="button"
-                onClick={() => bannerFileInputRef.current?.click()}
-                className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-xs border border-slate-200 dark:border-slate-700 flex items-center gap-2 transition-colors cursor-pointer"
+                onClick={() => setShowBannerPicker(true)}
+                className="px-4 py-2.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 font-bold text-xs border border-amber-500/20 flex items-center gap-2 transition-colors cursor-pointer"
               >
-                <FileCode className="w-4 h-4 text-amber-500" />
-                <span>Replace Banner</span>
+                <FolderOpen className="w-4 h-4 text-amber-500" />
+                <span>Choose from Media Library</span>
               </button>
 
               <button
@@ -540,6 +548,31 @@ export const BrandingManager: React.FC = () => {
           </div>
         </div>
       </section>
+
+      {/* Media Library Selection Modals */}
+      {showLogoPicker && (
+        <MediaPicker
+          selectedUrl={activeLogo}
+          onSelect={(url) => {
+            setPendingLogo(url);
+            setPendingLogoName('Selected from Media Library');
+            setShowLogoPicker(false);
+          }}
+          onClose={() => setShowLogoPicker(false)}
+        />
+      )}
+
+      {showBannerPicker && (
+        <MediaPicker
+          selectedUrl={activeBanner}
+          onSelect={(url) => {
+            setPendingBanner(url);
+            setPendingBannerName('Selected from Media Library');
+            setShowBannerPicker(false);
+          }}
+          onClose={() => setShowBannerPicker(false)}
+        />
+      )}
     </div>
   );
 };

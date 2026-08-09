@@ -79,7 +79,8 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate, onSelectProject,
             </div>
 
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight text-slate-900 dark:text-white leading-[1.1]">
-              {homeConfig?.hero_heading || 'Learn Data Analytics the Practical Way'}
+              Master Business Intelligence with{' '}
+              <span className="text-gradient">Real-World Projects</span>
             </h1>
 
             <p className="text-slate-600 dark:text-slate-300 text-base sm:text-lg leading-relaxed font-medium">

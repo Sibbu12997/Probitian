@@ -23,10 +23,13 @@ import {
   WHY_PROBITIAN_CARDS
 } from '../data/mockData';
 
+import { DEFAULT_LEGAL_SETTINGS, LegalSettings } from '../data/defaultLegalData';
+
 // LOCAL STORAGE KEYS
 const STORAGE_KEYS = {
   SETTINGS_GENERAL: 'probitian_cms_general_settings',
   SETTINGS_SEO: 'probitian_cms_seo_settings',
+  LEGAL_POLICIES: 'probitian_cms_legal_policies',
   HOME_PAGE: 'probitian_cms_home_page',
   PROJECTS: 'probitian_cms_projects',
   BLOGS: 'probitian_cms_blogs',
@@ -49,7 +52,10 @@ const DEFAULT_GENERAL_SETTINGS: WebsiteGeneralSettings = {
   favicon_url: '/logo.svg',
   banner_url: '/banner.svg',
   theme_color: 'purple',
-  footer_copyright: '© 2026 ProBItian. All Rights Reserved.'
+  footer_copyright: '© 2026 ProBItian. All Rights Reserved.',
+  community_hub_name: 'ProBitian Community Hub',
+  community_hub_address: 'M93M+688, Salaiya, Madhya Pradesh 486440, India',
+  community_hub_maps_url: 'https://maps.app.goo.gl/T4426JADcNHHFPqb7'
 };
 
 const DEFAULT_SEO_SETTINGS: SeoSettings = {
@@ -190,6 +196,17 @@ export const cmsService = {
 
   // --- SEO SETTINGS ---
   async getSeoSettings(): Promise<SeoSettings> {
+    try {
+      const res = await fetch('/api/cms/settings/seo');
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.meta_title) {
+          setLocal(STORAGE_KEYS.SETTINGS_SEO, data);
+          return data as SeoSettings;
+        }
+      }
+    } catch (e) {}
+
     if (isSupabaseConfigured()) {
       try {
         const { data } = await supabase.from('settings').select('value').eq('key', 'seo').single();
@@ -201,9 +218,65 @@ export const cmsService = {
 
   async saveSeoSettings(seo: SeoSettings): Promise<boolean> {
     setLocal(STORAGE_KEYS.SETTINGS_SEO, seo);
+
+    try {
+      await fetch('/api/cms/settings/seo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(seo)
+      });
+    } catch (e) {
+      console.error('Failed to post SEO settings to server store:', e);
+    }
+
     if (isSupabaseConfigured()) {
       try {
         await supabase.from('settings').upsert({ key: 'seo', value: seo, updated_at: new Date().toISOString() });
+      } catch (e) {}
+    }
+    return true;
+  },
+
+  // --- LEGAL & POLICIES SETTINGS ---
+  async getLegalSettings(): Promise<LegalSettings> {
+    try {
+      const res = await fetch('/api/cms/settings/legal');
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.terms && data.privacy) {
+          setLocal(STORAGE_KEYS.LEGAL_POLICIES, data);
+          return data as LegalSettings;
+        }
+      }
+    } catch (e) {
+      console.warn('Server legal settings fetch failed');
+    }
+
+    if (isSupabaseConfigured()) {
+      try {
+        const { data } = await supabase.from('settings').select('value').eq('key', 'legal_policies').single();
+        if (data?.value) return data.value as LegalSettings;
+      } catch (e) {}
+    }
+    return getLocal(STORAGE_KEYS.LEGAL_POLICIES, DEFAULT_LEGAL_SETTINGS);
+  },
+
+  async saveLegalSettings(legal: LegalSettings): Promise<boolean> {
+    setLocal(STORAGE_KEYS.LEGAL_POLICIES, legal);
+
+    try {
+      await fetch('/api/cms/settings/legal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(legal)
+      });
+    } catch (e) {
+      console.error('Failed to post legal settings to server store:', e);
+    }
+
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase.from('settings').upsert({ key: 'legal_policies', value: legal, updated_at: new Date().toISOString() });
       } catch (e) {}
     }
     return true;
@@ -215,13 +288,13 @@ export const cmsService = {
       const res = await fetch('/api/cms/settings/home');
       if (res.ok) {
         const data = await res.json();
-        if (data && data.banner_url) {
+        if (data && data.hero_heading) {
           setLocal(STORAGE_KEYS.HOME_PAGE, data);
           return data as HomePageConfig;
         }
       }
     } catch (e) {
-      console.warn('Server home config fetch failed, checking local/supabase fallback');
+      console.warn('Server home config fetch failed');
     }
 
     if (isSupabaseConfigured()) {
@@ -279,6 +352,17 @@ export const cmsService = {
 
   // --- PROJECTS ---
   async getProjects(): Promise<ProjectItem[]> {
+    try {
+      const res = await fetch('/api/cms/projects');
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          setLocal(STORAGE_KEYS.PROJECTS, data);
+          return data as ProjectItem[];
+        }
+      }
+    } catch (e) {}
+
     if (isSupabaseConfigured()) {
       try {
         const { data } = await supabase.from('projects').select('*').order('created_at', { ascending: false });
@@ -319,6 +403,14 @@ export const cmsService = {
     }
     setLocal(STORAGE_KEYS.PROJECTS, updatedList);
 
+    try {
+      await fetch('/api/cms/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(project)
+      });
+    } catch (e) {}
+
     if (isSupabaseConfigured()) {
       try {
         await supabase.from('projects').upsert({
@@ -348,6 +440,11 @@ export const cmsService = {
     const list = await this.getProjects();
     const filtered = list.filter(p => p.id !== id);
     setLocal(STORAGE_KEYS.PROJECTS, filtered);
+
+    try {
+      await fetch(`/api/cms/projects/${id}`, { method: 'DELETE' });
+    } catch (e) {}
+
     if (isSupabaseConfigured()) {
       try {
         await supabase.from('projects').delete().eq('id', id);
@@ -358,6 +455,17 @@ export const cmsService = {
 
   // --- BLOGS ---
   async getBlogs(): Promise<BlogArticle[]> {
+    try {
+      const res = await fetch('/api/cms/blogs');
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          setLocal(STORAGE_KEYS.BLOGS, data);
+          return data as BlogArticle[];
+        }
+      }
+    } catch (e) {}
+
     if (isSupabaseConfigured()) {
       try {
         const { data } = await supabase.from('blogs').select('*').order('created_at', { ascending: false });
@@ -396,6 +504,14 @@ export const cmsService = {
     }
     setLocal(STORAGE_KEYS.BLOGS, updatedList);
 
+    try {
+      await fetch('/api/cms/blogs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(blog)
+      });
+    } catch (e) {}
+
     if (isSupabaseConfigured()) {
       try {
         const slug = blog.slug || blog.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
@@ -423,6 +539,11 @@ export const cmsService = {
     const list = await this.getBlogs();
     const filtered = list.filter(b => b.id !== id);
     setLocal(STORAGE_KEYS.BLOGS, filtered);
+
+    try {
+      await fetch(`/api/cms/blogs/${id}`, { method: 'DELETE' });
+    } catch (e) {}
+
     if (isSupabaseConfigured()) {
       try {
         await supabase.from('blogs').delete().eq('id', id);
@@ -433,6 +554,17 @@ export const cmsService = {
 
   // --- COURSES / LEARN TOPICS ---
   async getCourses(): Promise<LearnTopic[]> {
+    try {
+      const res = await fetch('/api/cms/courses');
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          setLocal(STORAGE_KEYS.COURSES, data);
+          return data as LearnTopic[];
+        }
+      }
+    } catch (e) {}
+
     if (isSupabaseConfigured()) {
       try {
         const { data } = await supabase.from('courses').select('*').order('created_at', { ascending: false });
@@ -474,6 +606,14 @@ export const cmsService = {
     }
     setLocal(STORAGE_KEYS.COURSES, updatedList);
 
+    try {
+      await fetch('/api/cms/courses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(course)
+      });
+    } catch (e) {}
+
     if (isSupabaseConfigured()) {
       try {
         const slug = course.slug || course.title.toLowerCase().replace(/[^a-z0-9]+/g, '-');
@@ -505,6 +645,11 @@ export const cmsService = {
     const list = await this.getCourses();
     const filtered = list.filter(c => c.id !== id);
     setLocal(STORAGE_KEYS.COURSES, filtered);
+
+    try {
+      await fetch(`/api/cms/courses/${id}`, { method: 'DELETE' });
+    } catch (e) {}
+
     if (isSupabaseConfigured()) {
       try {
         await supabase.from('courses').delete().eq('id', id);
@@ -515,6 +660,17 @@ export const cmsService = {
 
   // --- YOUTUBE VIDEOS ---
   async getVideos(): Promise<YouTubeVideo[]> {
+    try {
+      const res = await fetch('/api/cms/videos');
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          setLocal(STORAGE_KEYS.VIDEOS, data);
+          return data as YouTubeVideo[];
+        }
+      }
+    } catch (e) {}
+
     if (isSupabaseConfigured()) {
       try {
         const { data } = await supabase.from('videos').select('*').order('created_at', { ascending: false });
@@ -551,6 +707,14 @@ export const cmsService = {
     }
     setLocal(STORAGE_KEYS.VIDEOS, updatedList);
 
+    try {
+      await fetch('/api/cms/videos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(video)
+      });
+    } catch (e) {}
+
     if (isSupabaseConfigured()) {
       try {
         await supabase.from('videos').upsert({
@@ -575,6 +739,11 @@ export const cmsService = {
     const list = await this.getVideos();
     const filtered = list.filter(v => v.id !== id);
     setLocal(STORAGE_KEYS.VIDEOS, filtered);
+
+    try {
+      await fetch(`/api/cms/videos/${id}`, { method: 'DELETE' });
+    } catch (e) {}
+
     if (isSupabaseConfigured()) {
       try {
         await supabase.from('videos').delete().eq('id', id);
@@ -583,33 +752,20 @@ export const cmsService = {
     return true;
   },
 
-  // --- CONTACT MESSAGES ---
+  // --- CONTACT MESSAGES / REAL ENQUIRIES ---
   async getMessages(): Promise<ContactMessage[]> {
-    const localMsgs = getLocal<ContactMessage[]>(STORAGE_KEYS.MESSAGES, [
-      {
-        id: 'msg-1',
-        name: 'Rahul Verma',
-        email: 'rahul.verma@example.com',
-        phone: '+91 98765 43210',
-        course_interested: 'Power BI',
-        subject: 'Corporate Power BI Training Query',
-        message: 'Hi Shivam, we would love to organize a 2-day Power BI workshop for our analytics team.',
-        status: 'new',
-        created_at: new Date(Date.now() - 3600000 * 5).toISOString()
-      },
-      {
-        id: 'msg-2',
-        name: 'Sneha Gupta',
-        email: 'sneha.g@example.com',
-        phone: '+91 91234 56789',
-        course_interested: 'SQL',
-        subject: 'Portfolio Dashboard Review',
-        message: 'Loved your sales dashboard project! Could you provide feedback on my DAX and SQL logic?',
-        status: 'read',
-        admin_notes: 'Replied via email with feedback on CALCULATE context transition.',
-        created_at: new Date(Date.now() - 3600000 * 28).toISOString()
+    try {
+      const res = await fetch('/api/cms/messages');
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setLocal(STORAGE_KEYS.MESSAGES, data);
+          return data as ContactMessage[];
+        }
       }
-    ]);
+    } catch (e) {
+      console.warn('Failed to fetch backend messages:', e);
+    }
 
     if (isSupabaseConfigured()) {
       try {
@@ -631,20 +787,13 @@ export const cmsService = {
             email_sent_status: m.email_sent_status || '',
             created_at: m.created_at || new Date().toISOString()
           }));
-
-          const map = new Map<string, ContactMessage>();
-          localMsgs.forEach(m => map.set(m.id, m));
-          sbMsgs.forEach(m => map.set(m.id, m));
-
-          return Array.from(map.values()).sort(
-            (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-          );
+          return sbMsgs;
         }
       } catch (e) {
         console.error('Error fetching messages from Supabase:', e);
       }
     }
-    return localMsgs;
+    return getLocal<ContactMessage[]>(STORAGE_KEYS.MESSAGES, []);
   },
 
   async submitContactMessage(msg: {
@@ -655,6 +804,24 @@ export const cmsService = {
     subject?: string;
     message: string;
   }): Promise<{ success: boolean; error?: string }> {
+    try {
+      const res = await fetch('/api/cms/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(msg)
+      });
+      if (res.ok) {
+        const responseData = await res.json();
+        if (responseData.message) {
+          const list = getLocal<ContactMessage[]>(STORAGE_KEYS.MESSAGES, []);
+          setLocal(STORAGE_KEYS.MESSAGES, [responseData.message, ...list]);
+        }
+        return { success: true };
+      }
+    } catch (e) {
+      console.error('Backend submission failed:', e);
+    }
+
     const newMsg: ContactMessage = {
       id: 'msg-' + Date.now(),
       name: msg.name,
@@ -668,12 +835,11 @@ export const cmsService = {
     };
 
     const list = getLocal<ContactMessage[]>(STORAGE_KEYS.MESSAGES, []);
-    const updated = [newMsg, ...list];
-    setLocal(STORAGE_KEYS.MESSAGES, updated);
+    setLocal(STORAGE_KEYS.MESSAGES, [newMsg, ...list]);
 
     if (isSupabaseConfigured()) {
       try {
-        const { error } = await supabase.from('messages').insert({
+        await supabase.from('messages').insert({
           name: msg.name,
           email: msg.email,
           phone: msg.phone,
@@ -682,27 +848,7 @@ export const cmsService = {
           message: msg.message,
           status: 'new'
         });
-
-        if (error) {
-          console.error('Error inserting message into Supabase:', error);
-          // If custom columns don't exist yet in Supabase, attempt fallback insert with standard fields
-          if (error.code === 'PGRST204' || error.message?.includes('column')) {
-            try {
-              await supabase.from('messages').insert({
-                name: msg.name,
-                email: msg.email,
-                subject: `${msg.subject || 'Contact Inquiry'} [Phone: ${msg.phone}, Course: ${msg.course_interested || 'None'}]`,
-                message: msg.message,
-                status: 'new'
-              });
-            } catch (fallbackErr) {
-              console.error('Fallback insert failed:', fallbackErr);
-            }
-          }
-        }
-      } catch (e: any) {
-        console.error('Exception submitting contact message:', e);
-      }
+      } catch (e) {}
     }
 
     return { success: true };
@@ -713,67 +859,35 @@ export const cmsService = {
     replyText: string,
     replySubject?: string
   ): Promise<{ success: boolean; message: string }> {
-    const now = new Date().toISOString();
-
-    const list = await this.getMessages();
-    const targetMsg = list.find(m => m.id === id);
-
-    if (!targetMsg) {
-      return { success: false, message: 'Message not found.' };
-    }
-
-    const updatedList = list.map(m => {
-      if (m.id === id) {
-        return {
-          ...m,
-          status: 'replied' as const,
-          reply_message: replyText,
-          replied_at: now,
-          reply_status: 'sent' as const,
-          email_sent_status: `Reply recorded & sent to ${m.email}`
-        };
-      }
-      return m;
-    });
-    setLocal(STORAGE_KEYS.MESSAGES, updatedList);
-
-    if (isSupabaseConfigured()) {
-      try {
-        const { error } = await supabase.from('messages').update({
-          status: 'replied',
-          reply_message: replyText,
-          replied_at: now,
-          reply_status: 'sent',
-          email_sent_status: `Reply sent to ${targetMsg.email}`
-        }).eq('id', id);
-
-        if (error) {
-          console.error('Error updating reply in Supabase:', error);
-          // Fallback update status and admin_notes
-          try {
-            await supabase.from('messages').update({
-              status: 'replied',
-              admin_notes: `[REPLIED AT ${new Date().toLocaleDateString()}]: ${replyText}`
-            }).eq('id', id);
-          } catch (fallbackErr) {
-            console.error('Fallback reply update failed:', fallbackErr);
-          }
-        }
-      } catch (e) {
-        console.error('Exception updating reply in Supabase:', e);
-      }
-    }
-
-    // Trigger Mailto client dispatch for seamless delivery
     try {
-      const mailtoUrl = `mailto:${targetMsg.email}?subject=${encodeURIComponent(replySubject || ('Re: ' + (targetMsg.subject || 'Inquiry')))}&body=${encodeURIComponent(replyText)}`;
-      window.open(mailtoUrl, '_blank');
-    } catch (e) {}
+      const response = await fetch(`/api/cms/messages/${id}/reply`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ replyText, replySubject }),
+      });
+      if (response.ok) {
+        const data = await response.json();
+        await this.getMessages(); // Refresh list
+        return { success: true, message: data.message || 'Reply sent successfully.' };
+      }
+    } catch (e) {
+      console.error('API reply failed:', e);
+    }
 
-    return { success: true, message: `Reply recorded and sent to ${targetMsg.email}.` };
+    return { success: false, message: 'Failed to send reply via server endpoint.' };
   },
 
   async updateMessageStatus(id: string, status: ContactMessage['status'], adminNotes?: string): Promise<boolean> {
+    try {
+      await fetch(`/api/cms/messages/${id}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status, adminNotes })
+      });
+    } catch (e) {}
+
     const list = await this.getMessages();
     const idx = list.findIndex(m => m.id === id);
     if (idx >= 0) {
@@ -790,6 +904,10 @@ export const cmsService = {
   },
 
   async deleteMessage(id: string): Promise<boolean> {
+    try {
+      await fetch(`/api/cms/messages/${id}`, { method: 'DELETE' });
+    } catch (e) {}
+
     const list = await this.getMessages();
     const filtered = list.filter(m => m.id !== id);
     setLocal(STORAGE_KEYS.MESSAGES, filtered);
@@ -803,10 +921,16 @@ export const cmsService = {
 
   // --- NEWSLETTER SUBSCRIBERS ---
   async getNewsletterSubscribers(): Promise<NewsletterSubscriber[]> {
-    const localSubs = getLocal<NewsletterSubscriber[]>(STORAGE_KEYS.NEWSLETTER, [
-      { id: 'sub-1', email: 'data.enthusiast@gmail.com', status: 'active', created_at: new Date(Date.now() - 86400000 * 2).toISOString() },
-      { id: 'sub-2', email: 'powerbi.user@outlook.com', status: 'active', created_at: new Date(Date.now() - 86400000 * 5).toISOString() }
-    ]);
+    try {
+      const res = await fetch('/api/cms/subscribers');
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setLocal(STORAGE_KEYS.NEWSLETTER, data);
+          return data as NewsletterSubscriber[];
+        }
+      }
+    } catch (e) {}
 
     if (isSupabaseConfigured()) {
       try {
@@ -818,44 +942,44 @@ export const cmsService = {
             status: s.status || 'active',
             created_at: s.created_at || new Date().toISOString()
           }));
-
-          const subMap = new Map<string, NewsletterSubscriber>();
-          localSubs.forEach(s => subMap.set(s.email.toLowerCase(), s));
-          sbSubs.forEach(s => subMap.set(s.email.toLowerCase(), s));
-
-          return Array.from(subMap.values()).sort(
-            (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-          );
+          return sbSubs;
         }
-      } catch (e) {
-        console.error('Error fetching subscribers from Supabase:', e);
-      }
+      } catch (e) {}
     }
-    return localSubs;
+    return getLocal<NewsletterSubscriber[]>(STORAGE_KEYS.NEWSLETTER, []);
   },
 
   async subscribeNewsletter(email: string): Promise<{ success: boolean; message: string }> {
-    const list = await this.getNewsletterSubscribers();
-    if (list.some(s => s.email.toLowerCase() === email.toLowerCase())) {
-      return { success: true, message: 'You are already subscribed to ProBItian!' };
-    }
+    try {
+      const res = await fetch('/api/newsletter', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        await this.getNewsletterSubscribers();
+        return { success: true, message: data.message || 'Successfully subscribed!' };
+      }
+    } catch (e) {}
+
     const newSub: NewsletterSubscriber = {
       id: 'sub-' + Date.now(),
       email,
       status: 'active',
       created_at: new Date().toISOString()
     };
+    const list = await this.getNewsletterSubscribers();
     setLocal(STORAGE_KEYS.NEWSLETTER, [newSub, ...list]);
 
-    if (isSupabaseConfigured()) {
-      try {
-        await supabase.from('newsletter').insert({ email, status: 'active' });
-      } catch (e) {}
-    }
-    return { success: true, message: 'Thank you for subscribing to ProBItian updates!' };
+    return { success: true, message: 'Thank you for subscribing to ProBitian updates!' };
   },
 
   async deleteSubscriber(id: string): Promise<boolean> {
+    try {
+      await fetch(`/api/cms/subscribers/${id}`, { method: 'DELETE' });
+    } catch (e) {}
+
     const list = await this.getNewsletterSubscribers();
     const filtered = list.filter(s => s.id !== id);
     setLocal(STORAGE_KEYS.NEWSLETTER, filtered);
@@ -869,6 +993,17 @@ export const cmsService = {
 
   // --- SOCIAL LINKS ---
   async getSocialLinks(): Promise<SocialLinkItem[]> {
+    try {
+      const res = await fetch('/api/cms/social');
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          setLocal(STORAGE_KEYS.SOCIAL_LINKS, data);
+          return data as SocialLinkItem[];
+        }
+      }
+    } catch (e) {}
+
     if (isSupabaseConfigured()) {
       try {
         const { data } = await supabase.from('social_links').select('*').order('display_order', { ascending: true });
@@ -890,6 +1025,14 @@ export const cmsService = {
     }
     setLocal(STORAGE_KEYS.SOCIAL_LINKS, updated);
 
+    try {
+      await fetch('/api/cms/social', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updated)
+      });
+    } catch (e) {}
+
     if (isSupabaseConfigured()) {
       try {
         await supabase.from('social_links').upsert({
@@ -907,6 +1050,17 @@ export const cmsService = {
 
   // --- NAVIGATION ---
   async getNavigation(): Promise<NavigationItem[]> {
+    try {
+      const res = await fetch('/api/cms/navigation');
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          setLocal(STORAGE_KEYS.NAVIGATION, data);
+          return data as NavigationItem[];
+        }
+      }
+    } catch (e) {}
+
     if (isSupabaseConfigured()) {
       try {
         const { data } = await supabase.from('navigation').select('*').order('display_order', { ascending: true });
@@ -918,6 +1072,15 @@ export const cmsService = {
 
   async saveNavigation(items: NavigationItem[]): Promise<boolean> {
     setLocal(STORAGE_KEYS.NAVIGATION, items);
+
+    try {
+      await fetch('/api/cms/navigation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(items)
+      });
+    } catch (e) {}
+
     if (isSupabaseConfigured()) {
       try {
         for (const nav of items) {
@@ -935,8 +1098,31 @@ export const cmsService = {
     return true;
   },
 
+  async getMedia(): Promise<MediaItem[]> {
+    return this.getMediaItems();
+  },
+
+  async createMedia(item: MediaItem): Promise<void> {
+    await this.addMediaItem(item);
+  },
+
+  async deleteMedia(id: string): Promise<boolean> {
+    return this.deleteMediaItem(id);
+  },
+
   // --- MEDIA LIBRARY ---
   async getMediaItems(): Promise<MediaItem[]> {
+    try {
+      const res = await fetch('/api/cms/media');
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          setLocal(STORAGE_KEYS.MEDIA, data);
+          return data as MediaItem[];
+        }
+      }
+    } catch (e) {}
+
     if (isSupabaseConfigured()) {
       try {
         const { data } = await supabase.from('media').select('*').order('created_at', { ascending: false });
@@ -954,6 +1140,18 @@ export const cmsService = {
     };
     const list = await this.getMediaItems();
     setLocal(STORAGE_KEYS.MEDIA, [newItem, ...list]);
+
+    try {
+      const res = await fetch('/api/cms/media', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newItem)
+      });
+      if (res.ok) {
+        const resData = await res.json();
+        if (resData.media) return resData.media as MediaItem;
+      }
+    } catch (e) {}
 
     if (isSupabaseConfigured()) {
       try {
@@ -974,6 +1172,11 @@ export const cmsService = {
     const list = await this.getMediaItems();
     const filtered = list.filter(m => m.id !== id);
     setLocal(STORAGE_KEYS.MEDIA, filtered);
+
+    try {
+      await fetch(`/api/cms/media/${id}`, { method: 'DELETE' });
+    } catch (e) {}
+
     if (isSupabaseConfigured()) {
       try {
         await supabase.from('media').delete().eq('id', id);
@@ -984,6 +1187,17 @@ export const cmsService = {
 
   // --- CATEGORIES ---
   async getCategories(): Promise<CategoryItem[]> {
+    try {
+      const res = await fetch('/api/cms/categories');
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          setLocal(STORAGE_KEYS.CATEGORIES, data);
+          return data as CategoryItem[];
+        }
+      }
+    } catch (e) {}
+
     if (isSupabaseConfigured()) {
       try {
         const { data } = await supabase.from('categories').select('*');
@@ -1005,6 +1219,14 @@ export const cmsService = {
     }
     setLocal(STORAGE_KEYS.CATEGORIES, updated);
 
+    try {
+      await fetch('/api/cms/categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(cat)
+      });
+    } catch (e) {}
+
     if (isSupabaseConfigured()) {
       try {
         await supabase.from('categories').upsert({
@@ -1023,6 +1245,11 @@ export const cmsService = {
     const list = await this.getCategories();
     const filtered = list.filter(c => c.id !== id);
     setLocal(STORAGE_KEYS.CATEGORIES, filtered);
+
+    try {
+      await fetch(`/api/cms/categories/${id}`, { method: 'DELETE' });
+    } catch (e) {}
+
     if (isSupabaseConfigured()) {
       try {
         await supabase.from('categories').delete().eq('id', id);

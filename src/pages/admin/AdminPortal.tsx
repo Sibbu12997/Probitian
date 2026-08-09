@@ -23,7 +23,8 @@ import {
   ShieldCheck,
   Sparkles,
   Sun,
-  Moon
+  Moon,
+  Scale
 } from 'lucide-react';
 
 import { Palette } from 'lucide-react';
@@ -42,6 +43,7 @@ import { SocialLinksManager } from './modules/SocialLinksManager';
 import { NavigationManager } from './modules/NavigationManager';
 import { SeoManager } from './modules/SeoManager';
 import { SettingsManager } from './modules/SettingsManager';
+import { LegalManager } from './modules/LegalManager';
 import { BackupManager } from './modules/BackupManager';
 
 interface AdminPortalProps {
@@ -95,6 +97,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
         { id: 'social', label: 'Social Links', icon: Share2 },
         { id: 'navigation', label: 'Navigation Menu', icon: MenuIcon },
         { id: 'seo', label: 'SEO & Meta Tags', icon: SearchIcon },
+        { id: 'legal', label: 'Legal & Policies', icon: Scale },
         { id: 'settings', label: 'Website Settings', icon: Sliders },
         { id: 'backup', label: 'Backup & Restore', icon: Database }
       ]
@@ -117,6 +120,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       case 'social': return <SocialLinksManager />;
       case 'navigation': return <NavigationManager />;
       case 'seo': return <SeoManager />;
+      case 'legal': return <LegalManager />;
       case 'settings': return <SettingsManager />;
       case 'backup': return <BackupManager />;
       default: return <DashboardOverview onNavigate={(m) => setActiveModule(m)} />;

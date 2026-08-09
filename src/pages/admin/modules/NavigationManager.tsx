@@ -59,14 +59,16 @@ export const NavigationManager: React.FC = () => {
     <form onSubmit={handleSave} className="space-y-6 max-w-3xl">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-bold text-white">Header Navigation Menu Manager</h2>
-          <p className="text-xs text-slate-400">Reorder, rename, or toggle visibility for navbar pages.</p>
+          <h2 className="text-xl md:text-2xl font-black bg-gradient-to-r from-purple-600 via-indigo-600 to-amber-500 bg-clip-text text-transparent">
+            Header Navigation Menu Manager
+          </h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400">Reorder, rename, or toggle visibility for navbar pages.</p>
         </div>
         <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={handleAdd}
-            className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-400 font-bold text-xs border border-slate-700 flex items-center gap-1 cursor-pointer"
+            className="px-3.5 py-2 rounded-xl bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 dark:hover:bg-slate-700 text-amber-400 font-bold text-xs border border-slate-700 flex items-center gap-1 cursor-pointer transition-colors shadow-sm"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>Add Menu</span>
@@ -74,7 +76,7 @@ export const NavigationManager: React.FC = () => {
           <button
             type="submit"
             disabled={saving}
-            className="px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-lg flex items-center gap-2 cursor-pointer disabled:opacity-50"
+            className="px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-md flex items-center gap-2 cursor-pointer disabled:opacity-50"
           >
             <Save className="w-4 h-4" />
             <span>{saving ? 'Saving...' : 'Save Menu'}</span>
@@ -83,21 +85,21 @@ export const NavigationManager: React.FC = () => {
       </div>
 
       {message && (
-        <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4" />
+        <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400 text-xs font-semibold flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 text-emerald-500" />
           <span>{message}</span>
         </div>
       )}
 
-      <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 space-y-3">
+      <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3 shadow-sm">
         {navItems.map((item, idx) => (
-          <div key={item.id} className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between gap-3">
+          <div key={item.id} className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => handleMove(idx, 'up')}
                 disabled={idx === 0}
-                className="p-1 rounded bg-slate-900 hover:bg-slate-800 text-slate-400 disabled:opacity-30 cursor-pointer"
+                className="p-1 rounded bg-white dark:bg-slate-900 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-800 disabled:opacity-30 cursor-pointer"
               >
                 <ArrowUp className="w-3.5 h-3.5" />
               </button>
@@ -105,7 +107,7 @@ export const NavigationManager: React.FC = () => {
                 type="button"
                 onClick={() => handleMove(idx, 'down')}
                 disabled={idx === navItems.length - 1}
-                className="p-1 rounded bg-slate-900 hover:bg-slate-800 text-slate-400 disabled:opacity-30 cursor-pointer"
+                className="p-1 rounded bg-white dark:bg-slate-900 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-800 disabled:opacity-30 cursor-pointer"
               >
                 <ArrowDown className="w-3.5 h-3.5" />
               </button>
@@ -120,7 +122,7 @@ export const NavigationManager: React.FC = () => {
                   copy[idx].label = e.target.value;
                   setNavItems(copy);
                 }}
-                className="bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-white font-bold"
+                className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-2 text-xs text-slate-900 dark:text-white font-bold"
                 placeholder="Label"
               />
               <input
@@ -131,13 +133,13 @@ export const NavigationManager: React.FC = () => {
                   copy[idx].path = e.target.value;
                   setNavItems(copy);
                 }}
-                className="bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-slate-300 font-mono"
+                className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-2 text-xs text-slate-700 dark:text-slate-300 font-mono"
                 placeholder="Path Key"
               />
             </div>
 
             <div className="flex items-center gap-3">
-              <label className="flex items-center gap-1.5 text-xs text-slate-300 font-semibold cursor-pointer">
+              <label className="flex items-center gap-1.5 text-xs text-slate-700 dark:text-slate-300 font-semibold cursor-pointer">
                 <input
                   type="checkbox"
                   checked={item.is_visible}
@@ -146,7 +148,7 @@ export const NavigationManager: React.FC = () => {
                     copy[idx].is_visible = e.target.checked;
                     setNavItems(copy);
                   }}
-                  className="rounded bg-slate-900 border-slate-700 text-purple-600"
+                  className="rounded bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 text-purple-600"
                 />
                 <span>Show</span>
               </label>
@@ -154,7 +156,8 @@ export const NavigationManager: React.FC = () => {
               <button
                 type="button"
                 onClick={() => handleDelete(item.id)}
-                className="p-1.5 rounded bg-slate-900 hover:bg-red-500/20 text-slate-500 hover:text-red-400 cursor-pointer"
+                className="p-1.5 rounded bg-white dark:bg-slate-900 hover:bg-red-500/10 text-slate-400 hover:text-red-500 border border-slate-200 dark:border-slate-800 cursor-pointer transition-colors"
+                title="Delete Menu Item"
               >
                 <Trash2 className="w-3.5 h-3.5" />
               </button>

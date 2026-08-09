@@ -32,13 +32,15 @@ export const SocialLinksManager: React.FC = () => {
     <form onSubmit={handleSave} className="space-y-6 max-w-3xl">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-bold text-white">Social Media & Contact Links</h2>
-          <p className="text-xs text-slate-400">Manage social URLs displayed across Header, Footer, and Contact page.</p>
+          <h2 className="text-xl md:text-2xl font-black bg-gradient-to-r from-purple-600 via-indigo-600 to-amber-500 bg-clip-text text-transparent">
+            Social Media & Contact Links
+          </h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400">Manage social URLs displayed across Header, Footer, and Contact page.</p>
         </div>
         <button
           type="submit"
           disabled={saving}
-          className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-lg flex items-center gap-2 cursor-pointer disabled:opacity-50"
+          className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-md flex items-center gap-2 cursor-pointer disabled:opacity-50"
         >
           <Save className="w-4 h-4" />
           <span>{saving ? 'Saving...' : 'Save Links'}</span>
@@ -46,18 +48,18 @@ export const SocialLinksManager: React.FC = () => {
       </div>
 
       {message && (
-        <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4" />
+        <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400 text-xs font-semibold flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 text-emerald-500" />
           <span>{message}</span>
         </div>
       )}
 
-      <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 space-y-4">
+      <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4 shadow-sm">
         {links.map((item, idx) => (
-          <div key={item.id || idx} className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
+          <div key={item.id || idx} className="p-4 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">{item.platform}</span>
-              <label className="flex items-center gap-2 text-xs text-slate-300 font-semibold cursor-pointer">
+              <span className="text-xs font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider">{item.platform}</span>
+              <label className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300 font-semibold cursor-pointer">
                 <input
                   type="checkbox"
                   checked={item.is_active}
@@ -66,7 +68,7 @@ export const SocialLinksManager: React.FC = () => {
                     copy[idx].is_active = e.target.checked;
                     setLinks(copy);
                   }}
-                  className="rounded bg-slate-900 border-slate-700 text-purple-600"
+                  className="rounded bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 text-purple-600"
                 />
                 <span>Active</span>
               </label>
@@ -80,7 +82,7 @@ export const SocialLinksManager: React.FC = () => {
                 copy[idx].url = e.target.value;
                 setLinks(copy);
               }}
-              className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-xs text-white font-mono"
+              className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-2.5 text-xs text-slate-900 dark:text-white font-mono"
             />
           </div>
         ))}

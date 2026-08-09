@@ -39,8 +39,12 @@ export default function App() {
   useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash.replace('#/', '').replace('#', '');
-      if (['home', 'about', 'projects', 'blog', 'learn', 'contact', 'privacy', 'terms', 'admin'].includes(hash)) {
-        setCurrentPage(hash as NavPage);
+      if (['home', 'about', 'projects', 'blog', 'learn', 'contact', 'privacy', 'privacy-policy', 'terms', 'admin'].includes(hash)) {
+        if (hash === 'privacy-policy') {
+          setCurrentPage('privacy');
+        } else {
+          setCurrentPage(hash as NavPage);
+        }
       } else if (hash === '404') {
         setCurrentPage('404');
       } else if (!hash) {

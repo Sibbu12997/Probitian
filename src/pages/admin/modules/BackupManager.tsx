@@ -47,31 +47,33 @@ export const BackupManager: React.FC = () => {
   return (
     <div className="space-y-6 max-w-3xl">
       <div>
-        <h2 className="text-xl font-bold text-white">Database Backup & Disaster Recovery</h2>
-        <p className="text-xs text-slate-400">Export or restore full JSON backups of projects, blogs, settings, and inquiries.</p>
+        <h2 className="text-xl md:text-2xl font-black bg-gradient-to-r from-purple-600 via-indigo-600 to-amber-500 bg-clip-text text-transparent">
+          Database Backup & Disaster Recovery
+        </h2>
+        <p className="text-xs text-slate-500 dark:text-slate-400">Export or restore full JSON backups of projects, blogs, settings, and inquiries.</p>
       </div>
 
       {status && (
-        <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-semibold flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4" />
+        <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-400 text-xs font-semibold flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 text-amber-500" />
           <span>{status}</span>
         </div>
       )}
 
       {/* Supabase Status Banner */}
       <div className={`p-5 rounded-2xl border ${
-        isSupabaseConfigured() ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' : 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+        isSupabaseConfigured() ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-800 dark:text-emerald-300' : 'bg-amber-500/10 border-amber-500/30 text-amber-800 dark:text-amber-300'
       } flex items-start gap-3`}>
         {isSupabaseConfigured() ? (
-          <ShieldCheck className="w-6 h-6 text-emerald-400 shrink-0 mt-0.5" />
+          <ShieldCheck className="w-6 h-6 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
         ) : (
-          <AlertTriangle className="w-6 h-6 text-amber-400 shrink-0 mt-0.5" />
+          <AlertTriangle className="w-6 h-6 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
         )}
         <div className="space-y-1 text-xs">
           <h3 className="font-bold text-sm">
             {isSupabaseConfigured() ? 'Supabase Live Connection Active' : 'LocalStorage Cache Mode Active'}
           </h3>
-          <p className="text-slate-300">
+          <p className="text-slate-600 dark:text-slate-300">
             {isSupabaseConfigured()
               ? 'All modifications sync directly with PostgreSQL database on Supabase cloud.'
               : 'Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to .env to enable instant cloud syncing.'}
@@ -82,32 +84,32 @@ export const BackupManager: React.FC = () => {
       {/* Actions Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {/* Export Card */}
-        <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 space-y-4 shadow-md">
-          <div className="p-3 rounded-xl bg-purple-500/10 w-fit text-purple-400">
+        <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4 shadow-sm">
+          <div className="p-3 rounded-xl bg-purple-500/10 w-fit text-purple-600 dark:text-purple-400">
             <Download className="w-6 h-6" />
           </div>
           <div>
-            <h3 className="text-sm font-bold text-white">Export Complete Backup</h3>
-            <p className="text-xs text-slate-400 mt-1">Download a single structured JSON file containing all CMS tables and settings.</p>
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white">Export Complete Backup</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Download a single structured JSON file containing all CMS tables and settings.</p>
           </div>
           <button
             onClick={handleExportFullBackup}
-            className="w-full py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-lg shadow-purple-600/20 cursor-pointer transition-all"
+            className="w-full py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-md cursor-pointer transition-all"
           >
             Download JSON Backup
           </button>
         </div>
 
         {/* Import Card */}
-        <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 space-y-4 shadow-md">
-          <div className="p-3 rounded-xl bg-amber-500/10 w-fit text-amber-400">
+        <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4 shadow-sm">
+          <div className="p-3 rounded-xl bg-amber-500/10 w-fit text-amber-600 dark:text-amber-400">
             <Upload className="w-6 h-6" />
           </div>
           <div>
-            <h3 className="text-sm font-bold text-white">Restore From Backup</h3>
-            <p className="text-xs text-slate-400 mt-1">Import a JSON backup file to overwrite or seed the database tables.</p>
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white">Restore From Backup</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Import a JSON backup file to overwrite or seed the database tables.</p>
           </div>
-          <label className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-400 border border-slate-700 font-bold text-xs flex items-center justify-center gap-2 cursor-pointer transition-all">
+          <label className="w-full py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-amber-600 dark:text-amber-400 border border-slate-200 dark:border-slate-700 font-bold text-xs flex items-center justify-center gap-2 cursor-pointer transition-all">
             {restoring ? (
               <span>Restoring...</span>
             ) : (

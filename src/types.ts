@@ -159,6 +159,9 @@ export interface WebsiteGeneralSettings {
   banner_url: string;
   theme_color: string;
   footer_copyright: string;
+  community_hub_name?: string;
+  community_hub_address?: string;
+  community_hub_maps_url?: string;
 }
 
 export interface SeoSettings {

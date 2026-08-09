@@ -3,6 +3,8 @@ import { Save, Plus, Trash2, CheckCircle2 } from 'lucide-react';
 import { cmsService } from '../../../services/cmsService';
 import { HomePageConfig } from '../../../types';
 
+import { MediaInput } from '../../../components/admin/MediaInput';
+
 export const HomePageManager: React.FC = () => {
   const [config, setConfig] = useState<HomePageConfig | null>(null);
   const [saving, setSaving] = useState(false);
@@ -27,19 +29,21 @@ export const HomePageManager: React.FC = () => {
     setTimeout(() => setMessage(null), 4000);
   };
 
-  if (!config) return <div className="text-white text-xs p-4">Loading home page config...</div>;
+  if (!config) return <div className="text-slate-900 dark:text-white  text-xs p-4">Loading home page config...</div>;
 
   return (
     <form onSubmit={handleSave} className="space-y-8 max-w-4xl">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-bold text-white">Home Page Content Manager</h2>
-          <p className="text-xs text-slate-400">Edit hero text, buttons, banner, statistics, and call-to-action live.</p>
+          <h2 className="text-xl md:text-2xl font-black bg-gradient-to-r from-purple-600 via-indigo-600 to-amber-500 bg-clip-text text-transparent">
+            Home Page Content Manager
+          </h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400">Edit hero text, buttons, banner graphic, statistics, and call-to-action sections live.</p>
         </div>
         <button
           type="submit"
           disabled={saving}
-          className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-lg shadow-purple-600/30 flex items-center gap-2 transition-all cursor-pointer disabled:opacity-50"
+          className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-lg shadow-purple-600/20 flex items-center gap-2 transition-all cursor-pointer disabled:opacity-50"
         >
           <Save className="w-4 h-4" />
           <span>{saving ? 'Saving...' : 'Save Changes'}</span>
@@ -47,58 +51,56 @@ export const HomePageManager: React.FC = () => {
       </div>
 
       {message && (
-        <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4" />
+        <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400 text-xs font-semibold flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 text-emerald-500" />
           <span>{message}</span>
         </div>
       )}
 
       {/* Hero Section */}
-      <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 space-y-4">
-        <h3 className="text-sm font-bold text-amber-400 uppercase tracking-wider">Hero Section</h3>
+      <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4 shadow-sm">
+        <h3 className="text-xs md:text-sm font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider">Hero Section</h3>
 
         <div className="space-y-1">
-          <label className="text-xs font-semibold text-slate-300">Hero Heading</label>
+          <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Hero Heading</label>
           <textarea
             rows={2}
             value={config.hero_heading}
             onChange={(e) => setConfig({ ...config, hero_heading: e.target.value })}
-            className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white focus:border-purple-500 focus:outline-none"
+            className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-xs text-slate-900 dark:text-white focus:border-purple-500 focus:outline-none"
           />
         </div>
 
         <div className="space-y-1">
-          <label className="text-xs font-semibold text-slate-300">Hero Description</label>
+          <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Hero Description</label>
           <textarea
             rows={3}
             value={config.hero_description}
             onChange={(e) => setConfig({ ...config, hero_description: e.target.value })}
-            className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white focus:border-purple-500 focus:outline-none"
+            className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-xs text-slate-900 dark:text-white focus:border-purple-500 focus:outline-none"
           />
         </div>
 
         <div className="space-y-1">
-          <label className="text-xs font-semibold text-slate-300">Official Banner Graphic URL</label>
-          <input
-            type="text"
-            value={config.banner_url}
-            onChange={(e) => setConfig({ ...config, banner_url: e.target.value })}
-            className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white focus:border-purple-500 focus:outline-none font-mono"
+          <MediaInput 
+            label="Official Banner Graphic URL" 
+            value={config.banner_url} 
+            onChange={(url) => setConfig({ ...config, banner_url: url })} 
           />
         </div>
       </div>
 
       {/* Hero Buttons */}
-      <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 space-y-4">
+      <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4 shadow-sm">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-bold text-amber-400 uppercase tracking-wider">Call to Action Buttons</h3>
+          <h3 className="text-xs md:text-sm font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider">Call to Action Buttons</h3>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {config.buttons.map((btn, idx) => (
-            <div key={idx} className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
+            <div key={idx} className="p-4 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 space-y-3">
               <div className="space-y-1">
-                <label className="text-[11px] font-semibold text-slate-400">Button Label</label>
+                <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-400">Button Label</label>
                 <input
                   type="text"
                   value={btn.label}
@@ -107,12 +109,12 @@ export const HomePageManager: React.FC = () => {
                     btns[idx].label = e.target.value;
                     setConfig({ ...config, buttons: btns });
                   }}
-                  className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-white"
+                  className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-2 text-xs text-slate-900 dark:text-white"
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="text-[11px] font-semibold text-slate-400">Target Path / Page</label>
+                <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-400">Target Path / Page</label>
                 <input
                   type="text"
                   value={btn.path}
@@ -121,7 +123,7 @@ export const HomePageManager: React.FC = () => {
                     btns[idx].path = e.target.value;
                     setConfig({ ...config, buttons: btns });
                   }}
-                  className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-white font-mono"
+                  className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-2 text-xs text-slate-900 dark:text-white font-mono"
                 />
               </div>
             </div>
@@ -130,16 +132,16 @@ export const HomePageManager: React.FC = () => {
       </div>
 
       {/* Statistics Counter Cards */}
-      <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 space-y-4">
+      <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4 shadow-sm">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-bold text-amber-400 uppercase tracking-wider">Key Statistics Counters</h3>
+          <h3 className="text-xs md:text-sm font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider">Key Statistics Counters</h3>
           <button
             type="button"
             onClick={() => {
               const stats = [...config.statistics, { label: 'New Metric', value: '100+' }];
               setConfig({ ...config, statistics: stats });
             }}
-            className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-400 font-semibold text-xs flex items-center gap-1 cursor-pointer"
+            className="px-3 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 font-semibold text-xs flex items-center gap-1 cursor-pointer border border-amber-500/20"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>Add Metric</span>
@@ -148,14 +150,14 @@ export const HomePageManager: React.FC = () => {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {config.statistics.map((stat, idx) => (
-            <div key={idx} className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-2 relative group">
+            <div key={idx} className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 space-y-2 relative group">
               <button
                 type="button"
                 onClick={() => {
                   const stats = config.statistics.filter((_, i) => i !== idx);
                   setConfig({ ...config, statistics: stats });
                 }}
-                className="absolute right-2 top-2 text-slate-500 hover:text-red-400 transition-colors cursor-pointer"
+                className="absolute right-2 top-2 text-slate-400 hover:text-red-500 transition-colors cursor-pointer"
               >
                 <Trash2 className="w-3.5 h-3.5" />
               </button>
@@ -169,7 +171,7 @@ export const HomePageManager: React.FC = () => {
                     stats[idx].value = e.target.value;
                     setConfig({ ...config, statistics: stats });
                   }}
-                  className="w-full bg-slate-900 border border-slate-800 rounded-lg p-1.5 text-xs font-bold text-white"
+                  className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-1.5 text-xs font-bold text-slate-900 dark:text-white"
                 />
               </div>
               <div>
@@ -182,7 +184,7 @@ export const HomePageManager: React.FC = () => {
                     stats[idx].label = e.target.value;
                     setConfig({ ...config, statistics: stats });
                   }}
-                  className="w-full bg-slate-900 border border-slate-800 rounded-lg p-1.5 text-xs text-slate-300"
+                  className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-1.5 text-xs text-slate-700 dark:text-slate-300"
                 />
               </div>
             </div>

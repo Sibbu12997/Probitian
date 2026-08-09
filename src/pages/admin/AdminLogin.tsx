@@ -24,14 +24,19 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, onNaviga
 
     try {
       if (loginMode === 'passkey') {
-        // Passkey authentication
-        const configuredPasskey = import.meta.env.VITE_ADMIN_PASSKEY;
-        const enteredPasskey = passkey.trim();
+        // Passkey authentication validated strictly server-side
+        const response = await fetch('/api/admin/verify-passkey', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ passkey: passkey.trim(), email: userEmail })
+        });
 
-        if (configuredPasskey && enteredPasskey === configuredPasskey.trim()) {
-          onLoginSuccess(userEmail);
+        if (response.ok) {
+          const resData = await response.json();
+          onLoginSuccess(resData.email || userEmail);
         } else {
-          setError('Invalid credentials');
+          const errData = await response.json().catch(() => null);
+          setError(errData?.error || 'Invalid credentials');
         }
       } else {
         // Supabase authentication
@@ -73,7 +78,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, onNaviga
               <ShieldCheck className="w-6 h-6 text-amber-400" />
             </div>
           </div>
-          <h1 className="text-2xl font-black text-white tracking-tight">
+          <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
             Pro<span className="text-amber-400">BI</span>tian CMS
           </h1>
           <p className="text-xs text-slate-400">
@@ -91,8 +96,8 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, onNaviga
             }}
             className={`py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
               loginMode === 'passkey'
-                ? 'bg-purple-600 text-white shadow-md'
-                : 'text-slate-400 hover:text-white'
+                ? 'bg-purple-600 text-slate-900 dark:text-white shadow-md'
+                : 'text-slate-400 hover:text-slate-900 dark:text-white'
             }`}
           >
             <Key className="w-3.5 h-3.5" />
@@ -106,8 +111,8 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, onNaviga
             }}
             className={`py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
               loginMode === 'supabase'
-                ? 'bg-purple-600 text-white shadow-md'
-                : 'text-slate-400 hover:text-white'
+                ? 'bg-purple-600 text-slate-900 dark:text-white shadow-md'
+                : 'text-slate-400 hover:text-slate-900 dark:text-white'
             }`}
           >
             <Lock className="w-3.5 h-3.5" />
@@ -128,7 +133,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, onNaviga
                     value={passkey}
                     onChange={(e) => setPasskey(e.target.value)}
                     required
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2.5 text-xs text-slate-900 dark:text-white placeholder-slate-600 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
                     placeholder="Enter admin passkey..."
                   />
                 </div>
@@ -142,7 +147,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, onNaviga
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2.5 text-xs text-slate-900 dark:text-white placeholder-slate-600 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
                     placeholder="admin@probitian.com"
                   />
                 </div>
@@ -159,7 +164,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, onNaviga
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2.5 text-xs text-slate-900 dark:text-white placeholder-slate-600 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
                     placeholder="admin@probitian.com"
                   />
                 </div>
@@ -174,7 +179,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, onNaviga
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2.5 text-xs text-slate-900 dark:text-white placeholder-slate-600 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
                     placeholder="••••••••"
                   />
                 </div>
@@ -191,7 +196,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, onNaviga
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-lg shadow-purple-600/30 flex items-center justify-center gap-2 transition-all disabled:opacity-50 cursor-pointer"
+            className="w-full py-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-slate-900 dark:text-white font-bold text-xs shadow-lg shadow-purple-600/30 flex items-center justify-center gap-2 transition-all disabled:opacity-50 cursor-pointer"
           >
             {loading ? (
               <span>Authenticating...</span>
@@ -210,7 +215,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, onNaviga
             <button
               type="button"
               onClick={onNavigateHome}
-              className="inline-flex items-center gap-2 text-xs font-semibold text-slate-400 hover:text-white transition-colors cursor-pointer py-1"
+              className="inline-flex items-center gap-2 text-xs font-semibold text-slate-400 hover:text-slate-900 dark:text-white transition-colors cursor-pointer py-1"
             >
               <ArrowLeft className="w-4 h-4 text-amber-400" />
               <span>Back to Website</span>

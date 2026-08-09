@@ -190,7 +190,7 @@ export const AnalyticsManager: React.FC<AnalyticsManagerProps> = () => {
               <BarChart3 className="w-6 h-6" />
             </div>
             <div>
-              <h1 className="text-xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
+              <h1 className="text-xl font-black  dark:text-slate-900 dark:text-white  tracking-tight flex items-center gap-2">
                 ProBitian Analytics Command Center
               </h1>
               <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -216,8 +216,8 @@ export const AnalyticsManager: React.FC<AnalyticsManagerProps> = () => {
                 onClick={() => setRange(item.id as any)}
                 className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
                   range === item.id
-                    ? 'bg-purple-600 text-white shadow-sm'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                    ? 'bg-purple-600 text-slate-900 dark:text-white  shadow-sm'
+                    : 'text-slate-600 dark:text-slate-400 hover: dark:hover:text-slate-900 dark:text-white '
                 }`}
               >
                 {item.label}
@@ -256,19 +256,19 @@ export const AnalyticsManager: React.FC<AnalyticsManagerProps> = () => {
               type="date"
               value={customStart}
               onChange={(e) => setCustomStart(e.target.value)}
-              className="px-3 py-1.5 text-xs rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-purple-500"
+              className="px-3 py-1.5 text-xs rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900  dark:text-slate-900 dark:text-white  focus:ring-2 focus:ring-purple-500"
             />
             <span className="text-xs text-slate-400">to</span>
             <input
               type="date"
               value={customEnd}
               onChange={(e) => setCustomEnd(e.target.value)}
-              className="px-3 py-1.5 text-xs rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-purple-500"
+              className="px-3 py-1.5 text-xs rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900  dark:text-slate-900 dark:text-white  focus:ring-2 focus:ring-purple-500"
             />
             <button
               onClick={fetchAnalyticsData}
               disabled={!customStart || !customEnd || loading}
-              className="px-3 py-1.5 bg-purple-600 text-white font-bold text-xs rounded-lg hover:bg-purple-700 disabled:opacity-50 transition-all cursor-pointer"
+              className="px-3 py-1.5 bg-purple-600 text-slate-900 dark:text-white  font-bold text-xs rounded-lg hover:bg-purple-700 disabled:opacity-50 transition-all cursor-pointer"
             >
               Apply Filter
             </button>
@@ -290,7 +290,7 @@ export const AnalyticsManager: React.FC<AnalyticsManagerProps> = () => {
       {/* OVERVIEW METRICS GRID */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Real-time Active Users Card */}
-        <div className="p-5 rounded-2xl bg-gradient-to-br from-purple-600 to-indigo-700 text-white shadow-lg space-y-2 relative overflow-hidden">
+        <div className="p-5 rounded-2xl bg-gradient-to-br from-purple-600 to-indigo-700 text-slate-900 dark:text-white  shadow-lg space-y-2 relative overflow-hidden">
           <div className="absolute top-0 right-0 p-4 opacity-15 pointer-events-none">
             <Activity className="w-20 h-20" />
           </div>
@@ -315,7 +315,7 @@ export const AnalyticsManager: React.FC<AnalyticsManagerProps> = () => {
             <span className="text-xs font-bold uppercase tracking-wider">Active Users ({range.toUpperCase()})</span>
             <Users className="w-4 h-4 text-purple-600 dark:text-purple-400" />
           </div>
-          <div className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+          <div className="text-2xl font-black  dark:text-slate-900 dark:text-white  tracking-tight">
             {overview.activeUsers.toLocaleString()}
           </div>
           <div className="flex items-center gap-3 text-[11px] text-slate-500 dark:text-slate-400">
@@ -334,7 +334,7 @@ export const AnalyticsManager: React.FC<AnalyticsManagerProps> = () => {
             <span className="text-xs font-bold uppercase tracking-wider">Page Views & Sessions</span>
             <Eye className="w-4 h-4 text-amber-500" />
           </div>
-          <div className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+          <div className="text-2xl font-black  dark:text-slate-900 dark:text-white  tracking-tight">
             {overview.pageViews.toLocaleString()}
           </div>
           <div className="flex items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400">
@@ -348,7 +348,7 @@ export const AnalyticsManager: React.FC<AnalyticsManagerProps> = () => {
             <span className="text-xs font-bold uppercase tracking-wider">Engagement Rate</span>
             <Clock className="w-4 h-4 text-emerald-500" />
           </div>
-          <div className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+          <div className="text-2xl font-black  dark:text-slate-900 dark:text-white  tracking-tight">
             {overview.engagementRate}
           </div>
           <div className="flex items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400">
@@ -362,7 +362,7 @@ export const AnalyticsManager: React.FC<AnalyticsManagerProps> = () => {
         <div className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-between">
           <div className="space-y-1">
             <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Users Today</span>
-            <div className="text-xl font-black text-slate-900 dark:text-white">{timeframeUsers.usersToday}</div>
+            <div className="text-xl font-black  dark:text-slate-900 dark:text-white ">{timeframeUsers.usersToday}</div>
           </div>
           <div className="p-2.5 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400">
             <CalendarDays className="w-5 h-5" />
@@ -372,7 +372,7 @@ export const AnalyticsManager: React.FC<AnalyticsManagerProps> = () => {
         <div className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-between">
           <div className="space-y-1">
             <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Users Last 7 Days</span>
-            <div className="text-xl font-black text-slate-900 dark:text-white">{timeframeUsers.users7d}</div>
+            <div className="text-xl font-black  dark:text-slate-900 dark:text-white ">{timeframeUsers.users7d}</div>
           </div>
           <div className="p-2.5 rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400">
             <TrendingUp className="w-5 h-5" />
@@ -382,7 +382,7 @@ export const AnalyticsManager: React.FC<AnalyticsManagerProps> = () => {
         <div className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-between">
           <div className="space-y-1">
             <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Users Last 30 Days</span>
-            <div className="text-xl font-black text-slate-900 dark:text-white">{timeframeUsers.users30d}</div>
+            <div className="text-xl font-black  dark:text-slate-900 dark:text-white ">{timeframeUsers.users30d}</div>
           </div>
           <div className="p-2.5 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
             <Users className="w-5 h-5" />
@@ -394,7 +394,7 @@ export const AnalyticsManager: React.FC<AnalyticsManagerProps> = () => {
       <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+            <h2 className="text-base font-extrabold  dark:text-slate-900 dark:text-white  flex items-center gap-2">
               <MousePointerClick className="w-5 h-5 text-amber-500" />
               Targeted Click & Conversion Events
             </h2>
@@ -428,7 +428,7 @@ export const AnalyticsManager: React.FC<AnalyticsManagerProps> = () => {
                     <IconComp className="w-3.5 h-3.5" />
                   </div>
                 </div>
-                <div className="text-lg font-black text-slate-900 dark:text-white">{item.count}</div>
+                <div className="text-lg font-black  dark:text-slate-900 dark:text-white ">{item.count}</div>
               </div>
             );
           })}
@@ -445,7 +445,7 @@ export const AnalyticsManager: React.FC<AnalyticsManagerProps> = () => {
                   className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center gap-2 text-xs"
                 >
                   <span className="font-mono font-bold text-purple-600 dark:text-purple-400">{evt.eventName}</span>
-                  <span className="px-1.5 py-0.5 rounded bg-purple-600 text-white font-extrabold text-[10px]">
+                  <span className="px-1.5 py-0.5 rounded bg-purple-600 text-slate-900 dark:text-white  font-extrabold text-[10px]">
                     {evt.count}
                   </span>
                 </div>
@@ -459,7 +459,7 @@ export const AnalyticsManager: React.FC<AnalyticsManagerProps> = () => {
       <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h2 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+            <h2 className="text-base font-extrabold  dark:text-slate-900 dark:text-white  flex items-center gap-2">
               <FileText className="w-5 h-5 text-purple-600 dark:text-purple-400" />
               Top Pages & Screen Views
             </h2>
@@ -476,14 +476,14 @@ export const AnalyticsManager: React.FC<AnalyticsManagerProps> = () => {
                 placeholder="Search page path..."
                 value={searchPageQuery}
                 onChange={(e) => setSearchPageQuery(e.target.value)}
-                className="pl-9 pr-3 py-1.5 text-xs font-medium bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                className="pl-9 pr-3 py-1.5 text-xs font-medium bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700  dark:text-slate-900 dark:text-white  focus:outline-none focus:ring-2 focus:ring-purple-500"
               />
             </div>
 
             <select
               value={sortField}
               onChange={(e) => setSortField(e.target.value as any)}
-              className="px-3 py-1.5 text-xs font-semibold bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500 cursor-pointer"
+              className="px-3 py-1.5 text-xs font-semibold bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700  dark:text-slate-900 dark:text-white  focus:outline-none focus:ring-2 focus:ring-purple-500 cursor-pointer"
             >
               <option value="views">Sort by Page Views</option>
               <option value="users">Sort by Users</option>
@@ -509,9 +509,9 @@ export const AnalyticsManager: React.FC<AnalyticsManagerProps> = () => {
                 pagesList.map((page: any, idx: number) => (
                   <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                     <td className="p-3 font-mono text-purple-600 dark:text-purple-400 font-semibold">{page.path}</td>
-                    <td className="p-3 font-semibold text-slate-900 dark:text-white">{page.title}</td>
+                    <td className="p-3 font-semibold  dark:text-slate-900 dark:text-white ">{page.title}</td>
                     <td className="p-3 text-right font-bold">{page.users}</td>
-                    <td className="p-3 text-right font-bold text-slate-900 dark:text-white">{page.views}</td>
+                    <td className="p-3 text-right font-bold  dark:text-slate-900 dark:text-white ">{page.views}</td>
                     <td className="p-3 text-right font-mono text-emerald-600 dark:text-emerald-400">{page.engagement}</td>
                     <td className="p-3 text-right font-mono">{page.avgTime}</td>
                   </tr>
@@ -533,7 +533,7 @@ export const AnalyticsManager: React.FC<AnalyticsManagerProps> = () => {
         {/* Traffic Sources */}
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm space-y-4">
           <div>
-            <h2 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+            <h2 className="text-base font-extrabold  dark:text-slate-900 dark:text-white  flex items-center gap-2">
               <Globe className="w-5 h-5 text-indigo-500" />
               Traffic Sources & Acquisition
             </h2>
@@ -549,7 +549,7 @@ export const AnalyticsManager: React.FC<AnalyticsManagerProps> = () => {
                   key={idx}
                   className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs font-semibold"
                 >
-                  <span className="text-slate-900 dark:text-white">{src.source}</span>
+                  <span className=" dark:text-slate-900 dark:text-white ">{src.source}</span>
                   <div className="flex items-center gap-4 text-slate-500 dark:text-slate-400">
                     <span>{src.users} Users</span>
                     <span className="font-bold text-purple-600 dark:text-purple-400">{src.sessions} Sessions</span>
@@ -567,7 +567,7 @@ export const AnalyticsManager: React.FC<AnalyticsManagerProps> = () => {
         {/* Devices & Browsers */}
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm space-y-6">
           <div>
-            <h2 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+            <h2 className="text-base font-extrabold  dark:text-slate-900 dark:text-white  flex items-center gap-2">
               <Smartphone className="w-5 h-5 text-emerald-500" />
               Devices & Browsers
             </h2>
@@ -585,7 +585,7 @@ export const AnalyticsManager: React.FC<AnalyticsManagerProps> = () => {
               {devices.length > 0 ? (
                 devices.map((dev: any, idx: number) => (
                   <div key={idx} className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/60 flex items-center justify-between text-xs">
-                    <span className="capitalize font-semibold text-slate-900 dark:text-white">{dev.device}</span>
+                    <span className="capitalize font-semibold  dark:text-slate-900 dark:text-white ">{dev.device}</span>
                     <span className="font-bold text-purple-600 dark:text-purple-400">{dev.users} Users</span>
                   </div>
                 ))
@@ -602,7 +602,7 @@ export const AnalyticsManager: React.FC<AnalyticsManagerProps> = () => {
               {browsers.length > 0 ? (
                 browsers.map((b: any, idx: number) => (
                   <div key={idx} className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/60 flex items-center justify-between text-xs">
-                    <span className="font-semibold text-slate-900 dark:text-white">{b.browser}</span>
+                    <span className="font-semibold  dark:text-slate-900 dark:text-white ">{b.browser}</span>
                     <span className="font-bold text-emerald-600 dark:text-emerald-400">{b.users} Users</span>
                   </div>
                 ))
@@ -616,7 +616,7 @@ export const AnalyticsManager: React.FC<AnalyticsManagerProps> = () => {
 
       {/* GEOGRAPHIC LOCATIONS */}
       <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm space-y-4">
-        <h2 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+        <h2 className="text-base font-extrabold  dark:text-slate-900 dark:text-white  flex items-center gap-2">
           <Globe className="w-5 h-5 text-purple-600" />
           Geographic Demographics (Countries & Cities)
         </h2>
@@ -624,7 +624,7 @@ export const AnalyticsManager: React.FC<AnalyticsManagerProps> = () => {
           {geography.length > 0 ? (
             geography.map((geo: any, idx: number) => (
               <div key={idx} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800">
-                <span className="font-semibold text-slate-900 dark:text-white truncate">
+                <span className="font-semibold  dark:text-slate-900 dark:text-white  truncate">
                   {geo.country} {geo.city !== 'Unknown' ? `(${geo.city})` : ''}
                 </span>
                 <span className="font-bold text-purple-600 dark:text-purple-400 shrink-0">{geo.users} Visitors</span>
@@ -642,7 +642,7 @@ export const AnalyticsManager: React.FC<AnalyticsManagerProps> = () => {
       <div className="p-4 rounded-xl bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 flex items-center gap-3 text-xs text-slate-600 dark:text-slate-400">
         <ShieldCheck className="w-5 h-5 text-emerald-500 shrink-0" />
         <p>
-          <strong className="text-slate-900 dark:text-white font-bold">Privacy & Credentials Audit:</strong> All Google Analytics Data API queries run strictly server-side using Google Cloud Service Account JWTs. Private keys and client emails are NEVER exposed to client browsers or bundled outputs.
+          <strong className=" dark:text-slate-900 dark:text-white  font-bold">Privacy & Credentials Audit:</strong> All Google Analytics Data API queries run strictly server-side using Google Cloud Service Account JWTs. Private keys and client emails are NEVER exposed to client browsers or bundled outputs.
         </p>
       </div>
     </div>
