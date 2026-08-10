@@ -81,14 +81,20 @@ export const SettingsManager: React.FC = () => {
         </div>
 
         <div className="space-y-1">
-          <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Official Contact Email</label>
+          <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+            Primary Website & Communication Email <span className="text-slate-400 font-normal">(Default: probitianofficial@gmail.com)</span>
+          </label>
           <input
             type="email"
             required
             value={settings.contact_email}
             onChange={(e) => setSettings({ ...settings, contact_email: e.target.value })}
             className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-2.5 text-xs text-slate-900 dark:text-white font-mono"
+            placeholder="probitianofficial@gmail.com"
           />
+          <p className="text-[11px] text-slate-400">
+            Public contact email displayed across site footers and forms. Server SMTP credentials (<code className="font-mono text-purple-500">GMAIL_USER</code> / <code className="font-mono text-purple-500">GMAIL_APP_PASSWORD</code>) remain securely isolated in server environment variables and cannot be edited from this UI.
+          </p>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

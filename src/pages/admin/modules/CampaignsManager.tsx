@@ -305,27 +305,25 @@ export const CampaignsManager: React.FC = () => {
           <div className="mt-2 flex items-center gap-1.5">
             <span className={`w-2.5 h-2.5 rounded-full ${providerConfigured ? 'bg-emerald-500' : 'bg-amber-500'}`} />
             <span className="font-bold text-sm text-slate-900 dark:text-white">
-              {providerConfigured ? 'Resend API Active' : 'Setup Required'}
+              {providerConfigured ? 'Gmail SMTP Active' : 'Setup Required'}
             </span>
           </div>
           <p className="text-[11px] text-slate-400 mt-1">
-            {providerConfigured ? 'Live bulk delivery ready' : 'Set RESEND_API_KEY in .env'}
+            {providerConfigured ? 'probitianofficial@gmail.com' : 'Set GMAIL_APP_PASSWORD in .env'}
           </p>
         </div>
       </div>
 
-      {/* Provider Warning Banner if not configured */}
-      {!providerConfigured && (
-        <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-300 flex items-start gap-3">
-          <Info className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
-          <div className="text-xs space-y-1">
-            <p className="font-bold">Email Provider Setup Info (Resend API)</p>
-            <p>
-              Transactional emails continue sending via Gmail SMTP/Nodemailer. To enable live bulk campaign broadcasting, set <code className="bg-amber-500/20 px-1 py-0.5 rounded text-amber-900 dark:text-amber-200 font-mono">RESEND_API_KEY</code> in environment variables. Draft creation, email previews, and test email flows remain fully operational.
-            </p>
-          </div>
+      {/* Gmail SMTP Campaign Provider Notice */}
+      <div className="p-4 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-900 dark:text-purple-200 flex items-start gap-3">
+        <Info className="w-5 h-5 text-purple-500 flex-shrink-0 mt-0.5" />
+        <div className="text-xs space-y-1">
+          <p className="font-bold text-purple-950 dark:text-purple-100">Email Delivery Provider Notice</p>
+          <p className="text-purple-900/90 dark:text-purple-200">
+            ProBitian campaigns are currently sent through Gmail SMTP. Gmail has sending and rate limits. For larger mailing lists, migrate to a dedicated email delivery provider with a verified domain.
+          </p>
         </div>
-      )}
+      </div>
 
       {/* Filters & Search */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800">

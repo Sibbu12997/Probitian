@@ -15,6 +15,7 @@ export function MediaPicker({ onSelect, onClose, selectedUrl }: MediaPickerProps
   const [search, setSearch] = useState('');
   const [uploading, setUploading] = useState(false);
   const [activeTab, setActiveTab] = useState<'library' | 'upload'>('library');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     fetchMedia();
@@ -37,9 +38,10 @@ export function MediaPicker({ onSelect, onClose, selectedUrl }: MediaPickerProps
     
     try {
       setUploading(true);
+      setErrorMessage(null);
       const file = e.target.files[0];
 
-      // Convert file to base64 Data URL for permanent persistence
+      // Convert file to Base64 Data URL for server processing
       const dataUrl = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => resolve(reader.result as string);
@@ -47,22 +49,24 @@ export function MediaPicker({ onSelect, onClose, selectedUrl }: MediaPickerProps
         reader.readAsDataURL(file);
       });
       
-      const newMedia: MediaItem = {
-        id: `media_${Date.now()}`,
+      const result = await cmsService.uploadMediaFile({
+        fileData: dataUrl,
         filename: file.name,
-        url: dataUrl,
-        size_bytes: file.size,
-        mime_type: file.type,
-        folder: 'General',
-        created_at: new Date().toISOString()
-      };
+        category: 'general',
+        altText: file.name
+      });
+
+      if (!result.success || !result.media) {
+        setErrorMessage(result.error || 'Upload failed.');
+        return;
+      }
       
-      await cmsService.createMedia(newMedia);
       await fetchMedia();
-      onSelect(newMedia.url);
+      onSelect(result.media.public_url || result.media.url);
       onClose();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error uploading file:', error);
+      setErrorMessage(error?.message || 'Error processing upload.');
     } finally {
       setUploading(false);
     }
@@ -131,7 +135,12 @@ export function MediaPicker({ onSelect, onClose, selectedUrl }: MediaPickerProps
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-4">
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          {errorMessage && (
+            <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-600 dark:text-red-400 text-xs font-semibold">
+              {errorMessage}
+            </div>
+          )}
           {activeTab === 'upload' ? (
             <div className="h-full min-h-[300px] flex flex-col items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-900/50 relative">
               <input

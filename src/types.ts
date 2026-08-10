@@ -117,11 +117,19 @@ export interface NewsletterSubscriber {
 export interface MediaItem {
   id: string;
   filename: string;
+  original_filename?: string;
+  storage_path?: string;
+  public_url?: string;
   url: string;
   size_bytes: number;
+  file_size?: number;
   mime_type: string;
+  alt_text?: string;
+  category?: string;
   folder: string;
+  uploaded_at?: string;
   created_at: string;
+  updated_at?: string;
 }
 
 export interface SocialLinkItem {

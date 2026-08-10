@@ -10,22 +10,26 @@ interface FooterProps {
 
 export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
   const [logoUrl, setLogoUrl] = useState<string>('/logo.svg');
+  const [contactEmail, setContactEmail] = useState<string>('probitianofficial@gmail.com');
   const [newsletterEmail, setNewsletterEmail] = useState('');
   const [newsletterSubmitting, setNewsletterSubmitting] = useState(false);
   const [newsletterSuccess, setNewsletterSuccess] = useState(false);
 
-  const loadLogo = async () => {
+  const loadSettings = async () => {
     try {
       const settings = await cmsService.getGeneralSettings();
       if (settings?.logo_url) {
         setLogoUrl(settings.logo_url);
       }
+      if (settings?.contact_email) {
+        setContactEmail(settings.contact_email);
+      }
     } catch (e) {}
   };
 
   useEffect(() => {
-    loadLogo();
-    const handleBrandingUpdate = () => loadLogo();
+    loadSettings();
+    const handleBrandingUpdate = () => loadSettings();
     window.addEventListener('probitian_branding_updated', handleBrandingUpdate);
     return () => window.removeEventListener('probitian_branding_updated', handleBrandingUpdate);
   }, []);
@@ -121,7 +125,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
                 <Github className="w-4 h-4" />
               </a>
               <a
-                href="mailto:Probitianofficial@gmail.com"
+                href={`mailto:${contactEmail}`}
                 onClick={() => trackContactClick('footer_email')}
                 className="p-2.5 rounded-xl bg-slate-800 hover:bg-emerald-600/20 hover:text-emerald-400 text-slate-300 border border-slate-700/60 transition-all"
                 aria-label="Direct Email"
@@ -216,11 +220,11 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
             <h4 className="text-xs font-bold uppercase tracking-wider text-purple-400 mb-4">Community & Contact</h4>
             <p className="text-xs text-slate-400 mb-3">Have questions or project inquiries? Reach out directly:</p>
             <a
-              href="mailto:Probitianofficial@gmail.com"
+              href={`mailto:${contactEmail}`}
               onClick={() => trackContactClick('footer_direct_link')}
               className="inline-flex items-center gap-2 text-xs font-semibold text-amber-400 hover:text-amber-300 transition-colors"
             >
-              <Mail className="w-3.5 h-3.5" /> Probitianofficial@gmail.com
+              <Mail className="w-3.5 h-3.5" /> {contactEmail}
             </a>
             <div className="mt-4 pt-4 border-t border-slate-800">
               <a

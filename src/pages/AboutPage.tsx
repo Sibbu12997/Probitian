@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavPage } from '../types';
+import { cmsService } from '../services/cmsService';
 import { BannerGraphic } from '../components/BannerGraphic';
 import { 
   BookOpen, 
@@ -25,6 +26,14 @@ interface AboutPageProps {
 }
 
 export const AboutPage: React.FC<AboutPageProps> = ({ onNavigate }) => {
+  const [contactEmail, setContactEmail] = useState<string>('probitianofficial@gmail.com');
+
+  useEffect(() => {
+    cmsService.getGeneralSettings().then((g) => {
+      if (g?.contact_email) setContactEmail(g.contact_email);
+    }).catch(() => {});
+  }, []);
+
   const valueCards = [
     {
       title: 'Beginner to Advanced Concepts',
@@ -230,7 +239,7 @@ export const AboutPage: React.FC<AboutPageProps> = ({ onNavigate }) => {
             <Instagram className="w-4 h-4" /> Instagram
           </a>
           <a
-            href="mailto:probitianofficial@gmail.com"
+            href={`mailto:${contactEmail}`}
             onClick={() => trackContactClick('about_page_email')}
             className="btn-radius px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold flex items-center gap-2 border border-slate-700 transition-all cursor-pointer"
           >

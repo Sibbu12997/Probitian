@@ -8,7 +8,7 @@ export const MediaLibraryManager: React.FC = () => {
   const [search, setSearch] = useState('');
   const [activeFolder, setActiveFolder] = useState<string>('all');
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   useEffect(() => {
     loadMedia();
@@ -23,24 +23,51 @@ export const MediaLibraryManager: React.FC = () => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
+    let successCount = 0;
+    let failCount = 0;
+    let lastError = '';
+
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      // In web applet, convert uploaded file to Object URL or Data URL for preview storage
-      const objectUrl = URL.createObjectURL(file);
-      await cmsService.createMedia({
-        id: `media_${Date.now()}_${i}`,
-        filename: file.name,
-        url: objectUrl,
-        size_bytes: file.size,
-        mime_type: file.type || 'application/octet-stream',
-        folder: activeFolder === 'all' ? 'general' : activeFolder,
-        created_at: new Date().toISOString()
-      });
+      try {
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+
+        const targetCategory = activeFolder === 'all' ? 'general' : activeFolder;
+        const res = await cmsService.uploadMediaFile({
+          fileData: dataUrl,
+          filename: file.name,
+          category: targetCategory,
+          folder: targetCategory,
+          altText: file.name
+        });
+
+        if (res.success) {
+          successCount++;
+        } else {
+          failCount++;
+          lastError = res.error || 'Upload error';
+        }
+      } catch (err: any) {
+        failCount++;
+        lastError = err?.message || 'Upload exception';
+      }
     }
 
-    setMessage('Media files uploaded successfully!');
+    if (failCount > 0 && successCount === 0) {
+      setMessage({ type: 'error', text: `Upload failed: ${lastError}` });
+    } else if (failCount > 0) {
+      setMessage({ type: 'error', text: `Uploaded ${successCount} file(s), but ${failCount} failed (${lastError}).` });
+    } else {
+      setMessage({ type: 'success', text: `Successfully uploaded ${successCount} file(s) to Supabase Storage!` });
+    }
+
     loadMedia();
-    setTimeout(() => setMessage(null), 3000);
+    setTimeout(() => setMessage(null), 4000);
   };
 
   const handleCopyUrl = (url: string, id: string) => {
@@ -50,11 +77,15 @@ export const MediaLibraryManager: React.FC = () => {
   };
 
   const handleDelete = async (id: string) => {
-    if (window.confirm('Delete this media asset?')) {
-      await cmsService.deleteMedia(id);
-      setMessage('Media item deleted.');
-      loadMedia();
-      setTimeout(() => setMessage(null), 3000);
+    if (window.confirm('Delete this media asset from Supabase Storage?')) {
+      const res = await cmsService.deleteMedia(id);
+      if (res.success) {
+        setMessage({ type: 'success', text: 'Media asset deleted successfully.' });
+        loadMedia();
+      } else {
+        setMessage({ type: 'error', text: res.error || 'Failed to delete asset.' });
+      }
+      setTimeout(() => setMessage(null), 4000);
     }
   };
 
@@ -88,9 +119,13 @@ export const MediaLibraryManager: React.FC = () => {
       </div>
 
       {message && (
-        <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400 text-xs font-semibold flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-          <span>{message}</span>
+        <div className={`p-3 rounded-xl text-xs font-semibold flex items-center gap-2 ${
+          message.type === 'success' 
+            ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400'
+            : 'bg-red-500/10 border border-red-500/30 text-red-700 dark:text-red-400'
+        }`}>
+          <CheckCircle2 className={`w-4 h-4 ${message.type === 'success' ? 'text-emerald-500' : 'text-red-500'}`} />
+          <span>{message.text}</span>
         </div>
       )}
 

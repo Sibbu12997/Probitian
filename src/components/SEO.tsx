@@ -16,6 +16,7 @@ export const SEO: React.FC<SEOProps> = ({
   ogImage,
 }) => {
   const [cmsSeo, setCmsSeo] = useState<SeoSettings | null>(null);
+  const [contactEmail, setContactEmail] = useState<string>('probitianofficial@gmail.com');
 
   useEffect(() => {
     cmsService.getSeoSettings().then((data) => {
@@ -25,6 +26,12 @@ export const SEO: React.FC<SEOProps> = ({
     }).catch((err) => {
       console.warn('Could not fetch CMS SEO settings:', err);
     });
+
+    cmsService.getGeneralSettings().then((g) => {
+      if (g?.contact_email) {
+        setContactEmail(g.contact_email);
+      }
+    }).catch(() => {});
   }, []);
 
   const finalTitle = title || cmsSeo?.meta_title || 'ProBItian | Master Business Intelligence';
@@ -82,7 +89,7 @@ export const SEO: React.FC<SEOProps> = ({
     founder: {
       '@type': 'Person',
       name: 'Shivam Baghel',
-      email: 'Probitianofficial@gmail.com',
+      email: contactEmail,
     },
     knowsAbout: ['Power BI', 'SQL', 'Excel', 'Power Query', 'DAX', 'Business Intelligence', 'Data Analytics', 'AI Tools'],
   };

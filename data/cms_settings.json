@@ -3,5 +3,67 @@
     "site_name": "ProBitian",
     "logo_url": "/logo.svg",
     "banner_url": "/banner.svg"
-  }
+  },
+  "media": [
+    {
+      "id": "m-1786374915433-6ec152",
+      "filename": "Banner.svg",
+      "original_filename": "Banner.svg",
+      "storage_path": "general/1786374914972-c54a1a00-Banner.svg",
+      "public_url": "https://dlaehchzzkjsrarktfsf.supabase.co/storage/v1/object/public/probitian-media/general/1786374914972-c54a1a00-Banner.svg",
+      "url": "https://dlaehchzzkjsrarktfsf.supabase.co/storage/v1/object/public/probitian-media/general/1786374914972-c54a1a00-Banner.svg",
+      "file_size": 282616,
+      "size_bytes": 282616,
+      "mime_type": "image/svg+xml",
+      "alt_text": "Banner.svg",
+      "category": "general",
+      "folder": "general",
+      "uploaded_at": "2026-08-10T15:15:15.433Z",
+      "created_at": "2026-08-10T15:15:15.433Z",
+      "updated_at": "2026-08-10T15:15:15.433Z"
+    },
+    {
+      "id": "m-1786374903150-3527eb",
+      "filename": "Logo__2_.svg",
+      "original_filename": "Logo (2).svg",
+      "storage_path": "general/1786374902395-2c321b22-Logo__2_.svg",
+      "public_url": "https://dlaehchzzkjsrarktfsf.supabase.co/storage/v1/object/public/probitian-media/general/1786374902395-2c321b22-Logo__2_.svg",
+      "url": "https://dlaehchzzkjsrarktfsf.supabase.co/storage/v1/object/public/probitian-media/general/1786374902395-2c321b22-Logo__2_.svg",
+      "file_size": 147003,
+      "size_bytes": 147003,
+      "mime_type": "image/svg+xml",
+      "alt_text": "Logo (2).svg",
+      "category": "general",
+      "folder": "general",
+      "uploaded_at": "2026-08-10T15:15:03.150Z",
+      "created_at": "2026-08-10T15:15:03.150Z",
+      "updated_at": "2026-08-10T15:15:03.150Z"
+    }
+  ],
+  "subscribers": [
+    {
+      "id": "sub-1786375517731",
+      "email": "probitian_reactivate_test@gmail.com",
+      "status": "active",
+      "created_at": "2026-08-10T15:25:17.731Z"
+    },
+    {
+      "id": "sub-1786375508695",
+      "email": "probitianofficial+test_dup@gmail.com",
+      "status": "active",
+      "created_at": "2026-08-10T15:25:08.695Z"
+    },
+    {
+      "id": "sub-1786375501047",
+      "email": "probitianofficial+test1786375500865@gmail.com",
+      "status": "active",
+      "created_at": "2026-08-10T15:25:01.047Z"
+    },
+    {
+      "id": "sub-1786375498741",
+      "email": "probitian_new_test_1786375498042@gmail.com",
+      "status": "active",
+      "created_at": "2026-08-10T15:24:58.741Z"
+    }
+  ]
 }

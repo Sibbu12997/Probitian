@@ -154,8 +154,36 @@ export const BrandingManager: React.FC = () => {
     setMessage(null);
 
     try {
-      const updatedLogoUrl = pendingLogo !== null ? pendingLogo : settings.logo_url;
-      const updatedBannerUrl = pendingBanner !== null ? pendingBanner : settings.banner_url;
+      let updatedLogoUrl = pendingLogo !== null ? pendingLogo : settings.logo_url;
+      let updatedBannerUrl = pendingBanner !== null ? pendingBanner : settings.banner_url;
+
+      // Upload pending base64 logo to Supabase Storage
+      if (pendingLogo && pendingLogo.startsWith('data:')) {
+        const logoRes = await cmsService.uploadMediaFile({
+          fileData: pendingLogo,
+          filename: pendingLogoName || 'logo.svg',
+          category: 'logos',
+          folder: 'logos',
+          altText: 'Website Logo'
+        });
+        if (logoRes.success && logoRes.media) {
+          updatedLogoUrl = logoRes.media.public_url || logoRes.media.url;
+        }
+      }
+
+      // Upload pending base64 banner to Supabase Storage
+      if (pendingBanner && pendingBanner.startsWith('data:')) {
+        const bannerRes = await cmsService.uploadMediaFile({
+          fileData: pendingBanner,
+          filename: pendingBannerName || 'banner.svg',
+          category: 'banners',
+          folder: 'banners',
+          altText: 'Hero Banner'
+        });
+        if (bannerRes.success && bannerRes.media) {
+          updatedBannerUrl = bannerRes.media.public_url || bannerRes.media.url;
+        }
+      }
 
       const newSettings: WebsiteGeneralSettings = {
         ...settings,

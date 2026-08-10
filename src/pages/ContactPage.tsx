@@ -35,6 +35,7 @@ export const ContactPage: React.FC = () => {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [socialLinks, setSocialLinks] = useState<SocialLinkItem[]>([]);
+  const [contactEmail, setContactEmail] = useState<string>('probitianofficial@gmail.com');
   const [hubSettings, setHubSettings] = useState<{ name: string; address: string; url: string }>({
     name: 'ProBitian Community Hub',
     address: 'M93M+688, Salaiya, Madhya Pradesh 486440, India',
@@ -53,6 +54,7 @@ export const ContactPage: React.FC = () => {
       ]);
       setSocialLinks(links.filter((l) => l.is_active));
       if (settings) {
+        if (settings.contact_email) setContactEmail(settings.contact_email);
         setHubSettings({
           name: settings.community_hub_name || 'ProBitian Community Hub',
           address: settings.community_hub_address || 'M93M+688, Salaiya, Madhya Pradesh 486440, India',
@@ -179,7 +181,7 @@ export const ContactPage: React.FC = () => {
                 Message Sent Successfully!
               </h3>
               <p className="text-xs sm:text-sm text-emerald-700 dark:text-emerald-300 leading-relaxed max-w-md mx-auto">
-                Thanks for reaching out. We've received your enquiry and will get back to you soon. A notification has been logged for Shivam Baghel at <strong className="font-bold">probitianofficial@gmail.com</strong>.
+                Thanks for reaching out. We've received your enquiry and will get back to you soon. A notification has been logged for Shivam Baghel at <strong className="font-bold">{contactEmail}</strong>.
               </p>
               <button
                 onClick={() => setSubmitted(false)}
@@ -334,8 +336,8 @@ export const ContactPage: React.FC = () => {
 
             <div className="space-y-3">
               <a
-                href="mailto:probitianofficial@gmail.com"
-                onClick={() => trackSocialClick('email', 'mailto:probitianofficial@gmail.com')}
+                href={`mailto:${contactEmail}`}
+                onClick={() => trackSocialClick('email', `mailto:${contactEmail}`)}
                 className="flex items-center gap-3.5 p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/70 hover:border-purple-400 transition-all group"
               >
                 <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-500">
@@ -345,7 +347,7 @@ export const ContactPage: React.FC = () => {
                   <p className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
                     Email Address
                   </p>
-                  <p className="font-mono text-xs text-slate-600 dark:text-slate-400">probitianofficial@gmail.com</p>
+                  <p className="font-mono text-xs text-slate-600 dark:text-slate-400">{contactEmail}</p>
                 </div>
               </a>
 

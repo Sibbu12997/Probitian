@@ -1,16 +1,21 @@
 import { Resend } from 'resend';
+import { getGmailUser, getGmailPass, getTransporter, sanitizeError } from './emailService';
 
 const resendApiKey = (process.env.RESEND_API_KEY || '').trim();
-const fromEmail = (process.env.EMAIL_FROM || process.env.RESEND_FROM_EMAIL || 'ProBitian Newsletter <newsletter@probitian.com>').trim();
-
-const resendClient = resendApiKey ? new Resend(resendApiKey) : null;
 
 export const campaignEmailService = {
   isConfigured(): boolean {
-    return Boolean(resendApiKey && resendApiKey.length > 5);
+    const gmailPass = getGmailPass();
+    return Boolean((gmailPass && gmailPass.length > 0) || (resendApiKey && resendApiKey.length > 5));
   },
 
   getSenderInfo(): string {
+    const gmailUser = getGmailUser();
+    const gmailPass = getGmailPass();
+    if (gmailPass) {
+      return `ProBitian Newsletter <${gmailUser}> (via Gmail SMTP)`;
+    }
+    const fromEmail = (process.env.EMAIL_FROM || process.env.RESEND_FROM_EMAIL || `ProBitian Newsletter <${gmailUser}>`).trim();
     return fromEmail;
   },
 
@@ -20,6 +25,7 @@ export const campaignEmailService = {
     contentHtml: string;
     unsubscribeUrl: string;
   }): string {
+    const gmailUser = getGmailUser();
     const { previewText, contentHtml, unsubscribeUrl } = params;
     return `<!DOCTYPE html>
 <html lang="en">
@@ -29,7 +35,7 @@ export const campaignEmailService = {
   <title>ProBitian Newsletter</title>
   <style>
     body { margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1e293b; line-height: 1.6; }
-    .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; margin-top: 24px; margin-bottom: 24px; shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+    .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; margin-top: 24px; margin-bottom: 24px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
     .header { background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%); padding: 32px 24px; text-align: center; }
     .logo-badge { display: inline-block; background-color: #f59e0b; color: #0f172a; font-weight: 900; padding: 6px 12px; border-radius: 8px; font-size: 16px; letter-spacing: -0.5px; margin-bottom: 8px; }
     .header-title { color: #ffffff; font-size: 22px; font-weight: 800; margin: 0; letter-spacing: -0.5px; }
@@ -62,7 +68,7 @@ export const campaignEmailService = {
     <div class="footer">
       <p style="margin: 0; font-weight: 600; color: #475569;">ProBitian Global BI Community Hub</p>
       <p style="margin: 4px 0;">Salaiya, Madhya Pradesh 486440, India</p>
-      <p style="margin: 4px 0;">Official Support: <a href="mailto:probitianofficial@gmail.com" style="color: #7c3aed;">probitianofficial@gmail.com</a></p>
+      <p style="margin: 4px 0;">Official Support: <a href="mailto:${gmailUser}" style="color: #7c3aed;">${gmailUser}</a></p>
       
       <div class="footer-links">
         <a href="${unsubscribeUrl}" target="_blank" rel="noopener noreferrer">Unsubscribe from Newsletter</a> &bull; 
@@ -82,48 +88,73 @@ export const campaignEmailService = {
     contentHtml: string;
     unsubscribeUrl: string;
   }): Promise<{ success: boolean; message: string; messageId?: string }> {
-    if (!resendClient) {
-      console.log(`[RESEND INFO] Test campaign email to ${params.testEmail} recorded. RESEND_API_KEY environment variable is not configured.`);
-      return {
-        success: false,
-        message: 'RESEND_API_KEY environment variable is not set on the server. Set RESEND_API_KEY to send live test emails.'
-      };
-    }
+    const gmailUser = getGmailUser();
+    const gmailPass = getGmailPass();
+    const html = this.generateCampaignHtml({
+      subject: params.subject,
+      previewText: params.previewText,
+      contentHtml: params.contentHtml,
+      unsubscribeUrl: params.unsubscribeUrl
+    });
 
-    try {
-      const html = this.generateCampaignHtml({
-        subject: params.subject,
-        previewText: params.previewText,
-        contentHtml: params.contentHtml,
-        unsubscribeUrl: params.unsubscribeUrl
-      });
-
-      const response = await resendClient.emails.send({
-        from: fromEmail,
-        to: params.testEmail,
-        subject: `[TEST CAMPAIGN] ${params.subject}`,
-        html
-      });
-
-      if (response.error) {
+    if (gmailPass) {
+      try {
+        const transporter = getTransporter();
+        const info = await transporter.sendMail({
+          from: `"ProBitian Newsletter" <${gmailUser}>`,
+          to: params.testEmail,
+          subject: `[TEST CAMPAIGN] ${params.subject}`,
+          html: html
+        });
+        return {
+          success: true,
+          message: `Test campaign email dispatched via Gmail SMTP to ${params.testEmail}`,
+          messageId: info.messageId
+        };
+      } catch (err: any) {
+        const sanitized = sanitizeError(err);
         return {
           success: false,
-          message: `Resend API Error: ${response.error.message}`
+          message: `Gmail SMTP Error: ${sanitized || 'Failed to dispatch test email.'}`
         };
       }
-
-      return {
-        success: true,
-        message: `Test email dispatched successfully to ${params.testEmail}`,
-        messageId: response.data?.id
-      };
-    } catch (err: any) {
-      console.error('Error sending test campaign email:', err);
-      return {
-        success: false,
-        message: err?.message || 'Failed to dispatch test email via Resend.'
-      };
     }
+
+    if (resendApiKey) {
+      try {
+        const resendClient = new Resend(resendApiKey);
+        const fromEmail = (process.env.EMAIL_FROM || process.env.RESEND_FROM_EMAIL || `ProBitian Newsletter <${gmailUser}>`).trim();
+        const response = await resendClient.emails.send({
+          from: fromEmail,
+          to: params.testEmail,
+          subject: `[TEST CAMPAIGN] ${params.subject}`,
+          html: html
+        });
+
+        if (response.error) {
+          return {
+            success: false,
+            message: `Resend API Error: ${response.error.message}`
+          };
+        }
+
+        return {
+          success: true,
+          message: `Test email dispatched successfully to ${params.testEmail} via Resend`,
+          messageId: response.data?.id
+        };
+      } catch (err: any) {
+        return {
+          success: false,
+          message: err?.message || 'Failed to dispatch test email via Resend.'
+        };
+      }
+    }
+
+    return {
+      success: false,
+      message: 'GMAIL_APP_PASSWORD is not configured in the server environment.'
+    };
   },
 
   async sendSingleRecipient(params: {
@@ -133,44 +164,71 @@ export const campaignEmailService = {
     contentHtml: string;
     unsubscribeUrl: string;
   }): Promise<{ success: boolean; messageId?: string; error?: string }> {
-    if (!resendClient) {
-      return {
-        success: false,
-        error: 'RESEND_API_KEY environment variable is missing on server.'
-      };
-    }
+    const gmailUser = getGmailUser();
+    const gmailPass = getGmailPass();
+    const html = this.generateCampaignHtml({
+      subject: params.subject,
+      previewText: params.previewText,
+      contentHtml: params.contentHtml,
+      unsubscribeUrl: params.unsubscribeUrl
+    });
 
-    try {
-      const html = this.generateCampaignHtml({
-        subject: params.subject,
-        previewText: params.previewText,
-        contentHtml: params.contentHtml,
-        unsubscribeUrl: params.unsubscribeUrl
-      });
-
-      const response = await resendClient.emails.send({
-        from: fromEmail,
-        to: params.toEmail,
-        subject: params.subject,
-        html
-      });
-
-      if (response.error) {
+    if (gmailPass) {
+      try {
+        const transporter = getTransporter();
+        const info = await transporter.sendMail({
+          from: `"ProBitian Newsletter" <${gmailUser}>`,
+          to: params.toEmail,
+          subject: params.subject,
+          html: html
+        });
+        return {
+          success: true,
+          messageId: info.messageId
+        };
+      } catch (err: any) {
+        const sanitized = sanitizeError(err);
         return {
           success: false,
-          error: response.error.message
+          error: sanitized || 'SMTP delivery error via Gmail.'
         };
       }
-
-      return {
-        success: true,
-        messageId: response.data?.id
-      };
-    } catch (err: any) {
-      return {
-        success: false,
-        error: err?.message || 'Network error delivering via Resend.'
-      };
     }
+
+    if (resendApiKey) {
+      try {
+        const resendClient = new Resend(resendApiKey);
+        const fromEmail = (process.env.EMAIL_FROM || process.env.RESEND_FROM_EMAIL || `ProBitian Newsletter <${gmailUser}>`).trim();
+        const response = await resendClient.emails.send({
+          from: fromEmail,
+          to: params.toEmail,
+          subject: params.subject,
+          html: html
+        });
+
+        if (response.error) {
+          return {
+            success: false,
+            error: response.error.message
+          };
+        }
+
+        return {
+          success: true,
+          messageId: response.data?.id
+        };
+      } catch (err: any) {
+        return {
+          success: false,
+          error: err?.message || 'Network error delivering via Resend.'
+        };
+      }
+    }
+
+    return {
+      success: false,
+      error: 'GMAIL_APP_PASSWORD is not configured in the server environment.'
+    };
   }
 };
+
