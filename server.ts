@@ -199,7 +199,6 @@ app.post('/api/newsletter', async (req, res) => {
   }
 
   let subscriberRecord: any = null;
-  let supabasePersisted = false;
 
   if (serverSupabase) {
     try {
@@ -210,12 +209,23 @@ app.post('/api/newsletter', async (req, res) => {
         .maybeSingle();
 
       if (checkErr) {
-        console.warn(`[NEWSLETTER] Supabase check warning: ${checkErr.message}. Falling back to file store.`);
-      } else if (existing) {
+        console.error(`[NEWSLETTER] Supabase query error checking subscriber: ${checkErr.message}`);
+        return res.status(503).json({
+          success: false,
+          message: 'Database service unavailable. Unable to process subscription.'
+        });
+      }
+
+      if (existing) {
         if (existing.status === 'active') {
           console.log(`[NEWSLETTER] Email ${cleanEmail} is already actively subscribed in Supabase.`);
-          return res.json({ success: true, message: 'You are already subscribed to ProBitian!', subscriber: existing });
+          return res.status(200).json({
+            success: true,
+            message: 'You are already subscribed to ProBitian!',
+            subscriber: existing
+          });
         } else {
+          // Reactivate unsubscribed user in Supabase
           const { data: updated, error: updateErr } = await serverSupabase
             .from('newsletter')
             .update({ status: 'active' })
@@ -223,79 +233,94 @@ app.post('/api/newsletter', async (req, res) => {
             .select()
             .single();
 
-          if (updateErr) {
-            console.warn(`[NEWSLETTER] Supabase update warning: ${updateErr.message}`);
-          } else {
-            subscriberRecord = updated;
-            supabasePersisted = true;
+          if (updateErr || !updated) {
+            console.error(`[NEWSLETTER] Supabase reactivation error: ${updateErr?.message}`);
+            return res.status(503).json({
+              success: false,
+              message: 'Database service unavailable. Failed to reactivate subscription.'
+            });
           }
+          subscriberRecord = updated;
         }
       } else {
+        // Insert new subscriber in Supabase
         const { data: inserted, error: insertErr } = await serverSupabase
           .from('newsletter')
           .insert({ email: cleanEmail, status: 'active' })
           .select()
           .single();
 
-        if (insertErr) {
-          console.warn(`[NEWSLETTER] Supabase insert warning: ${insertErr.message}`);
-        } else {
-          subscriberRecord = inserted;
-          supabasePersisted = true;
+        if (insertErr || !inserted) {
+          console.error(`[NEWSLETTER] Supabase insert error: ${insertErr?.message}`);
+          return res.status(503).json({
+            success: false,
+            message: 'Database service unavailable. Failed to save subscription.'
+          });
         }
+        subscriberRecord = inserted;
       }
     } catch (err: any) {
-      console.warn(`[NEWSLETTER] Supabase exception: ${err?.message || 'Unknown error'}`);
+      console.error(`[NEWSLETTER] Supabase exception: ${err?.message || 'Unknown error'}`);
+      return res.status(503).json({
+        success: false,
+        message: 'Database service unavailable. Exception during subscription.'
+      });
     }
-  }
 
-  // Local File System Persistence & Fallback
-  const data = readCmsData();
-  data.subscribers = data.subscribers || [];
-  const localIdx = data.subscribers.findIndex((s: any) => s.email.toLowerCase() === cleanEmail);
-
-  if (localIdx >= 0) {
-    const existingLocal = data.subscribers[localIdx];
-    if (existingLocal.status === 'active' && !subscriberRecord) {
-      console.log(`[NEWSLETTER] Email ${cleanEmail} is already actively subscribed in local storage.`);
-      return res.json({ success: true, message: 'You are already subscribed to ProBitian!', subscriber: existingLocal });
-    }
-    existingLocal.status = 'active';
-    if (subscriberRecord) {
-      data.subscribers[localIdx] = subscriberRecord;
-    } else {
-      subscriberRecord = existingLocal;
+    // Backup sync to local file (non-authoritative)
+    try {
+      const data = readCmsData();
+      data.subscribers = data.subscribers || [];
+      const localIdx = data.subscribers.findIndex((s: any) => s.email.toLowerCase() === cleanEmail);
+      if (localIdx >= 0) {
+        data.subscribers[localIdx] = subscriberRecord;
+      } else {
+        data.subscribers.unshift(subscriberRecord);
+      }
+      writeCmsData(data);
+    } catch (syncErr) {
+      console.warn('[NEWSLETTER] Backup local sync warning:', syncErr);
     }
   } else {
-    if (!subscriberRecord) {
+    // Fallback ONLY when Supabase is completely unconfigured
+    const data = readCmsData();
+    data.subscribers = data.subscribers || [];
+    const localIdx = data.subscribers.findIndex((s: any) => s.email.toLowerCase() === cleanEmail);
+
+    if (localIdx >= 0) {
+      const existingLocal = data.subscribers[localIdx];
+      if (existingLocal.status === 'active') {
+        return res.status(200).json({
+          success: true,
+          message: 'You are already subscribed to ProBitian!',
+          subscriber: existingLocal
+        });
+      }
+      existingLocal.status = 'active';
+      subscriberRecord = existingLocal;
+    } else {
       subscriberRecord = {
         id: 'sub-' + Date.now(),
         email: cleanEmail,
         status: 'active',
         created_at: new Date().toISOString()
       };
+      data.subscribers.unshift(subscriberRecord);
     }
-    data.subscribers.unshift(subscriberRecord);
-  }
-  writeCmsData(data);
-
-  if (supabasePersisted) {
-    console.log(`[NEWSLETTER] Supabase subscriber persistence: SUCCESS for ${cleanEmail}`);
-  } else {
-    console.log(`[NEWSLETTER] Local file subscriber persistence: SUCCESS for ${cleanEmail}`);
+    writeCmsData(data);
   }
 
-  // Always send welcome email for new/reactivated subscriptions
-  console.log(`[NEWSLETTER] Welcome email attempt: START for ${cleanEmail}`);
+  // Send welcome email ONLY after successful database persistence
+  console.log(`[NEWSLETTER] Sending welcome email for: ${cleanEmail}`);
   const emailRes = await emailService.sendWelcomeEmail(cleanEmail);
 
   if (emailRes.success) {
-    console.log(`[NEWSLETTER] Welcome email attempt: SUCCESS for ${cleanEmail}`);
+    console.log(`[NEWSLETTER] Welcome email sent successfully to: ${cleanEmail}`);
   } else {
-    console.error(`[NEWSLETTER] Welcome email attempt: FAILED for ${cleanEmail} - ${emailRes.message}`);
+    console.error(`[NEWSLETTER] Welcome email dispatch failed for: ${cleanEmail} - ${emailRes.message}`);
   }
 
-  return res.json({
+  return res.status(200).json({
     success: true,
     message: emailRes.message || 'Successfully subscribed to the newsletter!',
     subscriber: subscriberRecord,

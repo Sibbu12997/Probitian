@@ -1,0 +1,79 @@
+# ProBitian — Deployment Workflow Documentation
+
+Official Deployment Pipeline & Release Procedures for ProBitian.
+
+Project Owner: **Shivam Singh**  
+Official Website: [https://probitian.ai.studio/](https://probitian.ai.studio/)  
+Official Communication Email: [probitianofficial@gmail.com](mailto:probitianofficial@gmail.com)  
+
+---
+
+## 1. Overview
+
+This document outlines the step-by-step production deployment workflow for ProBitian, ensuring zero downtime, safe database schema updates, and clean releases.
+
+---
+
+## 2. Standard Deployment Pipeline
+
+```
+1. LOCAL DEVELOPMENT
+   └── Code Changes & Bug Fixes
+        ↓
+2. TYPECHECK & LINT
+   └── Run `npm run lint` (`tsc --noEmit`)
+        ↓
+3. PRODUCTION BUILD
+   └── Run `npm run build` (`vite build` + `esbuild server.ts`)
+        ↓
+4. DATABASE SCHEMA REVIEW
+   └── Identify if changes require database schema updates
+        ├── If Schema Updated: Create new migration in `supabase/migrations/`
+        ├── Review SQL for idempotency (CREATE IF NOT EXISTS, ADD COLUMN IF NOT EXISTS)
+        ├── Apply SQL in Supabase Dashboard SQL Editor
+        ├── Execute Grants (`GRANT ALL ON ALL TABLES IN SCHEMA public TO service_role;`)
+        └── Verify RLS and Table Permissions
+        ↓
+5. API & SYSTEM SMOKE TESTS
+   └── Test API endpoints (`/api/health`, `/api/cms/settings`)
+   └── Test Contact Form Submission & Email Delivery (Gmail SMTP)
+   └── Test Media Upload to Supabase Storage (`probitian-media`)
+        ↓
+6. DEPLOYMENT & REPUBLISH
+   └── Deploy Container Image / Cloud Run Service
+        ↓
+7. PRODUCTION VERIFICATION & UAT
+   └── Verify Live Web Application (https://probitian.ai.studio/)
+   └── Verify Admin Control Center Access
+   └── Verify Data Persistence in Supabase PostgreSQL
+```
+
+---
+
+## 3. Mandatory Non-Destructive Rules
+
+> 🚨 **NON-DESTRUCTIVE STARTUP MANDATE**:
+> Application startup (`server.ts`) must **NEVER** automatically perform:
+> - `DROP TABLE`
+> - `TRUNCATE`
+> - Automated database table recreation
+> - `DELETE` of production records
+> - Destruction or seeding of test records over production data
+
+All database migrations are forward-only, incremental SQL scripts explicitly applied and verified in Supabase prior to code deployment.
+
+---
+
+## 4. Post-Deployment Verification Protocol
+
+Immediately following a deployment:
+1. Load `https://probitian.ai.studio/` in a fresh browser session.
+2. Verify home page layout, featured courses, and project showcases.
+3. Submit a test enquiry via `#/contact` and verify email dispatch.
+4. Subscribe a test email via footer and confirm Supabase `newsletter` insert.
+5. Log into `#/admin` with `ADMIN_PASSKEY` and verify GA4 analytics metrics load.
+6. Test uploading a sample image in the Media Library.
+
+---
+
+*Documentation maintained by Shivam Singh — ProBitian.*

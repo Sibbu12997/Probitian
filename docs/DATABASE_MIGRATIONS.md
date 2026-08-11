@@ -1,8 +1,16 @@
-# ProBitian Database Migration & Schema Management Guide
+# ProBitian — Database Migrations & Schema Management Guide
+
+Official Database Migration Specification for ProBitian.
+
+Project Owner: **Shivam Singh**  
+Official Website: [https://probitian.ai.studio/](https://probitian.ai.studio/)  
+Official Communication Email: [probitianofficial@gmail.com](mailto:probitianofficial@gmail.com)  
+
+---
 
 ## 1. Production Database Architecture & Source of Truth
 
-**Supabase PostgreSQL** is the **SINGLE AUTHORITATIVE SOURCE OF TRUTH** for all production CMS data across ProBitian:
+**Supabase PostgreSQL** is the **SINGLE AUTHORITATIVE SOURCE OF TRUTH** for all production data in ProBitian:
 
 ```
 Public Website / Admin Portal
@@ -14,89 +22,62 @@ Public Website / Admin Portal
   SOURCE OF TRUTH (PERSISTENT)
 ```
 
-- **Local JSON (`/data/cms_settings.json`)**: Used exclusively as an offline development fallback or emergency read-only cache. Local JSON must **NEVER** overwrite newer Supabase records.
-- **`localStorage`**: Reserved strictly for client UI preferences (e.g. dark/light theme, collapsed sidebar state).
-- **`mockData.ts`**: Provides initial fallback seed data for local development when Supabase is completely unconfigured.
+- **Local JSON (`/data/cms_settings.json`)**: Used exclusively for offline local development backups. Local JSON is **NOT** a production database or fallback.
+- **`localStorage`**: Reserved strictly for client UI state (e.g., dark/light theme choice).
+- **`mockData.ts`**: Provides initial seed structure for brand resets or dev environment testing. It is **NOT** used in production.
 
 ---
 
-## 2. Migration Directory Structure
+## 2. Migration Directory Structure & History
 
-All database schema definitions and incremental changes are maintained strictly as sequential SQL files inside:
+All database schema definitions and incremental changes are maintained as sequential SQL files inside `supabase/migrations/`:
 
 ```
 supabase/
 └── migrations/
-    ├── 0001_initial_schema.sql       # Initial baseline schema & RLS policies
-    ├── 0002_add_message_fields.sql   # Contact enquiry reply & phone fields
-    ├── 0003_add_campaign_tables.sql  # Email newsletter campaign & recipient tables
-    ├── 0004_grant_table_permissions.sql # Table grants and permissions for Supabase API roles
-    └── 0005_upgrade_media_storage.sql # Upgrade media storage bucket & metadata table schema
+    ├── 0001_initial_schema.sql          # Baseline CMS schema & initial RLS policies
+    ├── 0002_add_message_fields.sql      # Contact enquiry reply, phone, & status fields
+    ├── 0003_add_campaign_tables.sql     # Email campaign & recipient tracking tables
+    ├── 0004_grant_table_permissions.sql # Table grants and permissions for service_role
+    ├── 0005_upgrade_media_storage.sql    # Upgrade media metadata schema & storage bucket
+    └── 0006_fix_newsletter_permissions.sql # Harden newsletter RLS and service_role grants
 ```
 
 ---
 
-## 3. Migration Naming Convention
+## 3. Migration File Inventory vs. Applied Production State
 
-Every schema change file MUST follow this naming convention:
-
-`<FOUR_DIGIT_SEQUENCE>_<DESCRIPTIVE_SNAKE_CASE_NAME>.sql`
-
-### Examples:
-- `0001_initial_schema.sql`
-- `0002_add_message_fields.sql`
-- `0003_add_campaign_tables.sql`
-- `0004_add_course_prerequisites.sql`
+> 🚨 **IMPORTANT**: The existence of a `.sql` file in `supabase/migrations/` does **NOT** automatically mean it is applied to the production database. Each migration must be explicitly executed in the Supabase Dashboard SQL Editor or via the Supabase CLI, and verified against the live PostgreSQL instance.
 
 ---
 
-## 4. CRITICAL NON-NEGOTIABLE MIGRATION RULES
+## 4. Standard Migration Workflow
 
-> 🚨 **GOLDEN RULE**: **NEVER edit an already-applied production migration. Always create a NEW migration file for any future change.**
+When schema modifications are required:
+
+1. **Create Migration SQL File**: Add a new sequential SQL script in `supabase/migrations/` (e.g., `0007_add_new_feature_table.sql`).
+2. **Review SQL for Safety**:
+   - Ensure non-destructive idempotency (`CREATE TABLE IF NOT EXISTS`, `ADD COLUMN IF NOT EXISTS`).
+   - Never write `DROP TABLE`, `TRUNCATE`, or `DELETE FROM` in automated migration files.
+3. **Back Up Production Data**: Export a full JSON database snapshot from the Admin Control Center (**Backup & Restore** module) prior to applying schema changes.
+4. **Apply Migration**: Execute the SQL migration script in the Supabase SQL Editor.
+5. **Verify Schema**: Confirm column types, default values, foreign keys, and indexes in the Supabase Dashboard.
+6. **Verify Permissions & RLS**: Ensure `GRANT ALL ON ALL TABLES IN SCHEMA public TO service_role;` is executed for newly created tables.
+7. **Test Application Endpoints**: Test Express backend API routes against the updated schema.
+8. **Record Migration Status**: Document the applied migration timestamp and version in deployment logs.
+9. **Never Run Destructive Startup Operations**: Application startup (`server.ts`) must **NEVER** drop tables, clear data, or run destructive resets on boot.
+
+---
+
+## 5. Non-Negotiable Migration Guidelines
 
 1. **FORWARD-ONLY MIGRATIONS**:
-   - Never alter or replace `0001_initial_schema.sql` or `0002_add_message_fields.sql` after they have been deployed.
-   - If a table needs a new column or modified type, create `0004_<change_description>.sql`.
-
-2. **SAFE NON-DESTRUCTIVE SQL**:
-   - Always use idempotent SQL constructs:
-     - `ADD COLUMN IF NOT EXISTS`
-     - `CREATE TABLE IF NOT EXISTS`
-     - `CREATE INDEX IF NOT EXISTS`
-   - **DO NOT** issue `DROP TABLE`, `TRUNCATE`, or `DELETE FROM` without explicit administrative confirmation.
-
-3. **SERVER SECRET ISOLATION**:
-   - Production migrations and server-side database writes use `SUPABASE_SECRET_KEY` or `SUPABASE_SERVICE_ROLE_KEY`.
-   - Never expose server keys in client bundles, `localStorage`, or API logs.
+   - Never edit or alter an already-applied migration file in repository history.
+   - Always create a new migration file for future modifications.
+2. **SERVICE ROLE ISOLATION**:
+   - Production operations execute server-side using `SUPABASE_SECRET_KEY`.
+   - Never expose `SUPABASE_SECRET_KEY` or `SUPABASE_SERVICE_ROLE_KEY` to the browser or public repositories.
 
 ---
 
-## 5. Schema Change Development Workflow
-
-Follow this step-by-step workflow for all future database schema modifications:
-
-1. **Identify Data Model Needs**: Determine if the change requires a database column, table, index, or RLS policy modification.
-2. **Create a New Migration File**: Add a new file in `supabase/migrations/` with the next sequence number (e.g., `0004_...sql`).
-3. **Write Safe SQL**:
-   ```sql
-   ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS prerequisite_ids UUID[] DEFAULT '{}';
-   ```
-4. **Test Migration Locally**: Apply the SQL script to a local or staging Supabase project SQL Editor.
-5. **Update TypeScript Interfaces**: Update `/src/types.ts` and Express server models to align with the new database schema.
-6. **Verify CRUD Operations**: Test GET, POST, PATCH, and DELETE API endpoints.
-7. **Apply to Production Supabase**: Run the migration in the Production Supabase SQL Editor.
-8. **Deploy Application Code**: Deploy the backend and frontend code after verifying database readiness.
-9. **Post-Deployment Verification**: Verify `/api/cms/status` returns `databaseConnected: true` and verify existing records remain intact.
-
----
-
-## 6. Emergency Rollback Procedures
-
-If a migration causes unexpected application errors:
-
-1. **Do NOT delete records**.
-2. Roll back application code to the prior release.
-3. If necessary, write a compensating forward migration (e.g. `0005_revert_course_prerequisites.sql`) to safely remove or drop the unused column:
-   ```sql
-   ALTER TABLE public.courses DROP COLUMN IF EXISTS prerequisite_ids;
-   ```
+*Documentation maintained by Shivam Singh — ProBitian.*

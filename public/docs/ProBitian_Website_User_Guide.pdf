@@ -10,7 +10,7 @@
 endobj
 4 0 obj
 <<
-/Length 6164
+/Length 6055
 >>
 stream
 0.200025 w
@@ -52,19 +52,40 @@ BT
 (Official User & Learner Guide for the ProBitian Business Intelligence & Data Analytics Platform.) Tj
 ET
 BT
+/F1 10 Tf
+11.5 TL
+0.2 0.255 0.333 rg
+40. 670.8899999999999864 Td
+(Project Owner: **Shivam Singh**) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0.2 0.255 0.333 rg
+40. 655.8899999999999864 Td
+(Official Website: https://probitian.ai.studio/) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0.2 0.255 0.333 rg
+40. 640.8899999999999864 Td
+(Official Communication Email: probitianofficial@gmail.com) Tj
+ET
+BT
 /F2 13 Tf
 14.9499999999999993 TL
 0.118 0.161 0.231 rg
-40. 660.8899999999999864 Td
+40. 609.8899999999999864 Td
 (1. Introduction & Platform Overview) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-40. 648.8899999999999864 Td
-(ProBitian is a premium, end-to-end Business Intelligence and Data Analytics learning ecosystem founded by) Tj
-T* (**Shivam Baghel**. The platform is designed to help students, data analysts, BI developers, and technology) Tj
+40. 597.8899999999999864 Td
+(ProBitian is a premium, end-to-end Business Intelligence and Data Analytics learning ecosystem maintained by) Tj
+T* (**Shivam Singh**. The platform is designed to help students, data analysts, BI developers, and technology) Tj
 T* (enthusiasts master practical skills in Power BI, SQL, Python, Advanced Excel, Financial Modeling, and AI-assisted) Tj
 T* (analytics.) Tj
 ET
@@ -72,49 +93,49 @@ BT
 /F2 11 Tf
 12.6499999999999986 TL
 0.278 0.333 0.412 rg
-40. 580.8899999999999864 Td
+40. 529.8899999999999864 Td
 (Core Objectives) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 570.8899999999999864 Td
+48. 519.8899999999999864 Td
 (� **Hands-On Learning**: Access interactive skill modules, video tutorials, and real-world project portfolios.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 555.8899999999999864 Td
+48. 504.8899999999999864 Td
 (� **Portfolio Building**: Download raw dataset files \(CSV, XLSX\) allowing learners to build verified resume projects.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 540.8899999999999864 Td
+48. 489.8899999999999864 Td
 (� **Industry Insights**: Read in-depth technical articles on DAX formulas, SQL optimization, and data engineering.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 525.8899999999999864 Td
+48. 474.8899999999999864 Td
 (� **Direct Engagement**: Connect directly via contact forms and newsletter subscription channels.) Tj
 ET
 BT
 /F2 13 Tf
 14.9499999999999993 TL
 0.118 0.161 0.231 rg
-40. 494.8899999999999864 Td
+40. 443.8899999999999864 Td
 (2. Getting Started & Website Navigation) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-40. 482.8899999999999864 Td
+40. 431.8899999999999864 Td
 (The ProBitian website features a single-page application \(SPA\) architecture with hash-based route navigation \(#/,) Tj
 T* (#/learn, #/projects, etc.\) for instantaneous page transitions.) Tj
 ET
@@ -122,49 +143,49 @@ BT
 /F2 11 Tf
 12.6499999999999986 TL
 0.278 0.333 0.412 rg
-40. 440.8899999999999864 Td
+40. 389.8899999999999864 Td
 (Header Navigation Bar) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 430.8899999999999864 Td
+48. 379.8899999999999864 Td
 (� **ProBitian Logo**: Click anytime to return to the Home page.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 415.8899999999999864 Td
+48. 364.8899999999999864 Td
 (� **Navigation Links**: Home, Learn, Projects, Blog, YouTube, About, Contact.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 400.8899999999999864 Td
+48. 349.8899999999999864 Td
 (� **Theme Switcher**: Sun/Moon icon in the top header bar toggles between Light Mode and Dark Mode.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 385.8899999999999864 Td
+48. 334.8899999999999864 Td
 (� **Responsive Mobile Menu**: On mobile screens \(<768px\), a hamburger icon opens a full-screen mobile menu.) Tj
 ET
 BT
 /F2 11 Tf
 12.6499999999999986 TL
 0.278 0.333 0.412 rg
-40. 356.8899999999999864 Td
+40. 305.8899999999999864 Td
 (Public Website Pages & Routes) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 346.8899999999999864 Td
+48. 295.8899999999999864 Td
 (� **Home \(#/\)**: Platform overview, hero statistics, core features, top courses, featured portfolio projects, and) Tj
 T* (YouTube highlights.) Tj
 ET
@@ -172,7 +193,7 @@ BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 318.8899999999999864 Td
+48. 267.8899999999999864 Td
 (� **Learn \(#/learn\)**: Complete course catalog with filter tabs, skill level badges, video lessons, PDF cheat sheets,) Tj
 T* (and dataset downloads.) Tj
 ET
@@ -180,7 +201,7 @@ BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 290.8899999999999864 Td
+48. 239.8899999999999864 Td
 (� **Projects \(#/projects\)**: Portfolio gallery of real-world Power BI & SQL dashboards featuring problem) Tj
 T* (statements, live interactive demos, GitHub repos, and raw sample dataset downloads.) Tj
 ET
@@ -188,7 +209,7 @@ BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 262.8899999999999864 Td
+48. 211.8899999999999864 Td
 (� **Blog \(#/blog\)**: Technical articles, DAX optimization guides, and BI career frameworks with code snippets and) Tj
 T* (video walk-throughs.) Tj
 ET
@@ -196,22 +217,22 @@ BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 234.8899999999999864 Td
+48. 183.8899999999999864 Td
 (� **YouTube \(#/youtube\)**: Curated repository of video tutorials, playlists, and channel subscription highlights.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 219.8899999999999864 Td
-(� **About \(#/about\)**: Founder profile \(Shivam Baghel\), platform mission statement, impact metrics, and learning) Tj
-T* (roadmap.) Tj
+48. 168.8899999999999864 Td
+(� **About \(#/about\)**: Project Owner profile \(Shivam Singh\), platform mission statement, impact metrics, and) Tj
+T* (learning roadmap.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 191.8899999999999864 Td
+48. 140.8899999999999864 Td
 (� **Contact \(#/contact\)**: Direct message portal for course inquiries, mentorship, or project collaborations, plus) Tj
 T* (official ProBitian Community Hub location.) Tj
 ET
@@ -219,14 +240,14 @@ BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 163.8899999999999864 Td
+48. 112.8899999999999864 Td
 (� **Terms of Service \(#/terms\)**: Platform usage terms, intellectual property, and learner guidelines.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 148.8899999999999864 Td
+48. 97.8899999999999864 Td
 (� **Privacy Policy \(#/privacy-policy / #/privacy\)**: Data handling practices, cookie policies, user rights, and privacy) Tj
 T* (controls.) Tj
 ET
@@ -234,30 +255,8 @@ BT
 /F2 13 Tf
 14.9499999999999993 TL
 0.118 0.161 0.231 rg
-40. 104.8899999999999864 Td
+40. 53.8899999999999864 Td
 (3. Home Page Guide) Tj
-ET
-BT
-/F1 10 Tf
-11.5 TL
-0.2 0.255 0.333 rg
-40. 92.8899999999999864 Td
-(The Home page serves as the entry point to the ProBitian ecosystem.) Tj
-ET
-BT
-/F2 11 Tf
-12.6499999999999986 TL
-0.278 0.333 0.412 rg
-40. 63.8899999999999864 Td
-(Key Sections & Interactions) Tj
-ET
-BT
-/F1 10 Tf
-11.5 TL
-0.2 0.255 0.333 rg
-48. 53.8899999999999864 Td
-(1. **Hero Banner**: Features primary headline, tagline, "Start Learning" CTA \(#/learn\), and "Explore Projects" CTA) Tj
-T* (\(#/projects\).) Tj
 ET
 BT
 /F1 8 Tf
@@ -285,7 +284,7 @@ endobj
 endobj
 6 0 obj
 <<
-/Length 6297
+/Length 6240
 >>
 stream
 1.5 w
@@ -305,7 +304,29 @@ BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 791.8899999999999864 Td
+40. 791.8899999999999864 Td
+(The Home page serves as the entry point to the ProBitian ecosystem.) Tj
+ET
+BT
+/F2 11 Tf
+12.6499999999999986 TL
+0.278 0.333 0.412 rg
+40. 762.8899999999999864 Td
+(Key Sections & Interactions) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0.2 0.255 0.333 rg
+48. 752.8899999999999864 Td
+(1. **Hero Banner**: Features primary headline, tagline, "Start Learning" CTA \(#/learn\), and "Explore Projects" CTA) Tj
+T* (\(#/projects\).) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0.2 0.255 0.333 rg
+48. 724.8899999999999864 Td
 (2. **Value Proposition Cards**: Highlights core skill pillars�Power BI Mastery, SQL Querying, Advanced Excel,) Tj
 T* (and AI Tools for Data Professionals.) Tj
 ET
@@ -313,14 +334,14 @@ BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 763.8899999999999864 Td
+48. 696.8899999999999864 Td
 (3. **Featured Course Cards**: Direct buttons opening detailed course curriculum modals.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 748.8899999999999864 Td
+48. 681.8899999999999864 Td
 (4. **Featured Project Showcase**: Interactive cards displaying project badges, tools used, and direct modal) Tj
 T* (popups.) Tj
 ET
@@ -328,210 +349,210 @@ BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 720.8899999999999864 Td
+48. 653.8899999999999864 Td
 (5. **Latest Blog Articles**: Quick-read summaries with direct links to full technical posts.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 705.8899999999999864 Td
+48. 638.8899999999999864 Td
 (6. **YouTube Community Highlights**: Direct links to video tutorials and channel subscription links.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 690.8899999999999864 Td
+48. 623.8899999999999864 Td
 (7. **Footer & Newsletter**: Instant subscription box for receiving weekly dataset drops and tips.) Tj
 ET
 BT
 /F2 13 Tf
 14.9499999999999993 TL
 0.118 0.161 0.231 rg
-40. 659.8899999999999864 Td
+40. 592.8899999999999864 Td
 (4. Learn Page Guide) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-40. 647.8899999999999864 Td
+40. 580.8899999999999864 Td
 (The Learn page hosts structured learning paths for data professionals.) Tj
 ET
 BT
 /F2 11 Tf
 12.6499999999999986 TL
 0.278 0.333 0.412 rg
-40. 618.8899999999999864 Td
+40. 551.8899999999999864 Td
 (Course Directory Features) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 608.8899999999999864 Td
+48. 541.8899999999999864 Td
 (� **Category Tabs**: Filter courses by All, Power BI, SQL, Excel, Python, or AI.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 593.8899999999999864 Td
+48. 526.8899999999999864 Td
 (� **Skill Level Indicators**: Marked as Beginner, Intermediate, or Advanced.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 578.8899999999999864 Td
+48. 511.8899999999999864 Td
 (� **Interactive Course Modals**: Click any course card to open the curriculum modal containing:) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 563.8899999999999864 Td
+48. 496.8899999999999864 Td
 (� Full course overview & learning outcomes.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 548.8899999999999864 Td
+48. 481.8899999999999864 Td
 (� Video lesson links and YouTube tutorials.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 533.8899999999999864 Td
+48. 466.8899999999999864 Td
 (� PDF downloadable guides and cheat sheets.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 518.8899999999999864 Td
+48. 451.8899999999999864 Td
 (� Practice dataset download buttons.) Tj
 ET
 BT
 /F2 13 Tf
 14.9499999999999993 TL
 0.118 0.161 0.231 rg
-40. 487.8899999999999864 Td
+40. 420.8899999999999864 Td
 (5. Projects Page Guide) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-40. 475.8899999999999864 Td
+40. 408.8899999999999864 Td
 (The Projects page offers production-grade portfolio projects designed for resume enhancement.) Tj
 ET
 BT
 /F2 11 Tf
 12.6499999999999986 TL
 0.278 0.333 0.412 rg
-40. 446.8899999999999864 Td
+40. 379.8899999999999864 Td
 (Project Gallery Features) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 436.8899999999999864 Td
+48. 369.8899999999999864 Td
 (� **Filter Options**: Power BI, SQL, Python, Financial Dashboards, Executive Analytics.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 421.8899999999999864 Td
+48. 354.8899999999999864 Td
 (� **Project Modal Views**:) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 406.8899999999999864 Td
+48. 339.8899999999999864 Td
 (� Problem Statement & Business Solution.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 391.8899999999999864 Td
+48. 324.8899999999999864 Td
 (� Tools & Technologies Used \(Power BI Desktop, DAX, PostgreSQL, Python, etc.\).) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 376.8899999999999864 Td
+48. 309.8899999999999864 Td
 (� Action Buttons:) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 361.8899999999999864 Td
+48. 294.8899999999999864 Td
 (� **Live Interactive Demo**: Launches embedded or hosted web dashboard.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 346.8899999999999864 Td
+48. 279.8899999999999864 Td
 (� **GitHub Repository**: Inspect clean SQL queries and Python scripts.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 331.8899999999999864 Td
+48. 264.8899999999999864 Td
 (� **YouTube Tutorial**: Step-by-step video walkthrough.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 316.8899999999999864 Td
+48. 249.8899999999999864 Td
 (� **Dataset Download**: Instant access to sample raw data files.) Tj
 ET
 BT
 /F2 13 Tf
 14.9499999999999993 TL
 0.118 0.161 0.231 rg
-40. 285.8899999999999864 Td
+40. 218.8899999999999864 Td
 (6. Blog Page Guide) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-40. 273.8899999999999864 Td
+40. 206.8899999999999864 Td
 (The Blog section contains technical tutorials and industry insights.) Tj
 ET
 BT
 /F2 11 Tf
 12.6499999999999986 TL
 0.278 0.333 0.412 rg
-40. 244.8899999999999864 Td
+40. 177.8899999999999864 Td
 (Article Reader Experience) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 234.8899999999999864 Td
+48. 167.8899999999999864 Td
 (� **Category & Tag Filters**: DAX, Data Modeling, SQL Optimization, AI Tools.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 219.8899999999999864 Td
+48. 152.8899999999999864 Td
 (� **Article Modals**: Clean typography with code snippets, key takeaways, and embedded YouTube video) Tj
 T* (walkthroughs.) Tj
 ET
@@ -539,57 +560,29 @@ BT
 /F2 13 Tf
 14.9499999999999993 TL
 0.118 0.161 0.231 rg
-40. 175.8899999999999864 Td
+40. 108.8899999999999864 Td
 (7. Contact Page Guide & Community Hub Location) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-40. 163.8899999999999864 Td
-(Get in touch with Shivam Baghel or the ProBitian support team.) Tj
+40. 96.8899999999999864 Td
+(Get in touch with Shivam Singh or the ProBitian support team.) Tj
 ET
 BT
 /F2 11 Tf
 12.6499999999999986 TL
 0.278 0.333 0.412 rg
-40. 134.8899999999999864 Td
+40. 67.8899999999999864 Td
 (How to Submit an Enquiry) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 124.8899999999999864 Td
+48. 57.8899999999999864 Td
 (1. Navigate to **Contact** \(#/contact\).) Tj
-ET
-BT
-/F1 10 Tf
-11.5 TL
-0.2 0.255 0.333 rg
-48. 109.8899999999999864 Td
-(2. Enter your **Full Name**, **Email Address**, and optional **Phone Number**.) Tj
-ET
-BT
-/F1 10 Tf
-11.5 TL
-0.2 0.255 0.333 rg
-48. 94.8899999999999864 Td
-(3. Select your **Subject or Interested Course** \(e.g., Power BI Mastery, SQL Bootcamp\).) Tj
-ET
-BT
-/F1 10 Tf
-11.5 TL
-0.2 0.255 0.333 rg
-48. 79.8899999999999864 Td
-(4. Type your message in the text box.) Tj
-ET
-BT
-/F1 10 Tf
-11.5 TL
-0.2 0.255 0.333 rg
-48. 64.8899999999999864 Td
-(5. Click **Send Message**.) Tj
 ET
 BT
 /F1 8 Tf
@@ -617,7 +610,7 @@ endobj
 endobj
 8 0 obj
 <<
-/Length 4429
+/Length 4379
 >>
 stream
 1.5 w
@@ -638,180 +631,186 @@ BT
 11.5 TL
 0.2 0.255 0.333 rg
 48. 791.8899999999999864 Td
-(6. Receive immediate on-screen confirmation. Your message is saved securely to Supabase and dispatches an) Tj
-T* (automated notification email via server-side Gmail SMTP / Nodemailer. Expect a reply within 24-48 hours.) Tj
+(2. Enter your **Full Name**, **Email Address**, and optional **Phone Number**.) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0.2 0.255 0.333 rg
+48. 776.8899999999999864 Td
+(3. Select your **Subject or Interested Course** \(e.g., Power BI Mastery, SQL Bootcamp\).) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0.2 0.255 0.333 rg
+48. 761.8899999999999864 Td
+(4. Type your message in the text box.) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0.2 0.255 0.333 rg
+48. 746.8899999999999864 Td
+(5. Click **Send Message**.) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0.2 0.255 0.333 rg
+48. 731.8899999999999864 Td
+(6. Receive immediate on-screen confirmation. Your message is saved securely to Supabase PostgreSQL and) Tj
+T* (dispatches an automated notification email via server-side Gmail SMTP / Nodemailer.) Tj
 ET
 BT
 /F2 11 Tf
 12.6499999999999986 TL
 0.278 0.333 0.412 rg
-40. 749.8899999999999864 Td
+40. 689.8899999999999864 Td
 (Official Community Hub Location) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 739.8899999999999864 Td
+48. 679.8899999999999864 Td
 (� **Name**: ProBitian Community Hub) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 724.8899999999999864 Td
+48. 664.8899999999999864 Td
 (� **Address**: M93M+688, Salaiya, Madhya Pradesh 486440, India) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 709.8899999999999864 Td
+48. 649.8899999999999864 Td
 (� **Plus Code**: M93M+688 Salaiya, Madhya Pradesh) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 694.8899999999999864 Td
-(� **Latitude / Longitude**: 24.6030, 81.2833 \(informational\)) Tj
-ET
-BT
-/F1 10 Tf
-11.5 TL
-0.2 0.255 0.333 rg
-48. 679.8899999999999864 Td
+48. 634.8899999999999864 Td
 (� **Google Maps Share URL**: https://maps.app.goo.gl/T4426JADcNHHFPqb7) Tj
-ET
-BT
-/F1 10 Tf
-11.5 TL
-0.2 0.255 0.333 rg
-48. 664.8899999999999864 Td
-(� **Action**: Click "View on Google Maps ->" to open the location in a new browser tab \(target="_blank") Tj
-T* (rel="noopener noreferrer"\).) Tj
 ET
 BT
 /F2 13 Tf
 14.9499999999999993 TL
 0.118 0.161 0.231 rg
-40. 620.8899999999999864 Td
+40. 603.8899999999999864 Td
 (8. Newsletter Subscription) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 608.8899999999999864 Td
+48. 591.8899999999999864 Td
 (� Located in the global website footer on every page.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 593.8899999999999864 Td
+48. 576.8899999999999864 Td
 (� Enter your email address and click **Subscribe**.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 578.8899999999999864 Td
-(� Immediate on-screen confirmation without full page reloads.) Tj
+48. 561.8899999999999864 Td
+(� Immediate on-screen confirmation. Subscriptions persist directly to Supabase PostgreSQL and trigger a welcome) Tj
+T* (email via Gmail SMTP.) Tj
 ET
 BT
 /F2 13 Tf
 14.9499999999999993 TL
 0.118 0.161 0.231 rg
-40. 547.8899999999999864 Td
+40. 517.8899999999999864 Td
 (9. Legal & Policy Pages) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 535.8899999999999864 Td
+48. 505.8899999999999864 Td
 (� **Terms of Service \(#/terms\)**: Outlines user conduct, intellectual property, course access, and liability limits.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 520.8899999999999864 Td
-(� **Privacy Policy \(#/privacy-policy\)**: Explains data collection, cookie usage, email communication preferences,) Tj
-T* (and security measures.) Tj
+48. 490.8899999999999864 Td
+(� **Privacy Policy \(#/privacy-policy\)**: Explains data collection, email communication preferences, and security) Tj
+T* (measures.) Tj
 ET
 BT
 /F2 13 Tf
 14.9499999999999993 TL
 0.118 0.161 0.231 rg
-40. 476.8899999999999864 Td
-(10. Light / Dark Theme & Mobile Experience) Tj
+40. 446.8899999999999864 Td
+(10. Analytics & Privacy) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 464.8899999999999864 Td
-(� **Theme Support**: Seamlessly toggle between Light Mode and Dark Mode using the sun/moon button in the top) Tj
-T* (navigation bar. Theme choice persists across sessions.) Tj
-ET
-BT
-/F1 10 Tf
-11.5 TL
-0.2 0.255 0.333 rg
-48. 436.8899999999999864 Td
-(� **Mobile Responsiveness**: Designed with responsive layouts and touch targets exceeding 44px for effortless) Tj
-T* (mobile browsing.) Tj
+48. 434.8899999999999864 Td
+(� Website visits are anonymously measured via Google Analytics 4 \(GA4\) for site quality and performance) Tj
+T* (optimizations. Users do not need any setup or configuration.) Tj
 ET
 BT
 /F2 13 Tf
 14.9499999999999993 TL
 0.118 0.161 0.231 rg
-40. 392.8899999999999864 Td
+40. 390.8899999999999864 Td
 (11. FAQ & Troubleshooting) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 380.8899999999999864 Td
+48. 378.8899999999999864 Td
 (� **Q: How do I download sample datasets?**) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 365.8899999999999864 Td
+48. 363.8899999999999864 Td
 (� **A**: Click "Download Dataset" inside any Project or Course modal.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 350.8899999999999864 Td
+48. 348.8899999999999864 Td
 (� **Q: Are all learning resources free?**) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 335.8899999999999864 Td
+48. 333.8899999999999864 Td
 (� **A**: Yes, ProBitian provides free public access to course curriculum guides, video links, and sample datasets.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 320.8899999999999864 Td
-(� **Q: How do I open the Community Hub location on Google Maps?**) Tj
+48. 318.8899999999999864 Td
+(� **Q: How do I contact ProBitian directly?**) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 305.8899999999999864 Td
-(� **A**: Go to the Contact page \(#/contact\) and click "View on Google Maps ->" on the Community Hub card.) Tj
+48. 303.8899999999999864 Td
+(� **A**: Use the Contact page \(#/contact\) or email probitianofficial@gmail.com.) Tj
 ET
 BT
 /F1 8 Tf
@@ -999,7 +998,7 @@ endobj
 23 0 obj
 <<
 /Producer (jsPDF 4.2.1)
-/CreationDate (D:20260809103433-00'00')
+/CreationDate (D:20260811153218-00'00')
 >>
 endobj
 24 0 obj
@@ -1013,37 +1012,37 @@ endobj
 xref
 0 25
 0000000000 65535 f 
-0000017472 00000 n 
-0000019305 00000 n 
+0000017256 00000 n 
+0000019089 00000 n 
 0000000015 00000 n 
 0000000152 00000 n 
-0000006368 00000 n 
-0000006505 00000 n 
-0000012854 00000 n 
-0000012991 00000 n 
-0000017541 00000 n 
-0000017666 00000 n 
-0000017797 00000 n 
-0000017931 00000 n 
-0000018069 00000 n 
-0000018193 00000 n 
-0000018322 00000 n 
-0000018454 00000 n 
-0000018590 00000 n 
-0000018718 00000 n 
-0000018845 00000 n 
-0000018974 00000 n 
-0000019107 00000 n 
-0000019209 00000 n 
-0000019557 00000 n 
-0000019643 00000 n 
+0000006259 00000 n 
+0000006396 00000 n 
+0000012688 00000 n 
+0000012825 00000 n 
+0000017325 00000 n 
+0000017450 00000 n 
+0000017581 00000 n 
+0000017715 00000 n 
+0000017853 00000 n 
+0000017977 00000 n 
+0000018106 00000 n 
+0000018238 00000 n 
+0000018374 00000 n 
+0000018502 00000 n 
+0000018629 00000 n 
+0000018758 00000 n 
+0000018891 00000 n 
+0000018993 00000 n 
+0000019341 00000 n 
+0000019427 00000 n 
 trailer
 <<
 /Size 25
 /Root 24 0 R
 /Info 23 0 R
-/ID [ <259E57A0947D537AA656C66A8DC43A77> <259E57A0947D537AA656C66A8DC43A77> ]
+/ID [ <ACA1443F39156BD564271CFE9596A66E> <ACA1443F39156BD564271CFE9596A66E> ]
 >>
 startxref
-19747
+19531
 %%EOF

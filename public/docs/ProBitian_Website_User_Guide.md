@@ -2,8 +2,12 @@
 
 Official User & Learner Guide for the ProBitian Business Intelligence & Data Analytics Platform.
 
+Project Owner: **Shivam Singh**
+Official Website: https://probitian.ai.studio/
+Official Communication Email: probitianofficial@gmail.com
+
 ## 1. Introduction & Platform Overview
-ProBitian is a premium, end-to-end Business Intelligence and Data Analytics learning ecosystem founded by **Shivam Baghel**. The platform is designed to help students, data analysts, BI developers, and technology enthusiasts master practical skills in Power BI, SQL, Python, Advanced Excel, Financial Modeling, and AI-assisted analytics.
+ProBitian is a premium, end-to-end Business Intelligence and Data Analytics learning ecosystem maintained by **Shivam Singh**. The platform is designed to help students, data analysts, BI developers, and technology enthusiasts master practical skills in Power BI, SQL, Python, Advanced Excel, Financial Modeling, and AI-assisted analytics.
 
 ### Core Objectives
 - **Hands-On Learning**: Access interactive skill modules, video tutorials, and real-world project portfolios.
@@ -26,7 +30,7 @@ The ProBitian website features a single-page application (SPA) architecture with
 - **Projects (#/projects)**: Portfolio gallery of real-world Power BI & SQL dashboards featuring problem statements, live interactive demos, GitHub repos, and raw sample dataset downloads.
 - **Blog (#/blog)**: Technical articles, DAX optimization guides, and BI career frameworks with code snippets and video walk-throughs.
 - **YouTube (#/youtube)**: Curated repository of video tutorials, playlists, and channel subscription highlights.
-- **About (#/about)**: Founder profile (Shivam Baghel), platform mission statement, impact metrics, and learning roadmap.
+- **About (#/about)**: Project Owner profile (Shivam Singh), platform mission statement, impact metrics, and learning roadmap.
 - **Contact (#/contact)**: Direct message portal for course inquiries, mentorship, or project collaborations, plus official ProBitian Community Hub location.
 - **Terms of Service (#/terms)**: Platform usage terms, intellectual property, and learner guidelines.
 - **Privacy Policy (#/privacy-policy / #/privacy)**: Data handling practices, cookie policies, user rights, and privacy controls.
@@ -77,7 +81,7 @@ The Blog section contains technical tutorials and industry insights.
 - **Article Modals**: Clean typography with code snippets, key takeaways, and embedded YouTube video walkthroughs.
 
 ## 7. Contact Page Guide & Community Hub Location
-Get in touch with Shivam Baghel or the ProBitian support team.
+Get in touch with Shivam Singh or the ProBitian support team.
 
 ### How to Submit an Enquiry
 1. Navigate to **Contact** (#/contact).
@@ -85,33 +89,30 @@ Get in touch with Shivam Baghel or the ProBitian support team.
 3. Select your **Subject or Interested Course** (e.g., Power BI Mastery, SQL Bootcamp).
 4. Type your message in the text box.
 5. Click **Send Message**.
-6. Receive immediate on-screen confirmation. Your message is saved securely to Supabase and dispatches an automated notification email via server-side Gmail SMTP / Nodemailer. Expect a reply within 24-48 hours.
+6. Receive immediate on-screen confirmation. Your message is saved securely to Supabase PostgreSQL and dispatches an automated notification email via server-side Gmail SMTP / Nodemailer.
 
 ### Official Community Hub Location
 - **Name**: ProBitian Community Hub
 - **Address**: M93M+688, Salaiya, Madhya Pradesh 486440, India
 - **Plus Code**: M93M+688 Salaiya, Madhya Pradesh
-- **Latitude / Longitude**: 24.6030, 81.2833 (informational)
 - **Google Maps Share URL**: https://maps.app.goo.gl/T4426JADcNHHFPqb7
-- **Action**: Click "View on Google Maps ->" to open the location in a new browser tab (target="_blank" rel="noopener noreferrer").
 
 ## 8. Newsletter Subscription
 - Located in the global website footer on every page.
 - Enter your email address and click **Subscribe**.
-- Immediate on-screen confirmation without full page reloads.
+- Immediate on-screen confirmation. Subscriptions persist directly to Supabase PostgreSQL and trigger a welcome email via Gmail SMTP.
 
 ## 9. Legal & Policy Pages
 - **Terms of Service (#/terms)**: Outlines user conduct, intellectual property, course access, and liability limits.
-- **Privacy Policy (#/privacy-policy)**: Explains data collection, cookie usage, email communication preferences, and security measures.
+- **Privacy Policy (#/privacy-policy)**: Explains data collection, email communication preferences, and security measures.
 
-## 10. Light / Dark Theme & Mobile Experience
-- **Theme Support**: Seamlessly toggle between Light Mode and Dark Mode using the sun/moon button in the top navigation bar. Theme choice persists across sessions.
-- **Mobile Responsiveness**: Designed with responsive layouts and touch targets exceeding 44px for effortless mobile browsing.
+## 10. Analytics & Privacy
+- Website visits are anonymously measured via Google Analytics 4 (GA4) for site quality and performance optimizations. Users do not need any setup or configuration.
 
 ## 11. FAQ & Troubleshooting
 - **Q: How do I download sample datasets?**
   - **A**: Click "Download Dataset" inside any Project or Course modal.
 - **Q: Are all learning resources free?**
   - **A**: Yes, ProBitian provides free public access to course curriculum guides, video links, and sample datasets.
-- **Q: How do I open the Community Hub location on Google Maps?**
-  - **A**: Go to the Contact page (#/contact) and click "View on Google Maps ->" on the Community Hub card.
+- **Q: How do I contact ProBitian directly?**
+  - **A**: Use the Contact page (#/contact) or email probitianofficial@gmail.com.

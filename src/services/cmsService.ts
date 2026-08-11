@@ -962,20 +962,6 @@ export const cmsService = {
       console.warn('Failed to fetch subscribers:', e?.message || e);
     }
 
-    if (isSupabaseConfigured()) {
-      try {
-        const { data, error } = await supabase.from('newsletter').select('*').order('created_at', { ascending: false });
-        if (!error && data) {
-          const sbSubs: NewsletterSubscriber[] = data.map((s: any) => ({
-            id: String(s.id || ('sub-' + s.created_at)),
-            email: s.email || '',
-            status: s.status || 'active',
-            created_at: s.created_at || new Date().toISOString()
-          }));
-          return sbSubs;
-        }
-      } catch (e) {}
-    }
     return getLocal<NewsletterSubscriber[]>(STORAGE_KEYS.NEWSLETTER, []);
   },
 
@@ -990,18 +976,8 @@ export const cmsService = {
       return { success: true, message: data.message || 'Successfully subscribed!' };
     } catch (e: any) {
       console.warn('Failed to subscribe via API:', e?.message || e);
+      throw e;
     }
-
-    const newSub: NewsletterSubscriber = {
-      id: 'sub-' + Date.now(),
-      email,
-      status: 'active',
-      created_at: new Date().toISOString()
-    };
-    const list = await this.getNewsletterSubscribers();
-    setLocal(STORAGE_KEYS.NEWSLETTER, [newSub, ...list]);
-
-    return { success: true, message: 'Thank you for subscribing to ProBitian updates!' };
   },
 
   async deleteSubscriber(id: string): Promise<boolean> {
@@ -1014,11 +990,6 @@ export const cmsService = {
     const list = await this.getNewsletterSubscribers();
     const filtered = list.filter(s => s.id !== id);
     setLocal(STORAGE_KEYS.NEWSLETTER, filtered);
-    if (isSupabaseConfigured()) {
-      try {
-        await supabase.from('newsletter').delete().eq('id', id);
-      } catch (e) {}
-    }
     return true;
   },
 

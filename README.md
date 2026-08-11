@@ -1,277 +1,360 @@
-# ProBitian — Master Business Intelligence & Data Analytics Platform
+# ProBitian
 
-> **ProBitian** is an enterprise-grade, full-stack learning, portfolio, and data-professional platform with an interactive public web application and a rich CMS Admin Command Center. Founded by **Shivam Baghel**, ProBitian delivers hands-on course modules, real-world portfolio project showcases with downloadable raw datasets, technical analytics articles, YouTube tutorials, and real-time business intelligence analytics.
+> **ProBitian** is an enterprise-grade, full-stack Business Intelligence and Data Analytics platform featuring an interactive public learning portal and a feature-rich CMS Admin Control Center. Founded and maintained by **Shivam Singh**, ProBitian delivers hands-on course paths, portfolio project showcases with downloadable datasets, technical analytics articles, YouTube tutorials, and real-time analytics.
 
-![ProBitian Banner](/banner.svg)
+Official Website: [https://probitian.ai.studio/](https://probitian.ai.studio/)  
+Official Communication Email: [probitianofficial@gmail.com](mailto:probitianofficial@gmail.com)  
+Project Owner: **Shivam Singh**
 
 ---
 
 ## 📋 Table of Contents
-- [Project Overview](#-project-overview)
-- [Technology Stack](#-technology-stack)
-- [Architecture](#-architecture)
-- [Admin Portal Modules](#-admin-portal-modules)
-- [Database & Storage Strategy](#-database--storage-strategy)
-- [Email System (Nodemailer + Gmail SMTP)](#-email-system-nodemailer--gmail-smtp)
-- [Authentication & Passkey Protection](#-authentication--passkey-protection)
-- [Environment Variables Guide](#-environment-variables-guide)
-- [Local Development & Commands](#-local-development--commands)
-- [CMS Content Management Usage](#-cms-content-management-usage)
-- [Media Library Engine](#-media-library-engine)
-- [Legal & Policy Management](#-legal--policy-management)
-- [Official Location & Community Hub](#-official-location--community-hub)
-- [Security Architecture](#-security-architecture)
+1. [About ProBitian](#1-about-probitian)
+2. [Key Features](#2-key-features)
+3. [Public Website](#3-public-website)
+4. [Admin Portal](#4-admin-portal)
+5. [Email & Newsletter System](#5-email--newsletter-system)
+6. [Media Library](#6-media-library)
+7. [Analytics](#7-analytics)
+8. [Database Architecture](#8-database-architecture)
+9. [Security Architecture](#9-security-architecture)
+10. [Production Infrastructure](#10-production-infrastructure)
+11. [Environment Variables](#11-environment-variables)
+12. [Local Development](#12-local-development)
+13. [Database Migration Workflow](#13-database-migration-workflow)
+14. [Deployment Workflow](#14-deployment-workflow)
+15. [Backup / Recovery](#15-backup--recovery)
+16. [User Documentation](#16-user-documentation)
+17. [Admin Documentation](#17-admin-documentation)
+18. [Project Structure](#18-project-structure)
+19. [Troubleshooting](#19-troubleshooting)
+20. [Production Checklist](#20-production-checklist)
+21. [Project Owner](#21-project-owner)
 
 ---
 
-## 🌐 Project Overview
+## 1. About ProBitian
 
-ProBitian is designed specifically for aspiring and experienced Data Analysts, BI Developers, and Analytics Engineers. It bridges the gap between academic theory and real-world execution by providing structured learning paths for **Power BI, SQL, Excel, Power Query, Microsoft Fabric, and AI Tools for Data Professionals**.
+ProBitian is designed specifically for aspiring and experienced Data Analysts, Business Intelligence (BI) Developers, and Analytics Engineers. It bridges the gap between academic theory and real-world execution by providing structured learning paths for **Power BI, SQL, Excel, Python, Microsoft Fabric, and AI Tools for Data Professionals**.
 
-Key capabilities include:
-- **Public Learning Platform**: Course curricula, interactive topic modals, downloadable practice datasets, portfolio project walk-throughs, technical articles, and direct inquiry forms.
-- **CMS Admin Portal**: Centralized administration for website content, lead management, email dispatch, branding, navigation, SEO meta tags, and system backups.
-- **Analytics Dashboard**: Real-time visitor activity and multi-range reporting integrated directly with Google Analytics 4 (GA4).
+- **Learners** get access to interactive curriculum guides, video walkthroughs, and raw sample dataset downloads (CSV, XLSX) to build verified resume portfolio projects.
+- **Administrators** get a unified CMS Control Center to manage course paths, portfolio projects, technical articles, user inquiries, email broadcasts, media assets, branding, and GA4 visitor metrics.
 
 ---
 
-## 🛠 Technology Stack
+## 2. Key Features
 
-### Frontend
-- **React 18**: UI rendering & component hierarchy
-- **TypeScript**: Full type safety across models and APIs
-- **Vite**: Rapid asset bundling and development server
-- **Tailwind CSS (v4)**: Modern utility-first styling with high-contrast Light/Dark mode
-- **Framer Motion (`motion/react`)**: Smooth view transitions and animated cards
-- **Lucide React**: Clean SVG iconography
-- **Recharts**: Responsive chart rendering for analytics and dashboards
-
-### Backend Server & APIs
-- **Node.js & Express**: High-performance HTTP application server running on port `3000`
-- **TypeScript & esbuild**: Native TS execution in dev mode (`tsx`), bundled CommonJS (`dist/server.cjs`) for production
-
-### Database & Persistence
-- **Supabase PostgreSQL**: Production source of truth for CMS data, content, messages, and subscribers
-- **Local Fallback Storage**: `/data/cms_settings.json` emergency persistence backup
-- **Browser State**: `localStorage` caching for instant UI hydration
-
-### Integrations
-- **Nodemailer + Gmail SMTP**: Server-side transactional email notifications and contact replies
-- **Google Analytics 4 (GA4)**: Real-time traffic, conversion events, and demographic metrics
-- **YouTube Integration**: Direct video playback, playlist embeds, and tutorial showcases
-- **DOMPurify**: XSS protection and SVG sanitization for dynamic media and logos
+- **Full-Stack SPA Architecture**: Single-page React application powered by Node.js/Express and Supabase PostgreSQL.
+- **Authoritative Database Persistence**: Direct server-side integration with Supabase PostgreSQL (no local JSON, mock data, or localStorage fallbacks in production).
+- **Media Asset Storage**: Cloud media management hosted in Supabase Storage (`probitian-media` bucket) with automatic SVG sanitization.
+- **Email Communications**: Server-side transactional email dispatch (welcome messages, inquiry alerts, admin inbox replies) and bulk email campaign broadcasts via **Gmail SMTP**.
+- **Visitor Analytics**: Google Analytics 4 (GA4) integration with real-time site monitoring in the Admin Command Center.
+- **Passkey Protection**: Secure server-side passkey authentication for administrative portal access.
+- **Responsive Theme Engine**: High-contrast Light and Dark mode styling built with Tailwind CSS and smooth motion transitions.
 
 ---
 
-## 🏗 Architecture
+## 3. Public Website
 
-```text
-               PUBLIC WEBSITE
-                     │
-              React Frontend
-                     │
-            Express Backend API
-            (/api/* Endpoints)
-                     │
-    ┌────────────────┼────────────────┐
-    ▼                ▼                ▼
-Supabase PG     Nodemailer       Google Analytics 4
-(CMS Data)      (Gmail SMTP)     (Traffic & Events)
+The public website caters to learners and site visitors with seamless hash routing:
+- **Home (`#/`)**: Hero overview, platform stats, core skill pillars, featured courses, project showcases, and recent articles.
+- **Learn (`#/learn`)**: Filterable course directory with interactive curriculum modals, lesson video links, downloadable cheat sheets, and practice datasets.
+- **Projects (`#/projects`)**: Portfolio gallery of production-grade BI dashboards with live demo links, GitHub repositories, video walkthroughs, and raw sample data files.
+- **Blog (`#/blog`)**: Deep-dive technical articles, DAX optimization guides, and SQL walkthroughs with code snippets and embedded videos.
+- **YouTube (`#/youtube`)**: Video tutorial repository and playlist directory.
+- **About (`#/about`)**: Profile of Project Owner Shivam Singh, mission statement, impact metrics, and learning roadmap.
+- **Contact (`#/contact`)**: Inquiry submission form and Community Hub physical location details.
+- **Legal Pages (`#/terms`, `#/privacy-policy`)**: Terms of Service and Privacy Policy.
+
+---
+
+## 4. Admin Portal
+
+Accessible at `#/admin`, the Admin Control Center provides 17 administrative modules:
+1. **Dashboard Overview**: KPI cards, recent activity, and quick CMS shortcuts.
+2. **GA4 Analytics**: Real-time traffic, page views, duration, country map, and conversion events.
+3. **Home Page Editor**: Headlines, value proposition cards, and platform statistics.
+4. **Projects Manager**: Create, edit, feature, and order portfolio projects.
+5. **Blog Manager**: Article publishing, markdown editing, and YouTube video attachments.
+6. **Learn & Courses Manager**: Course paths, curriculum lessons, and downloadable dataset URLs.
+7. **YouTube Manager**: Organize tutorial playlists and featured channel videos.
+8. **Media Library Engine**: Upload, sanitize, preview, and re-use media assets stored in Supabase Storage.
+9. **Contact Messages & Inbox**: Visitor inquiry table with status badges, notes, and direct Gmail SMTP email reply modals.
+10. **Subscribers Manager**: Active subscriber roster and CSV export capabilities.
+11. **Email Campaign Manager**: Create, test, schedule, and broadcast bulk newsletter emails.
+12. **Branding Manager**: Logo, banner, and theme color controls with factory reset support.
+13. **Social Links Manager**: Social media URL controls.
+14. **Navigation Menu Manager**: Menu visibility and link order controls.
+15. **SEO & Meta Tags Manager**: Meta titles, descriptions, keywords, OG tags, and canonical URLs.
+16. **Website Settings**: Site parameters and Community Hub physical address settings.
+17. **Legal & Policies Manager**: Edit Terms of Service and Privacy Policy texts.
+
+---
+
+## 5. Email & Newsletter System
+
+Email services run server-side using **Nodemailer** over **Gmail SMTP**:
+- **Official Sender**: `probitianofficial@gmail.com`
+- **Transactional Emails**:
+  - Immediate inquiry confirmation emails sent to visitors.
+  - New message notification alerts.
+  - Direct email replies sent from the Admin Inbox.
+  - Welcome emails triggered upon new newsletter subscriptions.
+- **Newsletter Persistence Gate**: Welcome emails are strictly gated on successful Supabase PostgreSQL subscriber persistence. If database write fails, HTTP 503 is returned and no email is dispatched.
+- **Email Campaigns**: Admin can draft campaigns, dispatch test emails, and execute bulk broadcasts to active subscribers with recipient tracking logged in `email_campaign_recipients`.
+
+---
+
+## 6. Media Library
+
+- **Storage Engine**: Supabase Storage (`probitian-media` bucket).
+- **Categories / Folders**: `logos/`, `banners/`, `blog/`, `projects/`, `courses/`, `youtube/`, `general/`.
+- **SVG Security**: Automatic server-side DOMPurify sanitization strips scripts and malicious handlers before storage.
+- **Integration**: Assets uploaded to the Media Library can be re-used directly across Branding, Projects, Blog, and Courses.
+
+---
+
+## 7. Analytics
+
+- **Platform**: Google Analytics 4 (GA4).
+- **Measurement ID**: Configured via `VITE_GA4_MEASUREMENT_ID`.
+- **Server API**: Express proxies GA4 Data API calls (`/api/admin/ga4/*`) to render visitor traffic charts, top pages, country distribution, and conversion event counters directly inside the Admin Portal.
+
+---
+
+## 8. Database Architecture
+
+- **Authoritative Engine**: **Supabase PostgreSQL**.
+- **CMS Tables**:
+  - `projects`
+  - `blogs`
+  - `courses`
+  - `videos`
+  - `categories`
+  - `pages`
+  - `settings`
+  - `messages`
+  - `newsletter`
+  - `media`
+  - `email_campaigns`
+  - `email_campaign_recipients`
+- **Strict Data Policy**: All production reads and writes communicate directly with Supabase PostgreSQL. There are **no production fallbacks** to local JSON files, localStorage, or mock data.
+
+---
+
+## 9. Security Architecture
+
+- **Secret Isolation**: All sensitive credentials (`SUPABASE_SECRET_KEY`, `GMAIL_APP_PASSWORD`, `ADMIN_PASSKEY`, `GEMINI_API_KEY`) reside exclusively in the server environment and are never exposed in client bundles or public code.
+- **Passkey Verification**: Admin login requires server-side passkey verification (`/api/admin/verify-passkey`) issuing time-limited session tokens.
+- **Row Level Security (RLS)**: RLS enabled on Supabase tables. Public direct postgREST access is blocked (HTTP 403), ensuring all privileged queries pass through Express using the service-role key.
+- **Sanitization**: SVG uploads are sanitized server-side to prevent stored XSS attacks.
+
+---
+
+## 10. Production Infrastructure
+
+```
+PROBITIAN WEBSITE / ADMIN PORTAL
+        ↓
+     EXPRESS API (Node.js Port 3000)
+        ↓
+SUPABASE POSTGRESQL (Authoritative Source of Truth)
+
+MEDIA:
+ADMIN / WEBSITE → EXPRESS MEDIA API → SUPABASE STORAGE (probitian-media bucket)
+
+EMAIL:
+PROBITIAN SERVER → GMAIL SMTP (probitianofficial@gmail.com)
+
+ANALYTICS:
+WEBSITE → GOOGLE ANALYTICS 4
 ```
 
-1. **Public Website Flow**: Users browse courses, projects, and articles. Data is fetched from Supabase via Express server API endpoints with local caching.
-2. **Email System Flow**: Contact enquiries and admin replies pass through Express server endpoints (`/api/contact`, `/api/admin/reply-message`) to Nodemailer using Gmail SMTP credentials (`GMAIL_USER` and `GMAIL_APP_PASSWORD`).
-3. **Analytics Flow**: GA4 tracks non-PII events (`contact_form_submit`, `newsletter_subscribe`, `dataset_download_click`, `course_click`, etc.) from client side without exposing sensitive input fields.
-4. **Media Storage Flow**: Media uploads pass through Admin Media Library, saving secure references to Supabase and filesystem for persistent web usage.
+- **Firebase**: NOT USED.
+- **Cloud SQL**: NOT USED.
+- **Drizzle**: NOT USED.
+- **Resend**: NOT the active email delivery provider.
 
 ---
 
-## 🔐 Admin Portal Modules
+## 11. Environment Variables
 
-The Admin Control Center (`#/admin`) features 16 integrated modules:
+Define required variables in `.env` (refer to `.env.example`):
 
-1. **Dashboard Overview**: System health, quick navigation shortcuts, statistics summary, and recent activity.
-2. **GA4 Analytics**: Active real-time visitors, date range selectors (7D, 30D, 90D, custom), traffic sources, device breakdowns, top pages, and conversion events.
-3. **Home Page Editor**: Customize hero headings, descriptions, call-to-action buttons, key statistics, and feature cards.
-4. **Projects Manager**: Create, edit, publish, order, and tag portfolio projects with dataset downloads and live links.
-5. **Blog Manager**: Draft, schedule, or publish technical articles with custom excerpts, category tags, and SEO metadata.
-6. **Courses / Learn Manager**: Manage skill topics, module syllabi, video links, PDF resources, and skill levels.
-7. **YouTube Manager**: Organize video tutorials, playlists, durations, view counts, and category tags.
-8. **Media Library**: Upload images, search files, manage graphics, and select media for branding or content.
-9. **Messages Inbox**: Review contact inquiries, set status (new, read, replied, archived), add internal admin notes, and send email responses via Gmail SMTP.
-10. **Subscribers Manager**: Manage newsletter email subscriptions, filter domains, and export subscriber lists.
-11. **Branding Manager**: Update official logos, banners, themes, and execute factory defaults.
-12. **Social Links Manager**: Control active social profiles (YouTube, Instagram, Facebook, GitHub, etc.) and display order.
-13. **Navigation Manager**: Customize top menu items, paths, icons, and visibility toggles.
-14. **SEO & Meta Tags**: Configure meta titles, meta descriptions, Open Graph images, Twitter handles, and `robots.txt`.
-15. **Website Settings**: Manage site name, tagline, official contact email, footer copyright, and **Community Hub Location details**.
-16. **Legal & Policies**: Edit Terms of Service, Privacy Policy, effective dates, and governing law clauses.
-17. **Backup & Restore**: Export full JSON database backups and restore CMS content on demand.
-
----
-
-## 🗄 Database & Storage Strategy
-
-ProBitian implements a multi-tier storage architecture to ensure zero downtime and absolute data persistence:
-
-- **Supabase PostgreSQL (Production Source of Truth)**: Primary cloud database storing all CMS records, messages, subscribers, settings, and legal documents.
-- **`/data/cms_settings.json` (Local Emergency Fallback)**: Persistent file-based store ensuring backend operations continue even during external network disruptions.
-- **`localStorage` (Client-Side Cache)**: Caches general settings and theme preferences for immediate render without layout shifts.
-- **`mockData` (Seed Data Only)**: Standard initial default values used solely during brand initialization or factory reset.
-
----
-
-## 📧 Email System (Nodemailer + Gmail SMTP)
-
-Contact form submissions and admin response dispatches use server-side **Nodemailer** over **Gmail SMTP**:
-
-- **Outgoing Contact Notification**: Sent automatically when a visitor submits the contact form.
-- **Admin Reply Dispatch**: Sent directly from the Messages Inbox modal in the Admin Portal to the visitor's email.
-- **Environment Configuration**:
-  - `GMAIL_USER`: Official sender email address (`probitianofficial@gmail.com`)
-  - `GMAIL_APP_PASSWORD`: Google App Password generated for secure SMTP authentication
-  - `NOTIFICATION_EMAIL`: Recipient email address for new contact alerts
-
-*Note: All SMTP processing occurs strictly on the server side (`server.ts`). Secret credentials are never exposed to browser clients.*
-
----
-
-## 🔑 Authentication & Passkey Protection
-
-Access to the Admin Portal (`#/admin`) is guarded by a server-side authentication layer:
-
-- **Authentication Flow**: Client sends passkey to `POST /api/admin/verify-passkey`.
-- **Server Validation**: Express server compares the submitted string against the `ADMIN_PASSKEY` environment variable.
-- **Token Handling**: Successful validation issues an authenticated session token stored in browser memory/session storage.
-- **Isolation**: The `ADMIN_PASSKEY` value is server-only. It is **never** included in client JavaScript bundles, network payloads, or logs.
-
----
-
-## 🔑 Environment Variables Guide
-
-Declare all environment keys in `.env.example`. Do not commit real production secrets to repository history.
-
-### Public Client Variables
 ```env
-# Frontend Supabase URL & Public Anon Key
-VITE_SUPABASE_URL="https://your-supabase-project.supabase.co"
-VITE_SUPABASE_ANON_KEY="your-supabase-anon-key"
+# GEMINI API KEY (Server Side)
+GEMINI_API_KEY="<configured in server environment>"
 
-# Public Google Analytics 4 Measurement ID
-VITE_GA4_MEASUREMENT_ID="G-G3WJXY6THP"
+# APP HOST URL
+APP_URL="https://probitian.ai.studio/"
 
-# Brand Social & Contact Public Links
-VITE_SITE_URL="https://probitian.com"
+# PUBLIC BRAND SETTINGS
+VITE_SITE_URL="https://probitian.ai.studio/"
 VITE_YOUTUBE_URL="https://youtube.com/@probitian"
 VITE_INSTAGRAM_URL="https://instagram.com/probitian"
 VITE_FACEBOOK_URL="https://facebook.com/probitian"
 VITE_GITHUB_URL="https://github.com/probitian"
 VITE_CONTACT_EMAIL="probitianofficial@gmail.com"
-```
 
-### Server-Only Secrets
-```env
-# Admin Portal Master Passkey
-ADMIN_PASSKEY="your-secure-passkey"
+# SUPABASE CONFIGURATION
+VITE_SUPABASE_URL="https://dlaehchzzkjsrarktfsf.supabase.co"
+VITE_SUPABASE_ANON_KEY="<configured in client environment>"
+SUPABASE_SECRET_KEY="<configured in server environment>"
 
-# Supabase Server Service Role Key
-SUPABASE_SECRET_KEY="your-supabase-service-role-key"
+# ADMIN AUTHENTICATION
+ADMIN_PASSKEY="<configured in server environment>"
 
-# Gmail SMTP Email Credentials
+# GA4 ANALYTICS
+VITE_GA4_MEASUREMENT_ID="<configured in client environment>"
+
+# GMAIL SMTP CONFIGURATION
 GMAIL_USER="probitianofficial@gmail.com"
-GMAIL_APP_PASSWORD="your-google-app-password"
-
-# GA4 Server Reporting Credentials
-GA4_PROPERTY_ID="549083163"
-GA4_CLIENT_EMAIL="your-service-account@iam.gserviceaccount.com"
-GA4_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
+GMAIL_APP_PASSWORD="<configured in server environment>"
 ```
 
 ---
 
-## 💻 Local Development & Commands
-
-### Prerequisites
-- Node.js v18.0 or higher
-- npm v9.0 or higher
-
-### Installation & Execution
+## 12. Local Development
 
 ```bash
-# 1. Install dependencies
+# Install dependencies
 npm install
 
-# 2. Run local development server (Express + Vite on Port 3000)
+# Run development server (Node + Express + Vite on port 3000)
 npm run dev
 
-# 3. Validate code quality & TypeScript types
+# Run TypeScript type check
 npm run lint
 
-# 4. Build full-stack production bundle (Vite SPA + esbuild server.cjs)
+# Build production assets and bundle server
 npm run build
 
-# 5. Launch compiled production server
-npm run start
+# Start production server
+npm start
 ```
 
-Access the application at `http://localhost:3000`.
+---
+
+## 13. Database Migration Workflow
+
+1. Create a timestamped SQL migration file in `supabase/migrations/`.
+2. Review migration SQL for destructive actions.
+3. Test migration on a staging environment or backup database.
+4. Execute SQL in Supabase Dashboard SQL Editor or via Supabase CLI.
+5. Verify schema updates and grants (`GRANT ALL ON ALL TABLES IN SCHEMA public TO service_role;`).
+6. Test application API handlers.
+7. Record migration completion status.
+
+*Note: Application startup NEVER performs automated `TRUNCATE`, `DROP TABLE`, or database reset routines.*
 
 ---
 
-## 📝 CMS Content Management Usage
+## 14. Deployment Workflow
 
-Admin users can modify all site content dynamically without editing code:
-1. Navigate to `#/admin` and log in using the Admin Passkey.
-2. Select desired module from the left navigation bar:
-   - **Home**: Edit headline, subheadline, stats, and feature cards.
-   - **Projects / Blog / Courses / YouTube**: Add new entries, upload custom thumbnails, attach datasets/PDFs, and toggle visibility.
-   - **Branding / Navigation / Social**: Upload logos, adjust display order, and update social URLs.
-   - **Website Settings**: Update site name, contact email, copyright, and Community Hub location.
-   - **Legal & Policies**: Edit Terms of Service and Privacy Policy sections.
-3. Click **Save Changes** — Updates persist immediately to Supabase and reflect live across the public website.
+1. Perform local typecheck (`npm run lint`).
+2. Run local build (`npm run build`).
+3. Verify environment variables in Cloud Run container settings.
+4. Apply any pending database migrations to Supabase PostgreSQL.
+5. Deploy container artifact.
+6. Perform post-deployment smoke tests (contact form, newsletter, media upload, admin login).
 
 ---
 
-## 🖼 Media Library Engine
+## 15. Backup / Recovery
 
-The Media Library module provides a unified asset manager:
-- **Upload**: Accepts PNG, JPG, SVG, WebP, and PDF assets.
-- **Sanitization**: SVG files undergo DOMPurify sanitization before saving to protect against script injection.
-- **Selection**: Assets uploaded in Media Library can be selected directly inside Project forms, Blog editors, Course resources, and Branding panels.
-- **Persistence**: File meta and URLs are stored persistently in Supabase (`probitian_cms_media`) and filesystem.
+- **Database Backups**: Download full JSON backups directly from the Admin Portal (**Backup & Restore** module).
+- **Supabase Cloud Snapshots**: Automatic daily PostgreSQL backups managed within the Supabase Cloud dashboard.
+- **Disaster Recovery**: Upload backup JSON files via the Admin Control Center to restore full CMS state on demand.
 
 ---
 
-## ⚖️ Legal & Policy Management
+## 16. User Documentation
 
-ProBitian maintains dedicated, editable legal pages:
-- **Terms of Service**: Reachable at `#/terms`. Governs platform usage, course access, and intellectual property.
-- **Privacy Policy**: Reachable at `#/privacy` and `#/privacy-policy`. Details data collection, cookie usage, user rights, and contact procedures.
-- **CMS Management**: Accessible via **Admin Portal → Legal & Policies**. Edits save directly to Supabase and update public legal pages in real time.
+- **Website User Guide (Markdown)**: `docs/PROBITIAN_USER_GUIDE.md`
+- **Website User Guide (PDF)**: `public/docs/ProBitian_Website_User_Guide.pdf`
 
 ---
 
-## 📍 Official Location & Community Hub
+## 17. Admin Documentation
 
-The official ProBitian Community Hub location is integrated into the Contact page (`#/contact`):
-
-- **Place Name**: ProBitian Community Hub
-- **Address**: `M93M+688, Salaiya, Madhya Pradesh 486440, India`
-- **Coordinates**: `24.6030, 81.2833`
-- **Plus Code**: `M93M+688 Salaiya, Madhya Pradesh`
-- **Public Maps Link**: `https://maps.app.goo.gl/T4426JADcNHHFPqb7` (opens in a new browser tab with `target="_blank" rel="noopener noreferrer"`).
-- **CMS Configurable**: Editable via **Admin Portal → Website Settings → Community Hub Location Settings**.
+- **Admin User Guide (Markdown)**: `docs/PROBITIAN_ADMIN_CONTROL_CENTER_USER_GUIDE.md`
+- **Admin User Guide (PDF)**: `public/docs/ProBitian_Admin_Control_Center_User_Guide.pdf`
 
 ---
 
-## 🛡 Security Architecture
+## 18. Project Structure
 
-- **Credential Isolation**: All API keys, passkeys, and SMTP secrets remain strictly on the server side (`process.env`).
-- **Input Sanitization**: Contact forms and CMS text fields are validated client-side and sanitized server-side.
-- **XSS Protection**: Dynamic SVG logos and user inputs are passed through DOMPurify sanitization.
-- **PII Protection**: User details entered into contact forms are never transmitted to Google Analytics 4.
-- **Secure Links**: All external hyperlinks enforce `rel="noopener noreferrer"`.
+```
+.
+├── docs/                                    # Technical & Architectural Documentation
+│   ├── README.md                            # Documentation Index
+│   ├── PROBITIAN_USER_GUIDE.md             # Website Learner Guide
+│   ├── PROBITIAN_ADMIN_CONTROL_CENTER_USER_GUIDE.md # Admin Manual
+│   ├── DATABASE_ARCHITECTURE.md            # Supabase PostgreSQL Architecture
+│   ├── DATABASE_MIGRATIONS.md               # Migration Log & Procedure
+│   ├── NEWSLETTER_WORKFLOW.md               # Subscription & Welcome Email Pipeline
+│   ├── EMAIL_CAMPAIGN_WORKFLOW.md           # Email Campaign Broadcast Engine
+│   ├── EMAIL_CONFIGURATION.md              # Gmail SMTP Setup & Security
+│   ├── MEDIA_LIBRARY.md                     # Supabase Storage Asset Management
+│   ├── ANALYTICS.md                         # GA4 Integration Specification
+│   ├── SECURITY.md                          # Secret Isolation & RLS Security
+│   ├── DEPLOYMENT_WORKFLOW.md               # Deployment Pipeline
+│   ├── PRODUCTION_RELEASE_CHECKLIST.md      # Production Audit Checklist
+│   └── TROUBLESHOOTING.md                   # Operational Error Resolution
+├── public/                                  # Static Assets & Public Documents
+│   ├── docs/                                # Public Guides & Generated PDFs
+│   ├── banner.svg                           # Site Banner
+│   ├── favicon.svg                          # Site Favicon
+│   └── logo.svg                             # ProBitian Brand Logo
+├── src/                                     # React Frontend Application
+│   ├── components/                          # UI Components & Modals
+│   ├── pages/                               # Page Components (Home, Learn, Admin, etc.)
+│   ├── services/                            # Frontend API Services
+│   ├── lib/                                 # Supabase client, SVG Sanitizer, GA4 helpers
+│   ├── App.tsx                              # Main Application Router
+│   └── main.tsx                             # Entry Point
+├── supabase/                                # Supabase Schema & Migrations
+│   └── migrations/                          # Sequential Migration Scripts
+├── generate_docs.js                         # Documentation & PDF Generator Script
+├── metadata.json                            # Platform Capabilities Config
+├── package.json                             # Dependencies & Build Scripts
+├── server.ts                                # Node.js Express Application Server
+└── vite.config.ts                           # Vite Config
+```
 
 ---
 
-© 2026 ProBitian. All Rights Reserved. Founded by Shivam Baghel.
+## 19. Troubleshooting
+
+- **Admin Login Rejected**: Ensure `ADMIN_PASSKEY` environment variable matches the passkey entered.
+- **Contact Email Not Sending**: Verify server environment variables `GMAIL_USER` and `GMAIL_APP_PASSWORD` are valid.
+- **Supabase Permission Error (HTTP 403)**: Ensure service role grants are executed in Supabase SQL Editor (`GRANT ALL ON ALL TABLES IN SCHEMA public TO service_role;`).
+- **Media Upload Failed**: Confirm the `probitian-media` bucket is created in Supabase Storage with public access enabled.
+
+---
+
+## 20. Production Checklist
+
+- [x] Supabase PostgreSQL project provisioned and configured.
+- [x] All 6 migration files applied (`0001` through `0006`).
+- [x] Table grants verified for `service_role`.
+- [x] RLS enabled and direct public postgREST access blocked.
+- [x] Supabase Storage bucket `probitian-media` created and public.
+- [x] Gmail SMTP credentials (`GMAIL_USER`, `GMAIL_APP_PASSWORD`) active.
+- [x] Admin Passkey (`ADMIN_PASSKEY`) configured in server environment.
+- [x] GA4 Measurement ID (`VITE_GA4_MEASUREMENT_ID`) active.
+- [x] Firebase and Cloud SQL dependencies removed.
+- [x] Production build and TypeScript checks passing cleanly.
+
+---
+
+## 21. Project Owner
+
+- **Name**: Shivam Singh
+- **Project**: ProBitian
+- **Website**: [https://probitian.ai.studio/](https://probitian.ai.studio/)
+- **Official Email**: [probitianofficial@gmail.com](mailto:probitianofficial@gmail.com)
+
+---
+
+*© 2026 ProBitian. All Rights Reserved. Maintained by Shivam Singh.*
