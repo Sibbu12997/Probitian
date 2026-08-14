@@ -50,7 +50,7 @@ const STORAGE_KEYS = {
 const DEFAULT_GENERAL_SETTINGS: WebsiteGeneralSettings = {
   website_name: 'ProBItian',
   tagline: 'Master Business Intelligence',
-  contact_email: 'Probitianofficial@gmail.com',
+  contact_email: 'probitianofficial@gmail.com',
   logo_url: '/logo.svg',
   favicon_url: '/logo.svg',
   banner_url: '/banner.svg',
@@ -102,7 +102,7 @@ const DEFAULT_SOCIAL_LINKS: SocialLinkItem[] = [
   { id: '2', platform: 'instagram', url: 'https://instagram.com/probitian', icon: 'Instagram', is_active: true, display_order: 2 },
   { id: '3', platform: 'facebook', url: 'https://facebook.com/probitian', icon: 'Facebook', is_active: true, display_order: 3 },
   { id: '4', platform: 'github', url: 'https://github.com/probitian', icon: 'Github', is_active: true, display_order: 4 },
-  { id: '5', platform: 'email', url: 'mailto:Probitianofficial@gmail.com', icon: 'Mail', is_active: true, display_order: 5 }
+  { id: '5', platform: 'email', url: 'mailto:probitianofficial@gmail.com', icon: 'Mail', is_active: true, display_order: 5 }
 ];
 
 const DEFAULT_NAVIGATION: NavigationItem[] = [
@@ -150,7 +150,14 @@ function setLocal<T>(key: string, value: T): void {
  * Throws a descriptive error if the status is not OK or if the response is HTML.
  */
 async function safeFetchJson<T = any>(url: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(url, options);
+  const fetchOptions: RequestInit = {
+    credentials: 'include',
+    ...options,
+    headers: {
+      ...options?.headers
+    }
+  };
+  const response = await fetch(url, fetchOptions);
   const contentType = response.headers.get('content-type') || '';
 
   if (!response.ok) {
@@ -506,7 +513,7 @@ export const cmsService = {
             tags: b.tags || [],
             date: new Date(b.created_at || Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
             readTime: b.read_time || '5 min read',
-            author: b.author || 'Shivam Baghel',
+            author: b.author || 'Shivam Singh',
             imageUrl: b.featured_image || 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=800&q=80',
             status: b.status || 'published',
             scheduledAt: b.scheduled_at,

@@ -82,13 +82,17 @@ export const emailService = {
     }
   },
 
-  async sendWelcomeEmail(email: string): Promise<{ success: boolean; message?: string }> {
+  async sendWelcomeEmail(email: string, unsubscribeUrl?: string): Promise<{ success: boolean; message?: string }> {
     const user = getGmailUser();
     const pass = getGmailPass();
     if (!pass) {
       console.log(`[EMAIL INFO] Welcome email recorded for ${email}. Set GMAIL_APP_PASSWORD in environment to enable live SMTP delivery.`);
       return { success: true, message: 'Welcome email queued.' };
     }
+
+    const unsubFooter = unsubscribeUrl
+      ? `<br/><a href="${unsubscribeUrl}" style="color: #94a3b8; text-decoration: underline;">Unsubscribe</a>`
+      : '';
 
     try {
       const transporter = getTransporter();
@@ -107,7 +111,7 @@ export const emailService = {
             <p>Stay tuned for our upcoming content and resources.</p>
             <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;" />
             <p style="font-size: 12px; color: #94a3b8; text-align: center;">
-              ProBitian &bull; Official Learning Hub &bull; <a href="mailto:${user}" style="color: #7c3aed;">${user}</a>
+              ProBitian &bull; Official Learning Hub &bull; <a href="mailto:${user}" style="color: #7c3aed;">${user}</a>${unsubFooter}
             </p>
           </div>
         `
@@ -144,7 +148,7 @@ export const emailService = {
               ${replyMessage.replace(/\n/g, '<br/>')}
             </div>
             <br/>
-            <p>Best regards,<br/><strong>Shivam Baghel</strong><br/><span style="color: #64748b; font-size: 12px;">Founder & BI Specialist, ProBitian</span></p>
+            <p>Best regards,<br/><strong>Shivam Singh</strong><br/><span style="color: #64748b; font-size: 12px;">Founder & BI Specialist, ProBitian</span></p>
             <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;" />
             <p style="font-size: 12px; color: #94a3b8; text-align: center;">
               ProBitian &bull; Official Support &bull; <a href="mailto:${user}" style="color: #7c3aed;">${user}</a>

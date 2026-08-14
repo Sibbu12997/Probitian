@@ -104,7 +104,7 @@ export const PrivacyPage: React.FC<PrivacyPageProps> = ({ onNavigate }) => {
               Privacy Rights & Data Requests
             </h4>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-              To request data correction, deletion, or exercise your privacy rights, email Shivam Baghel.
+              To request data correction, deletion, or exercise your privacy rights, email Shivam Singh.
             </p>
           </div>
 

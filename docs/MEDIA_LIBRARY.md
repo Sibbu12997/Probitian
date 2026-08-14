@@ -40,7 +40,7 @@ Select File (PNG, JPG, WebP, SVG, PDF)
         ↓
 POST /api/cms/media/upload (Express Upload API)
         ↓
-Validation: File Size Check (Max 10MB) & Mime-Type Verification
+Validation: File Size Check (Max 15MB) & Mime-Type Verification
         ↓
 SVG Security Check: DOMPurify Sanitization (if SVG file)
         ↓
@@ -59,9 +59,9 @@ Return Asset Metadata & Public URL to Admin UI
 
 ## 4. Key Media Management Rules
 
-1. **Maximum File Size**: 10 MB per file.
+1. **Maximum File Size**: 15 MB per file.
 2. **Supported Mime Types**: `image/png`, `image/jpeg`, `image/webp`, `image/svg+xml`, `application/pdf`.
-3. **Filename Sanitization**: Special characters, spaces, and non-ASCII characters are stripped or converted to snake_case to ensure safe web URLs.
+3. **Filename Sanitization**: Special characters, spaces, directory traversals (`../`), and non-ASCII characters are stripped or converted to safe snake_case identifiers.
 4. **SVG DOMPurify Sanitization**: All uploaded SVG files are sanitized server-side prior to storage to strip `<script>` tags, inline `onload/onerror` JavaScript handlers, and malicious XML entities.
 5. **Asset Reuse**: Media uploaded to the Media Library can be selected directly when editing Branding (Logo & Banner), Projects, Blog Articles, or Course Curriculum modules, avoiding duplicate file uploads.
 
@@ -70,10 +70,11 @@ Return Asset Metadata & Public URL to Admin UI
 ## 5. Media Deletion Flow
 
 When an admin deletes a media file:
-1. Express calls `DELETE /api/cms/media/:id`.
-2. The server removes the file object from Supabase Storage (`probitian-media` bucket).
-3. The server deletes the corresponding metadata record from `public.media` in Supabase PostgreSQL.
-4. On-screen feedback confirms successful removal.
+1. Express receives `DELETE /api/cms/media/:id`.
+2. Validates media ID syntax (`isValidId`) and sanitizes storage path to prevent directory traversal or bucket escape.
+3. The server removes the file object from Supabase Storage (`probitian-media` bucket).
+4. The server deletes the corresponding metadata record from `public.media` in Supabase PostgreSQL.
+5. On-screen feedback confirms successful removal.
 
 ---
 

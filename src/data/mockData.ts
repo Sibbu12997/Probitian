@@ -182,7 +182,7 @@ export const BLOG_ARTICLES: BlogArticle[] = [
     category: 'DAX',
     date: 'August 2, 2026',
     readTime: '6 min read',
-    author: 'Shivam Baghel',
+    author: 'Shivam Singh',
     imageUrl: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=800&q=80',
     content: `
 # Top 10 DAX Functions Every Data Analyst Must Master in 2026
@@ -250,7 +250,7 @@ Mastering these core functions transforms static reports into dynamic, intellige
     category: 'SQL',
     date: 'July 28, 2026',
     readTime: '8 min read',
-    author: 'Shivam Baghel',
+    author: 'Shivam Singh',
     imageUrl: 'https://images.unsplash.com/photo-1504868584819-f8e8b4b6d7e3?auto=format&fit=crop&w=800&q=80',
     content: `
 # The Ultimate Guide to SQL Window Functions for Data Interviews
@@ -290,7 +290,7 @@ Practicing window functions with partition clauses is essential for building rob
     category: 'Power Query',
     date: 'July 15, 2026',
     readTime: '5 min read',
-    author: 'Shivam Baghel',
+    author: 'Shivam Singh',
     imageUrl: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=800&q=80',
     content: `
 # Power Query Transformation Secrets: Clean Messy Data 10x Faster
@@ -320,7 +320,7 @@ Use \`Table.Buffer()\` in M code when joining static reference tables repeatedly
     category: 'AI',
     date: 'July 04, 2026',
     readTime: '7 min read',
-    author: 'Shivam Baghel',
+    author: 'Shivam Singh',
     imageUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80',
     content: `
 # How to Use AI & ChatGPT as Your Personal Data Analytics Pair Programmer

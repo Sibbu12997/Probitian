@@ -65,7 +65,7 @@ export const DEFAULT_TERMS_DOCUMENT: LegalDocument = {
     {
       id: "terms-8",
       title: "8. Intellectual Property",
-      body: "All original website design, branding, logos, graphics, source code, and written tutorials on ProBitian are the intellectual property of ProBitian and Shivam Baghel. You may not republish, sell, or commercially redistribute our starter datasets or proprietary templates without prior written permission."
+      body: "All original website design, branding, logos, graphics, source code, and written tutorials on ProBitian are the intellectual property of ProBitian and Shivam Singh. You may not republish, sell, or commercially redistribute our starter datasets or proprietary templates without prior written permission."
     },
     {
       id: "terms-9",
@@ -115,7 +115,7 @@ export const DEFAULT_TERMS_DOCUMENT: LegalDocument = {
     {
       id: "terms-18",
       title: "18. Contact Information",
-      body: "If you have questions regarding these Terms of Service, please contact Shivam Baghel directly at probitianofficial@gmail.com."
+      body: "If you have questions regarding these Terms of Service, please contact Shivam Singh directly at probitianofficial@gmail.com."
     }
   ]
 };
@@ -234,7 +234,7 @@ export const DEFAULT_PRIVACY_DOCUMENT: LegalDocument = {
     {
       id: "priv-22",
       title: "22. Contact Us",
-      body: "For any privacy questions, data correction requests, or privacy concerns, please contact Shivam Baghel at probitianofficial@gmail.com."
+      body: "For any privacy questions, data correction requests, or privacy concerns, please contact Shivam Singh at probitianofficial@gmail.com."
     }
   ]
 };

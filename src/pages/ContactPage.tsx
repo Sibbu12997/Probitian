@@ -181,7 +181,7 @@ export const ContactPage: React.FC = () => {
                 Message Sent Successfully!
               </h3>
               <p className="text-xs sm:text-sm text-emerald-700 dark:text-emerald-300 leading-relaxed max-w-md mx-auto">
-                Thanks for reaching out. We've received your enquiry and will get back to you soon. A notification has been logged for Shivam Baghel at <strong className="font-bold">{contactEmail}</strong>.
+                Thanks for reaching out. We've received your enquiry and will get back to you soon. A notification has been logged for Shivam Singh at <strong className="font-bold">{contactEmail}</strong>.
               </p>
               <button
                 onClick={() => setSubmitted(false)}

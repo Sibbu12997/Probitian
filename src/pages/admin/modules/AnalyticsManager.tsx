@@ -67,7 +67,7 @@ export const AnalyticsManager: React.FC<AnalyticsManagerProps> = () => {
 
     try {
       // 1. Check GA4 Config Status
-      const statusRes = await fetch('/api/analytics/status');
+      const statusRes = await fetch('/api/analytics/status', { credentials: 'include' });
       if (statusRes.ok) {
         const statusJson = await statusRes.json();
         setGa4Status({
@@ -78,7 +78,7 @@ export const AnalyticsManager: React.FC<AnalyticsManagerProps> = () => {
       }
 
       // 2. Fetch Realtime Active Users
-      const realtimeRes = await fetch('/api/analytics/realtime');
+      const realtimeRes = await fetch('/api/analytics/realtime', { credentials: 'include' });
       if (realtimeRes.ok) {
         const realtimeJson = await realtimeRes.json();
         if (realtimeJson.configured) {
@@ -92,7 +92,7 @@ export const AnalyticsManager: React.FC<AnalyticsManagerProps> = () => {
         url += `&startDate=${customStart}&endDate=${customEnd}`;
       }
 
-      const reportRes = await fetch(url);
+      const reportRes = await fetch(url, { credentials: 'include' });
       if (reportRes.ok) {
         const reportJson = await reportRes.json();
         setReportData(reportJson);

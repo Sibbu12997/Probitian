@@ -20,9 +20,26 @@ import { trackPageView, trackNavigationClick } from './lib/analytics';
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState<NavPage>('home');
-  const [adminUser, setAdminUser] = useState<string | null>(() => {
-    return localStorage.getItem('probitian_admin_session');
-  });
+  const [adminUser, setAdminUser] = useState<string | null>(null);
+
+  // Validate server-side admin session on load
+  useEffect(() => {
+    async function checkSession() {
+      try {
+        const res = await fetch('/api/admin/session', { credentials: 'include' });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.authenticated && data.email) {
+            setAdminUser(data.email);
+          }
+        }
+      } catch (err) {
+        console.warn('Admin session validation error:', err);
+      }
+    }
+    checkSession();
+  }, []);
+
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('probitian_theme');
@@ -59,12 +76,15 @@ export default function App() {
 
   const handleAdminLoginSuccess = (email: string) => {
     setAdminUser(email);
-    localStorage.setItem('probitian_admin_session', email);
   };
 
-  const handleAdminLogout = () => {
+  const handleAdminLogout = async () => {
+    try {
+      await fetch('/api/admin/logout', { method: 'POST', credentials: 'include' });
+    } catch (e) {
+      console.warn('Logout error:', e);
+    }
     setAdminUser(null);
-    localStorage.removeItem('probitian_admin_session');
   };
 
   // Sync theme class to document and localStorage
@@ -126,6 +146,8 @@ export default function App() {
             <AdminLogin
               onLoginSuccess={handleAdminLoginSuccess}
               onNavigateHome={() => handleNavigate('home')}
+              isDarkMode={isDarkMode}
+              onToggleDarkMode={handleToggleDarkMode}
             />
           );
         }
@@ -151,7 +173,7 @@ export default function App() {
       case 'projects': return 'Portfolio Projects & Dashboards | ProBItian';
       case 'blog': return 'Data Analytics Blog & DAX Guides | ProBItian';
       case 'learn': return 'Learn Power BI, SQL, Excel & AI | ProBItian';
-      case 'contact': return 'Contact Shivam Baghel | ProBItian';
+      case 'contact': return 'Contact Shivam Singh | ProBItian';
       case 'privacy': return 'Privacy Policy | ProBItian';
       case 'terms': return 'Terms of Service | ProBItian';
       case 'admin': return 'Admin CMS Portal | ProBItian';

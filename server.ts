@@ -5,6 +5,8 @@ import crypto from 'crypto';
 import dotenv from 'dotenv';
 import { createServer as createViteServer } from 'vite';
 import { createClient } from '@supabase/supabase-js';
+import { emailService } from './src/services/emailService';
+import { campaignEmailService } from './src/services/campaignEmailService';
 
 dotenv.config();
 
@@ -14,9 +16,320 @@ const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 app.use(express.json({ limit: '25mb' }));
 app.use(express.urlencoded({ limit: '25mb', extended: true }));
 
-// Supabase Server-Side Client Configuration
+// ==================== ORIGIN ALLOWLIST & CORS VALIDATOR ====================
+function isAllowedOrigin(origin: string | undefined, req: express.Request): boolean {
+  if (!origin) return true; // Direct same-origin requests or server-side calls without Origin header
+
+  try {
+    const parsed = new URL(origin);
+    const host = parsed.host.toLowerCase();
+    const reqHost = ((req.headers['x-forwarded-host'] as string) || req.headers.host || '').toLowerCase();
+
+    // Direct host match (same domain/port)
+    if (host === reqHost) return true;
+
+    // Local development origins
+    if (
+      host === 'localhost:3000' ||
+      host === '127.0.0.1:3000' ||
+      host === 'localhost:5173' ||
+      host === '127.0.0.1:5173' ||
+      host === 'localhost' ||
+      host === '127.0.0.1'
+    ) {
+      return true;
+    }
+
+    // Google Cloud Run & AI Studio environments
+    if (
+      host.endsWith('.run.app') ||
+      host.endsWith('.ai.studio') ||
+      host === 'ai.studio' ||
+      host.endsWith('.google.com') ||
+      host.endsWith('.googleusercontent.com')
+    ) {
+      return true;
+    }
+
+    // Custom allowed origins from environment
+    const customAllowed = [
+      process.env.APP_URL,
+      process.env.FRONTEND_URL,
+      process.env.PUBLIC_URL,
+      process.env.CORS_ALLOWED_ORIGINS
+    ].filter(Boolean).map(s => s!.toLowerCase().trim());
+
+    for (const allowed of customAllowed) {
+      if (allowed.includes(',')) {
+        const split = allowed.split(',').map(item => item.trim());
+        if (split.some(item => origin.toLowerCase() === item || host === item.replace(/^https?:\/\//, ''))) {
+          return true;
+        }
+      } else {
+        if (origin.toLowerCase() === allowed || host === allowed.replace(/^https?:\/\//, '')) {
+          return true;
+        }
+      }
+    }
+  } catch (e) {
+    return false;
+  }
+
+  return false;
+}
+
+// ==================== SECURITY HEADERS & SHIELD MIDDLEWARE ====================
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  
+  // Environment-aware frame policy (clickjacking protection)
+  const isDevOrPreview = process.env.NODE_ENV !== 'production' || 
+    Boolean(process.env.DISABLE_HMR) || 
+    Boolean(process.env.AI_STUDIO_APPLET_ID);
+
+  if (isDevOrPreview) {
+    // In AI Studio preview environment, allow embedding from AI Studio and Google domains
+    res.setHeader('Content-Security-Policy', "frame-ancestors 'self' https://ai.studio https://*.ai.studio https://*.google.com https://*.googleusercontent.com https://*.run.app");
+  } else {
+    // Standard production environment clickjacking protection
+    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+    res.setHeader('Content-Security-Policy', "frame-ancestors 'self'");
+  }
+
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+
+  const isHttps = req.secure || 
+                  req.headers['x-forwarded-proto'] === 'https' ||
+                  req.headers['x-forwarded-ssl'] === 'on';
+
+  if (isHttps && process.env.NODE_ENV === 'production') {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  }
+
+  // Hardened CORS: Explicit origin validation
+  const origin = req.headers.origin;
+  const isAllowed = isAllowedOrigin(origin, req);
+
+  if (origin && isAllowed) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, PUT, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-admin-token, X-Requested-With');
+    res.setHeader('Vary', 'Origin');
+  }
+
+  if (req.method === 'OPTIONS') {
+    if (origin && !isAllowed) {
+      return res.status(403).json({ error: 'CORS policy violation: Unauthorized origin' });
+    }
+    return res.status(204).end();
+  }
+
+  // CSRF Defense: Block cross-site state-changing requests from untrusted origins on sensitive routes
+  const isStateChanging = ['POST', 'PATCH', 'PUT', 'DELETE'].includes(req.method);
+  if (isStateChanging && (req.path.startsWith('/api/admin') || req.path.startsWith('/api/cms'))) {
+    if (origin && !isAllowed) {
+      return res.status(403).json({ error: 'Forbidden: Untrusted cross-site request origin' });
+    }
+    const referer = req.headers.referer;
+    if (!origin && referer) {
+      try {
+        const refOrigin = new URL(referer).origin;
+        if (!isAllowedOrigin(refOrigin, req)) {
+          return res.status(403).json({ error: 'Forbidden: Untrusted cross-site request referer' });
+        }
+      } catch (e) {
+        return res.status(403).json({ error: 'Forbidden: Malformed referer' });
+      }
+    }
+  }
+
+  // Block source maps, env files, and git metadata in all environments
+  if (req.path.endsWith('.map') || req.path.includes('.env') || req.path.includes('.git')) {
+    return res.status(403).json({ error: 'Access denied' });
+  }
+
+  // Block direct .ts source file access in production mode
+  if (!isDevOrPreview && req.path.endsWith('.ts')) {
+    return res.status(403).json({ error: 'Access denied' });
+  }
+
+  if (req.path === '/' || req.path.endsWith('.html')) {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+  }
+  next();
+});
+
+// ==================== COOKIE PARSER & ADMIN SESSIONS ====================
+function parseCookies(req: express.Request): Record<string, string> {
+  const list: Record<string, string> = {};
+  const rc = req.headers.cookie;
+  if (rc) {
+    rc.split(';').forEach(cookie => {
+      const parts = cookie.split('=');
+      list[parts.shift()!.trim()] = decodeURIComponent(parts.join('='));
+    });
+  }
+  return list;
+}
+
+interface AdminSession {
+  token: string;
+  email: string;
+  createdAt: number;
+  expiresAt: number;
+}
+
+const adminSessions = new Map<string, AdminSession>();
+
+function getAdminCookieHeader(token: string, req: express.Request, maxAgeSeconds: number = 86400): string {
+  const isHttps = req.secure || 
+                  req.headers['x-forwarded-proto'] === 'https' ||
+                  req.headers['x-forwarded-ssl'] === 'on' ||
+                  Boolean(process.env.AIS_APPLET_ID) ||
+                  Boolean(process.env.AI_STUDIO_APPLET_ID) ||
+                  Boolean(process.env.DISABLE_HMR) ||
+                  process.env.NODE_ENV === 'production';
+
+  if (maxAgeSeconds === 0) {
+    if (isHttps) {
+      return 'admin_session=; HttpOnly; Path=/; SameSite=None; Secure; Max-Age=0';
+    }
+    return 'admin_session=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0';
+  }
+
+  if (isHttps) {
+    return `admin_session=${token}; HttpOnly; Path=/; SameSite=None; Secure; Max-Age=${maxAgeSeconds}`;
+  }
+  return `admin_session=${token}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${maxAgeSeconds}`;
+}
+
+// Cleanup expired sessions every 15 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [token, session] of adminSessions.entries()) {
+    if (now > session.expiresAt) {
+      adminSessions.delete(token);
+    }
+  }
+}, 15 * 60 * 1000);
+
+function getAdminSession(req: express.Request): AdminSession | null {
+  const cookies = parseCookies(req);
+  const token = cookies['admin_session'];
+
+  if (!token) return null;
+
+  const session = adminSessions.get(token);
+  if (!session) return null;
+
+  if (Date.now() > session.expiresAt) {
+    adminSessions.delete(token);
+    return null;
+  }
+
+  return session;
+}
+
+function requireAdmin(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const session = getAdminSession(req);
+  if (!session) {
+    return res.status(401).json({ error: 'Unauthorized: Admin authentication required' });
+  }
+  (req as any).adminSession = session;
+  next();
+}
+
+// ==================== RATE LIMITING MIDDLEWARE ====================
+interface RateLimitOptions {
+  windowMs: number;
+  max: number;
+  message?: string;
+}
+
+function createRateLimiter(options: RateLimitOptions) {
+  const requests = new Map<string, { count: number; resetTime: number }>();
+
+  setInterval(() => {
+    const now = Date.now();
+    for (const [ip, data] of requests.entries()) {
+      if (now > data.resetTime) requests.delete(ip);
+    }
+  }, 5 * 60 * 1000);
+
+  return (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const rawIp = (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || 'unknown';
+    const ip = rawIp.split(',')[0].trim();
+    const now = Date.now();
+    const record = requests.get(ip);
+
+    if (!record || now > record.resetTime) {
+      requests.set(ip, { count: 1, resetTime: now + options.windowMs });
+      return next();
+    }
+
+    if (record.count >= options.max) {
+      return res.status(429).json({
+        error: options.message || 'Too many requests. Please try again later.'
+      });
+    }
+
+    record.count += 1;
+    next();
+  };
+}
+
+const loginLimiter = createRateLimiter({ windowMs: 15 * 60 * 1000, max: 10, message: 'Too many login attempts. Please try again in 15 minutes.' });
+const newsletterLimiter = createRateLimiter({ windowMs: 15 * 60 * 1000, max: 10, message: 'Too many subscription attempts. Please try again later.' });
+const contactLimiter = createRateLimiter({ windowMs: 15 * 60 * 1000, max: 10, message: 'Too many contact messages sent. Please try again later.' });
+const uploadLimiter = createRateLimiter({ windowMs: 15 * 60 * 1000, max: 30, message: 'Too many upload requests. Please try again later.' });
+const emailTestLimiter = createRateLimiter({ windowMs: 15 * 60 * 1000, max: 10, message: 'Too many test emails sent. Please try again later.' });
+const emailSendLimiter = createRateLimiter({ windowMs: 15 * 60 * 1000, max: 5, message: 'Too many campaign broadcasts requested. Please try again later.' });
+
+// ==================== SIGNED UNSUBSCRIBE TOKENS ====================
+const UNSUBSCRIBE_SECRET = process.env.ADMIN_PASSKEY || process.env.SUPABASE_SECRET_KEY || 'probitian-unsub-secret-key';
+
+function generateUnsubscribeToken(email: string): string {
+  const cleanEmail = email.trim().toLowerCase();
+  const hmac = crypto.createHmac('sha256', UNSUBSCRIBE_SECRET);
+  hmac.update(cleanEmail);
+  const sig = hmac.digest('hex').slice(0, 16);
+  return Buffer.from(`${cleanEmail}:${sig}`).toString('base64url');
+}
+
+function verifyUnsubscribeToken(tokenStr: string): string | null {
+  try {
+    const decoded = Buffer.from(tokenStr, 'base64url').toString('utf-8');
+    const [email, sig] = decoded.split(':');
+    if (!email || !sig) return null;
+    const cleanEmail = email.trim().toLowerCase();
+    const hmac = crypto.createHmac('sha256', UNSUBSCRIBE_SECRET);
+    hmac.update(cleanEmail);
+    const expectedSig = hmac.digest('hex').slice(0, 16);
+    if (crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expectedSig))) {
+      return cleanEmail;
+    }
+  } catch (e) {
+    return null;
+  }
+  return null;
+}
+
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// ==================== SUPABASE SERVER-SIDE CLIENT ====================
 const supabaseUrl = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '').trim();
-// Strictly use server secret/service role key for server operations; NEVER fall back to client anon keys.
 const serverSecretKey = (process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
 
 const isServerSupabaseConfigured = (): boolean => {
@@ -65,11 +378,15 @@ function isValidUuid(id?: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
 }
 
-function ensureValidUuid(id?: string): string | undefined {
-  if (isValidUuid(id)) return id;
-  return undefined;
+function isValidId(id?: string): boolean {
+  if (!id || typeof id !== 'string') return false;
+  const clean = id.trim();
+  if (clean.length === 0 || clean.length > 128) return false;
+  if (clean.includes('..') || clean.includes('/') || clean.includes('\\') || clean.includes('\0')) return false;
+  return /^[a-zA-Z0-9_.-]+$/.test(clean);
 }
 
+// Local storage files for offline / unconfigured dev environment
 const CMS_DATA_FILE = path.join(process.cwd(), 'data', 'cms_settings.json');
 
 function readCmsData() {
@@ -96,38 +413,6 @@ function writeCmsData(data: any) {
   }
 }
 
-// Global Headers Middleware: Enables CORS and prevents HTML caching for stale deployment prevention
-app.use((req, res, next) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-
-  if (req.path === '/' || req.path.endsWith('.html')) {
-    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
-  }
-  next();
-});
-
-// ADMIN PASSKEY AUTHENTICATION ENDPOINT (Server-Side Only)
-app.post('/api/admin/verify-passkey', (req, res) => {
-  const { passkey, email } = req.body || {};
-  const serverPasskey = (process.env.ADMIN_PASSKEY || '').trim();
-  const enteredPasskey = (passkey || '').trim();
-
-  if (!serverPasskey) {
-    console.warn('[SECURITY WARNING] ADMIN_PASSKEY environment variable is not configured on the server.');
-    return res.status(500).json({ error: 'Admin passkey is not configured on the server environment. Please set ADMIN_PASSKEY.' });
-  }
-
-  if (enteredPasskey && enteredPasskey === serverPasskey) {
-    return res.json({ success: true, email: (email || 'admin@probitian.com').trim() });
-  }
-
-  return res.status(401).json({ error: 'Invalid credentials' });
-});
-
 // Helper to acquire Google OAuth2 Access Token for GA4 Data API via Service Account
 async function getGA4AccessToken(clientEmail: string, privateKey: string): Promise<string> {
   const header = { alg: 'RS256', typ: 'JWT' };
@@ -137,7 +422,7 @@ async function getGA4AccessToken(clientEmail: string, privateKey: string): Promi
     scope: 'https://www.googleapis.com/auth/analytics.readonly',
     aud: 'https://oauth2.googleapis.com/token',
     exp: now + 3600,
-    iat: now,
+    iat: now - 60,
   };
 
   const base64Url = (str: string) =>
@@ -181,13 +466,134 @@ async function getGA4AccessToken(clientEmail: string, privateKey: string): Promi
   return tokenData.access_token;
 }
 
-// ----------------------------------------------------
-// NEWSLETTER & MESSAGES API
-// ----------------------------------------------------
-import { emailService } from './src/services/emailService';
-import { campaignEmailService } from './src/services/campaignEmailService';
+// ==================== ADMIN AUTHENTICATION API ====================
 
-app.post('/api/newsletter', async (req, res) => {
+// Constant-time string comparison against timing attacks
+function constantTimeCompare(a: string, b: string): boolean {
+  if (typeof a !== 'string' || typeof b !== 'string' || !a || !b) return false;
+  const hashA = crypto.createHash('sha256').update(a).digest();
+  const hashB = crypto.createHash('sha256').update(b).digest();
+  return crypto.timingSafeEqual(hashA, hashB);
+}
+
+// POST /api/admin/verify-passkey
+app.post('/api/admin/verify-passkey', loginLimiter, (req, res) => {
+  const { passkey, email } = req.body || {};
+  const serverPasskey = (process.env.ADMIN_PASSKEY || '').trim();
+
+  if (!serverPasskey) {
+    console.warn('[SECURITY WARNING] ADMIN_PASSKEY environment variable is not configured on the server.');
+    return res.status(500).json({ error: 'Admin passkey is not configured on the server environment. Please set ADMIN_PASSKEY.' });
+  }
+
+  if (typeof passkey !== 'string' || !passkey.trim() || passkey.length > 512) {
+    return res.status(401).json({ error: 'Invalid credentials' });
+  }
+
+  const enteredPasskey = passkey.trim();
+
+  if (constantTimeCompare(enteredPasskey, serverPasskey)) {
+    let adminEmail = 'admin@probitian.com';
+    if (typeof email === 'string' && email.trim()) {
+      const cleanEmail = email.trim().toLowerCase();
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (emailRegex.test(cleanEmail)) {
+        adminEmail = cleanEmail;
+      }
+    }
+
+    const token = crypto.randomBytes(32).toString('hex');
+    const expiresAt = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
+
+    adminSessions.set(token, {
+      token,
+      email: adminEmail,
+      createdAt: Date.now(),
+      expiresAt
+    });
+
+    res.setHeader('Set-Cookie', getAdminCookieHeader(token, req));
+    return res.json({ success: true, email: adminEmail });
+  }
+
+  return res.status(401).json({ error: 'Invalid credentials' });
+});
+
+// POST /api/admin/verify-supabase-session
+app.post('/api/admin/verify-supabase-session', loginLimiter, async (req, res) => {
+  const { accessToken } = req.body || {};
+  if (!accessToken || typeof accessToken !== 'string') {
+    return res.status(400).json({ error: 'Access token is required' });
+  }
+
+  try {
+    let verifiedUser: { email?: string; id: string } | null = null;
+
+    if (serverSupabase) {
+      const { data, error } = await serverSupabase.auth.getUser(accessToken);
+      if (!error && data?.user) {
+        verifiedUser = data.user;
+      }
+    } else if (supabaseUrl) {
+      const anonKey = (process.env.VITE_SUPABASE_ANON_KEY || '').trim();
+      const userRes = await fetch(`${supabaseUrl}/auth/v1/user`, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          apikey: anonKey || serverSecretKey,
+        },
+      });
+      if (userRes.ok) {
+        verifiedUser = (await userRes.json()) as any;
+      }
+    }
+
+    if (!verifiedUser || !verifiedUser.email) {
+      return res.status(401).json({ error: 'Invalid or expired Supabase authentication' });
+    }
+
+    const userEmail = verifiedUser.email.toLowerCase().trim();
+    const token = crypto.randomBytes(32).toString('hex');
+    const expiresAt = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
+
+    adminSessions.set(token, {
+      token,
+      email: userEmail,
+      createdAt: Date.now(),
+      expiresAt,
+    });
+
+    res.setHeader('Set-Cookie', getAdminCookieHeader(token, req));
+    return res.json({ success: true, email: userEmail });
+  } catch (err) {
+    console.error('[Admin Supabase Session Verification Error]', err);
+    return res.status(500).json({ error: 'Failed to verify Supabase session' });
+  }
+});
+
+// GET /api/admin/session
+app.get('/api/admin/session', (req, res) => {
+  const session = getAdminSession(req);
+  if (session) {
+    return res.json({ authenticated: true, email: session.email });
+  }
+  return res.json({ authenticated: false });
+});
+
+// POST /api/admin/logout
+app.post('/api/admin/logout', (req, res) => {
+  const cookies = parseCookies(req);
+  const token = cookies['admin_session'];
+  if (token) {
+    adminSessions.delete(token);
+  }
+  res.setHeader('Set-Cookie', getAdminCookieHeader('', req, 0));
+  return res.json({ success: true });
+});
+
+// ==================== PUBLIC NEWSLETTER & MESSAGES API ====================
+
+// Public Newsletter Subscription
+app.post('/api/newsletter', newsletterLimiter, async (req, res) => {
   const { email } = req.body;
   const cleanEmail = (email || '').trim().toLowerCase();
 
@@ -225,7 +631,7 @@ app.post('/api/newsletter', async (req, res) => {
             subscriber: existing
           });
         } else {
-          // Reactivate unsubscribed user in Supabase
+          // Reactivate unsubscribed user
           const { data: updated, error: updateErr } = await serverSupabase
             .from('newsletter')
             .update({ status: 'active' })
@@ -243,7 +649,7 @@ app.post('/api/newsletter', async (req, res) => {
           subscriberRecord = updated;
         }
       } else {
-        // Insert new subscriber in Supabase
+        // Insert new subscriber
         const { data: inserted, error: insertErr } = await serverSupabase
           .from('newsletter')
           .insert({ email: cleanEmail, status: 'active' })
@@ -266,23 +672,8 @@ app.post('/api/newsletter', async (req, res) => {
         message: 'Database service unavailable. Exception during subscription.'
       });
     }
-
-    // Backup sync to local file (non-authoritative)
-    try {
-      const data = readCmsData();
-      data.subscribers = data.subscribers || [];
-      const localIdx = data.subscribers.findIndex((s: any) => s.email.toLowerCase() === cleanEmail);
-      if (localIdx >= 0) {
-        data.subscribers[localIdx] = subscriberRecord;
-      } else {
-        data.subscribers.unshift(subscriberRecord);
-      }
-      writeCmsData(data);
-    } catch (syncErr) {
-      console.warn('[NEWSLETTER] Backup local sync warning:', syncErr);
-    }
   } else {
-    // Fallback ONLY when Supabase is completely unconfigured
+    // Local JSON fallback ONLY when Supabase is completely unconfigured
     const data = readCmsData();
     data.subscribers = data.subscribers || [];
     const localIdx = data.subscribers.findIndex((s: any) => s.email.toLowerCase() === cleanEmail);
@@ -310,15 +701,15 @@ app.post('/api/newsletter', async (req, res) => {
     writeCmsData(data);
   }
 
-  // Send welcome email ONLY after successful database persistence
-  console.log(`[NEWSLETTER] Sending welcome email for: ${cleanEmail}`);
-  const emailRes = await emailService.sendWelcomeEmail(cleanEmail);
+  // Generate signed unsubscribe URL
+  const reqProtocol = req.headers['x-forwarded-proto'] || req.protocol;
+  const reqHost = req.headers['x-forwarded-host'] || req.headers.host;
+  const unsubToken = generateUnsubscribeToken(cleanEmail);
+  const unsubUrl = `${reqProtocol}://${reqHost}/api/newsletter/unsubscribe?token=${unsubToken}`;
 
-  if (emailRes.success) {
-    console.log(`[NEWSLETTER] Welcome email sent successfully to: ${cleanEmail}`);
-  } else {
-    console.error(`[NEWSLETTER] Welcome email dispatch failed for: ${cleanEmail} - ${emailRes.message}`);
-  }
+  // Send welcome email with signed unsubscribe token
+  console.log(`[NEWSLETTER] Sending welcome email for: ${cleanEmail}`);
+  const emailRes = await emailService.sendWelcomeEmail(cleanEmail, unsubUrl);
 
   return res.status(200).json({
     success: true,
@@ -328,9 +719,81 @@ app.post('/api/newsletter', async (req, res) => {
   });
 });
 
-// ----------------------------------------------------
-// CMS BRANDING & SETTINGS API ENDPOINTS (Supabase Authoritative + Local File System Fallback)
-// ----------------------------------------------------
+// Public Unsubscribe Endpoint
+app.get('/api/newsletter/unsubscribe', async (req, res) => {
+  const token = (req.query.token || '').toString().trim();
+  const rawEmail = (req.query.email || '').toString().trim();
+
+  let verifiedEmail: string | null = null;
+
+  if (token) {
+    verifiedEmail = verifyUnsubscribeToken(token);
+  } else if (rawEmail) {
+    verifiedEmail = verifyUnsubscribeToken(rawEmail);
+  }
+
+  if (!verifiedEmail) {
+    return res.status(400).send(`
+      <!DOCTYPE html>
+      <html>
+        <head><title>Unsubscribe - ProBitian</title><style>body{font-family:sans-serif;text-align:center;padding:50px;background:#f8fafc;color:#1e293b;}.card{max-width:480px;margin:auto;background:white;padding:32px;border-radius:12px;border:1px solid #e2e8f0;}</style></head>
+        <body>
+          <div class="card">
+            <h2 style="color:#ef4444;">Invalid or Expired Request</h2>
+            <p>The unsubscribe request is invalid, tampered with, or expired. Please use the original unsubscribe link provided in your newsletter email.</p>
+          </div>
+        </body>
+      </html>
+    `);
+  }
+
+  // Update in Supabase
+  if (serverSupabase) {
+    try {
+      await serverSupabase.from('newsletter').update({ status: 'unsubscribed' }).eq('email', verifiedEmail);
+    } catch (e) {
+      console.error('[Unsubscribe DB Error]', e);
+    }
+  } else {
+    const data = readCmsData();
+    data.subscribers = data.subscribers || [];
+    const target = data.subscribers.find((s: any) => s.email.toLowerCase() === verifiedEmail);
+    if (target) {
+      target.status = 'unsubscribed';
+      writeCmsData(data);
+    }
+  }
+
+  return res.status(200).send(`
+    <!DOCTYPE html>
+    <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <title>Unsubscribed - ProBitian</title>
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #0f172a; color: #f8fafc; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; }
+          .card { background-color: #1e293b; border: 1px solid #334155; border-radius: 16px; max-width: 500px; width: 100%; padding: 40px; text-align: center; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5); }
+          .badge { display: inline-block; background-color: #f59e0b; color: #0f172a; font-weight: 900; padding: 6px 12px; border-radius: 8px; font-size: 16px; margin-bottom: 16px; }
+          h1 { color: #ffffff; font-size: 24px; font-weight: 800; margin-bottom: 12px; }
+          p { color: #94a3b8; font-size: 15px; line-height: 1.6; margin-bottom: 24px; }
+          .email-highlight { color: #a78bfa; font-weight: 600; }
+          .btn { display: inline-block; background-color: #7c3aed; color: #ffffff; font-weight: 700; padding: 12px 24px; border-radius: 8px; text-decoration: none; transition: all 0.2s; }
+          .btn:hover { background-color: #6d28d9; }
+        </style>
+      </head>
+      <body>
+        <div class="card">
+          <div class="badge">PB</div>
+          <h1>You Have Been Unsubscribed</h1>
+          <p><span class="email-highlight">${escapeHtml(verifiedEmail)}</span> has been removed from ProBitian newsletter and community campaign emails. You will no longer receive marketing or tutorial updates from us.</p>
+          <a href="/" class="btn">Return to ProBitian Homepage</a>
+        </div>
+      </body>
+    </html>
+  `);
+});
+
+// ==================== CMS PUBLIC READ ENDPOINTS ====================
 
 // CMS SYSTEM STATUS
 app.get('/api/cms/status', async (req, res) => {
@@ -352,24 +815,27 @@ app.get('/api/cms/status', async (req, res) => {
   });
 });
 
-// GENERAL SETTINGS
+// GENERAL SETTINGS (PUBLIC READ)
 app.get('/api/cms/settings/general', async (req, res) => {
   if (serverSupabase) {
     try {
       const { data, error } = await serverSupabase.from('settings').select('value').eq('key', 'general').single();
-      if (error && error.code !== 'PGRST116') {
-        return res.status(503).json({ error: 'Database error fetching general settings: ' + error.message });
+      if (!error && data?.value) {
+        return res.json(data.value);
       }
-      return res.json(data?.value || null);
+      if (error && error.code !== 'PGRST116') {
+        console.warn('[CMS Settings General Read Warning]', error.message);
+      }
     } catch (err: any) {
-      return res.status(503).json({ error: 'Database error: ' + (err?.message || 'Unknown error') });
+      console.warn('[CMS Settings General Read Exception]', err?.message || err);
     }
   }
   const data = readCmsData();
   return res.json(data.general || null);
 });
 
-app.post('/api/cms/settings/general', async (req, res) => {
+// GENERAL SETTINGS (PROTECTED WRITE)
+app.post('/api/cms/settings/general', requireAdmin, async (req, res) => {
   const settings = req.body;
   if (!settings) {
     return res.status(400).json({ error: 'Missing settings payload' });
@@ -383,10 +849,13 @@ app.post('/api/cms/settings/general', async (req, res) => {
         updated_at: new Date().toISOString()
       });
       if (error) {
-        return res.status(500).json({ error: 'Database error saving general settings: ' + error.message });
+        console.error('[CMS Settings General Write Error]', error.message);
+        return res.status(500).json({ error: 'Failed to update general settings' });
       }
+      return res.json({ success: true, settings });
     } catch (err: any) {
-      return res.status(500).json({ error: 'Database exception: ' + (err?.message || 'Unknown error') });
+      console.error('[CMS Settings General Write Exception]', err);
+      return res.status(500).json({ error: 'Failed to update general settings' });
     }
   }
 
@@ -397,24 +866,27 @@ app.post('/api/cms/settings/general', async (req, res) => {
   return res.json({ success: true, settings });
 });
 
-// SEO SETTINGS
+// SEO SETTINGS (PUBLIC READ)
 app.get('/api/cms/settings/seo', async (req, res) => {
   if (serverSupabase) {
     try {
       const { data, error } = await serverSupabase.from('settings').select('value').eq('key', 'seo').single();
-      if (error && error.code !== 'PGRST116') {
-        return res.status(503).json({ error: 'Database error fetching SEO settings: ' + error.message });
+      if (!error && data?.value) {
+        return res.json(data.value);
       }
-      return res.json(data?.value || null);
+      if (error && error.code !== 'PGRST116') {
+        console.warn('[CMS SEO Read Warning]', error.message);
+      }
     } catch (err: any) {
-      return res.status(503).json({ error: 'Database exception: ' + (err?.message || 'Unknown error') });
+      console.warn('[CMS SEO Read Exception]', err?.message || err);
     }
   }
   const data = readCmsData();
   return res.json(data.seo || null);
 });
 
-app.post('/api/cms/settings/seo', async (req, res) => {
+// SEO SETTINGS (PROTECTED WRITE)
+app.post('/api/cms/settings/seo', requireAdmin, async (req, res) => {
   const seo = req.body;
   if (!seo) {
     return res.status(400).json({ error: 'Missing SEO settings payload' });
@@ -428,10 +900,13 @@ app.post('/api/cms/settings/seo', async (req, res) => {
         updated_at: new Date().toISOString()
       });
       if (error) {
-        return res.status(500).json({ error: 'Database error saving SEO settings: ' + error.message });
+        console.error('[CMS SEO Write Error]', error.message);
+        return res.status(500).json({ error: 'Failed to update SEO settings' });
       }
+      return res.json({ success: true, seo });
     } catch (err: any) {
-      return res.status(500).json({ error: 'Database exception: ' + (err?.message || 'Unknown error') });
+      console.error('[CMS SEO Write Exception]', err);
+      return res.status(500).json({ error: 'Failed to update SEO settings' });
     }
   }
 
@@ -442,24 +917,27 @@ app.post('/api/cms/settings/seo', async (req, res) => {
   return res.json({ success: true, seo });
 });
 
-// LEGAL & POLICIES SETTINGS
+// LEGAL & POLICIES SETTINGS (PUBLIC READ)
 app.get('/api/cms/settings/legal', async (req, res) => {
   if (serverSupabase) {
     try {
       const { data, error } = await serverSupabase.from('settings').select('value').eq('key', 'legal_policies').single();
-      if (error && error.code !== 'PGRST116') {
-        return res.status(503).json({ error: 'Database error fetching legal settings: ' + error.message });
+      if (!error && data?.value) {
+        return res.json(data.value);
       }
-      return res.json(data?.value || null);
+      if (error && error.code !== 'PGRST116') {
+        console.warn('[CMS Legal Read Warning]', error.message);
+      }
     } catch (err: any) {
-      return res.status(503).json({ error: 'Database exception: ' + (err?.message || 'Unknown error') });
+      console.warn('[CMS Legal Read Exception]', err?.message || err);
     }
   }
   const data = readCmsData();
   return res.json(data.legal_policies || null);
 });
 
-app.post('/api/cms/settings/legal', async (req, res) => {
+// LEGAL SETTINGS (PROTECTED WRITE)
+app.post('/api/cms/settings/legal', requireAdmin, async (req, res) => {
   const legal = req.body;
   if (!legal) {
     return res.status(400).json({ error: 'Missing legal settings payload' });
@@ -473,10 +951,13 @@ app.post('/api/cms/settings/legal', async (req, res) => {
         updated_at: new Date().toISOString()
       });
       if (error) {
-        return res.status(500).json({ error: 'Database error saving legal settings: ' + error.message });
+        console.error('[CMS Legal Write Error]', error.message);
+        return res.status(500).json({ error: 'Failed to update legal settings' });
       }
+      return res.json({ success: true, legal });
     } catch (err: any) {
-      return res.status(500).json({ error: 'Database exception: ' + (err?.message || 'Unknown error') });
+      console.error('[CMS Legal Write Exception]', err);
+      return res.status(500).json({ error: 'Failed to update legal settings' });
     }
   }
 
@@ -487,15 +968,12 @@ app.post('/api/cms/settings/legal', async (req, res) => {
   return res.json({ success: true, legal });
 });
 
-// HOME PAGE CONFIG
+// HOME PAGE CONFIG (PUBLIC READ)
 app.get('/api/cms/settings/home', async (req, res) => {
   if (serverSupabase) {
     try {
       const { data, error } = await serverSupabase.from('pages').select('*').eq('page_key', 'home').single();
-      if (error && error.code !== 'PGRST116') {
-        return res.status(503).json({ error: 'Database error fetching home page config: ' + error.message });
-      }
-      if (data) {
+      if (!error && data) {
         return res.json({
           hero_heading: data.hero_heading,
           hero_description: data.hero_description,
@@ -507,16 +985,19 @@ app.get('/api/cms/settings/home', async (req, res) => {
           cta: data.cta
         });
       }
-      return res.json(null);
+      if (error && error.code !== 'PGRST116') {
+        console.warn('[CMS Home Config Read Warning]', error.message);
+      }
     } catch (err: any) {
-      return res.status(503).json({ error: 'Database exception: ' + (err?.message || 'Unknown error') });
+      console.warn('[CMS Home Config Read Exception]', err?.message || err);
     }
   }
   const data = readCmsData();
   return res.json(data.home || null);
 });
 
-app.post('/api/cms/settings/home', async (req, res) => {
+// HOME PAGE CONFIG (PROTECTED WRITE)
+app.post('/api/cms/settings/home', requireAdmin, async (req, res) => {
   const homeConfig = req.body;
   if (!homeConfig) {
     return res.status(400).json({ error: 'Missing home config payload' });
@@ -538,10 +1019,13 @@ app.post('/api/cms/settings/home', async (req, res) => {
         updated_at: new Date().toISOString()
       });
       if (error) {
-        return res.status(500).json({ error: 'Database error saving home page config: ' + error.message });
+        console.error('[CMS Home Config Write Error]', error.message);
+        return res.status(500).json({ error: 'Failed to update home configuration' });
       }
+      return res.json({ success: true, home: homeConfig });
     } catch (err: any) {
-      return res.status(500).json({ error: 'Database exception: ' + (err?.message || 'Unknown error') });
+      console.error('[CMS Home Config Write Exception]', err);
+      return res.status(500).json({ error: 'Failed to update home configuration' });
     }
   }
 
@@ -552,24 +1036,27 @@ app.post('/api/cms/settings/home', async (req, res) => {
   return res.json({ success: true, home: homeConfig });
 });
 
-// PROJECTS
+// PROJECTS (PUBLIC READ)
 app.get('/api/cms/projects', async (req, res) => {
   if (serverSupabase) {
     try {
       const { data, error } = await serverSupabase.from('projects').select('*').order('created_at', { ascending: false });
-      if (error) {
-        return res.status(503).json({ error: 'Database error fetching projects: ' + error.message });
+      if (!error && Array.isArray(data) && data.length > 0) {
+        return res.json(data);
       }
-      return res.json(data || []);
+      if (error) {
+        console.warn('[CMS Projects Read Warning]', error.message);
+      }
     } catch (err: any) {
-      return res.status(503).json({ error: 'Database exception: ' + (err?.message || 'Unknown error') });
+      console.warn('[CMS Projects Read Exception]', err?.message || err);
     }
   }
   const data = readCmsData();
   return res.json(data.projects || []);
 });
 
-app.post('/api/cms/projects', async (req, res) => {
+// PROJECTS (PROTECTED WRITE)
+app.post('/api/cms/projects', requireAdmin, async (req, res) => {
   const project = req.body;
   if (!project || !project.title) {
     return res.status(400).json({ error: 'Invalid project payload' });
@@ -603,18 +1090,20 @@ app.post('/api/cms/projects', async (req, res) => {
 
       const { data, error } = await serverSupabase.from('projects').upsert(dbPayload).select().single();
       if (error) {
-        return res.status(500).json({ error: 'Database error saving project: ' + error.message });
+        console.error('[CMS Project Save Error]', error.message);
+        return res.status(500).json({ error: 'Failed to save project' });
       }
       if (data) {
         savedProject = { ...project, id: data.id };
       }
+      return res.json({ success: true, project: savedProject });
     } catch (err: any) {
-      return res.status(500).json({ error: 'Database exception: ' + (err?.message || 'Unknown error') });
+      console.error('[CMS Project Save Exception]', err);
+      return res.status(500).json({ error: 'Failed to save project' });
     }
-  } else {
-    if (!savedProject.id) savedProject.id = 'project-' + Date.now();
   }
 
+  if (!savedProject.id) savedProject.id = 'project-' + Date.now();
   const data = readCmsData();
   data.projects = data.projects || [];
   const idx = data.projects.findIndex((p: any) => p.id === savedProject.id);
@@ -628,17 +1117,24 @@ app.post('/api/cms/projects', async (req, res) => {
   return res.json({ success: true, project: savedProject });
 });
 
-app.delete('/api/cms/projects/:id', async (req, res) => {
+// PROJECTS (PROTECTED DELETE)
+app.delete('/api/cms/projects/:id', requireAdmin, async (req, res) => {
   const { id } = req.params;
+  if (!isValidId(id)) {
+    return res.status(400).json({ error: 'Invalid project ID format' });
+  }
 
   if (serverSupabase) {
     try {
       const { error } = await serverSupabase.from('projects').delete().eq('id', id);
       if (error) {
-        return res.status(500).json({ error: 'Database error deleting project: ' + error.message });
+        console.error('[CMS Project Delete Error]', error.message);
+        return res.status(500).json({ error: 'Failed to delete project' });
       }
+      return res.json({ success: true });
     } catch (err: any) {
-      return res.status(500).json({ error: 'Database exception: ' + (err?.message || 'Unknown error') });
+      console.error('[CMS Project Delete Exception]', err);
+      return res.status(500).json({ error: 'Failed to delete project' });
     }
   }
 
@@ -651,24 +1147,27 @@ app.delete('/api/cms/projects/:id', async (req, res) => {
   return res.json({ success: true });
 });
 
-// BLOGS
+// BLOGS (PUBLIC READ)
 app.get('/api/cms/blogs', async (req, res) => {
   if (serverSupabase) {
     try {
       const { data, error } = await serverSupabase.from('blogs').select('*').order('created_at', { ascending: false });
-      if (error) {
-        return res.status(503).json({ error: 'Database error fetching blogs: ' + error.message });
+      if (!error && Array.isArray(data) && data.length > 0) {
+        return res.json(data);
       }
-      return res.json(data || []);
+      if (error) {
+        console.warn('[CMS Blogs Read Warning]', error.message);
+      }
     } catch (err: any) {
-      return res.status(503).json({ error: 'Database exception: ' + (err?.message || 'Unknown error') });
+      console.warn('[CMS Blogs Read Exception]', err?.message || err);
     }
   }
   const data = readCmsData();
   return res.json(data.blogs || []);
 });
 
-app.post('/api/cms/blogs', async (req, res) => {
+// BLOGS (PROTECTED WRITE)
+app.post('/api/cms/blogs', requireAdmin, async (req, res) => {
   const blog = req.body;
   if (!blog || !blog.title) {
     return res.status(400).json({ error: 'Invalid blog payload' });
@@ -687,7 +1186,7 @@ app.post('/api/cms/blogs', async (req, res) => {
         category: blog.category || 'Data Analytics',
         tags: blog.tags || [],
         featured_image: blog.imageUrl || blog.featured_image || '',
-        author: blog.author || 'Shivam Baghel',
+        author: blog.author || 'Shivam Singh',
         read_time: blog.readTime || blog.read_time || '5 min read',
         status: blog.status || 'published',
         scheduled_at: blog.scheduledAt || blog.scheduled_at || null,
@@ -700,18 +1199,20 @@ app.post('/api/cms/blogs', async (req, res) => {
 
       const { data, error } = await serverSupabase.from('blogs').upsert(dbPayload).select().single();
       if (error) {
-        return res.status(500).json({ error: 'Database error saving blog: ' + error.message });
+        console.error('[CMS Blog Save Error]', error.message);
+        return res.status(500).json({ error: 'Failed to save blog' });
       }
       if (data) {
         savedBlog = { ...blog, id: data.id };
       }
+      return res.json({ success: true, blog: savedBlog });
     } catch (err: any) {
-      return res.status(500).json({ error: 'Database exception: ' + (err?.message || 'Unknown error') });
+      console.error('[CMS Blog Save Exception]', err);
+      return res.status(500).json({ error: 'Failed to save blog' });
     }
-  } else {
-    if (!savedBlog.id) savedBlog.id = 'blog-' + Date.now();
   }
 
+  if (!savedBlog.id) savedBlog.id = 'blog-' + Date.now();
   const data = readCmsData();
   data.blogs = data.blogs || [];
   const idx = data.blogs.findIndex((b: any) => b.id === savedBlog.id);
@@ -725,17 +1226,24 @@ app.post('/api/cms/blogs', async (req, res) => {
   return res.json({ success: true, blog: savedBlog });
 });
 
-app.delete('/api/cms/blogs/:id', async (req, res) => {
+// BLOGS (PROTECTED DELETE)
+app.delete('/api/cms/blogs/:id', requireAdmin, async (req, res) => {
   const { id } = req.params;
+  if (!isValidId(id)) {
+    return res.status(400).json({ error: 'Invalid blog ID format' });
+  }
 
   if (serverSupabase) {
     try {
       const { error } = await serverSupabase.from('blogs').delete().eq('id', id);
       if (error) {
-        return res.status(500).json({ error: 'Database error deleting blog: ' + error.message });
+        console.error('[CMS Blog Delete Error]', error.message);
+        return res.status(500).json({ error: 'Failed to delete blog' });
       }
+      return res.json({ success: true });
     } catch (err: any) {
-      return res.status(500).json({ error: 'Database exception: ' + (err?.message || 'Unknown error') });
+      console.error('[CMS Blog Delete Exception]', err);
+      return res.status(500).json({ error: 'Failed to delete blog' });
     }
   }
 
@@ -748,24 +1256,27 @@ app.delete('/api/cms/blogs/:id', async (req, res) => {
   return res.json({ success: true });
 });
 
-// COURSES
+// COURSES (PUBLIC READ)
 app.get('/api/cms/courses', async (req, res) => {
   if (serverSupabase) {
     try {
       const { data, error } = await serverSupabase.from('courses').select('*').order('created_at', { ascending: false });
-      if (error) {
-        return res.status(503).json({ error: 'Database error fetching courses: ' + error.message });
+      if (!error && Array.isArray(data) && data.length > 0) {
+        return res.json(data);
       }
-      return res.json(data || []);
+      if (error) {
+        console.warn('[CMS Courses Read Warning]', error.message);
+      }
     } catch (err: any) {
-      return res.status(503).json({ error: 'Database exception: ' + (err?.message || 'Unknown error') });
+      console.warn('[CMS Courses Read Exception]', err?.message || err);
     }
   }
   const data = readCmsData();
   return res.json(data.courses || []);
 });
 
-app.post('/api/cms/courses', async (req, res) => {
+// COURSES (PROTECTED WRITE)
+app.post('/api/cms/courses', requireAdmin, async (req, res) => {
   const course = req.body;
   if (!course || !course.title) {
     return res.status(400).json({ error: 'Invalid course payload' });
@@ -787,7 +1298,7 @@ app.post('/api/cms/courses', async (req, res) => {
         lessons_count: course.lessons_count || course.lessonsCount || 10,
         enrolled_count: course.enrolled_count || course.enrolledCount || 0,
         rating: course.rating || 5.0,
-        instructor: course.instructor || 'Shivam Baghel',
+        instructor: course.instructor || 'Shivam Singh',
         featured: Boolean(course.featured),
         status: course.status || 'published',
         tags: course.tags || [],
@@ -801,18 +1312,20 @@ app.post('/api/cms/courses', async (req, res) => {
 
       const { data, error } = await serverSupabase.from('courses').upsert(dbPayload).select().single();
       if (error) {
-        return res.status(500).json({ error: 'Database error saving course: ' + error.message });
+        console.error('[CMS Course Save Error]', error.message);
+        return res.status(500).json({ error: 'Failed to save course' });
       }
       if (data) {
         savedCourse = { ...course, id: data.id };
       }
+      return res.json({ success: true, course: savedCourse });
     } catch (err: any) {
-      return res.status(500).json({ error: 'Database exception: ' + (err?.message || 'Unknown error') });
+      console.error('[CMS Course Save Exception]', err);
+      return res.status(500).json({ error: 'Failed to save course' });
     }
-  } else {
-    if (!savedCourse.id) savedCourse.id = 'course-' + Date.now();
   }
 
+  if (!savedCourse.id) savedCourse.id = 'course-' + Date.now();
   const data = readCmsData();
   data.courses = data.courses || [];
   const idx = data.courses.findIndex((c: any) => c.id === savedCourse.id);
@@ -826,17 +1339,24 @@ app.post('/api/cms/courses', async (req, res) => {
   return res.json({ success: true, course: savedCourse });
 });
 
-app.delete('/api/cms/courses/:id', async (req, res) => {
+// COURSES (PROTECTED DELETE)
+app.delete('/api/cms/courses/:id', requireAdmin, async (req, res) => {
   const { id } = req.params;
+  if (!isValidId(id)) {
+    return res.status(400).json({ error: 'Invalid course ID format' });
+  }
 
   if (serverSupabase) {
     try {
       const { error } = await serverSupabase.from('courses').delete().eq('id', id);
       if (error) {
-        return res.status(500).json({ error: 'Database error deleting course: ' + error.message });
+        console.error('[CMS Course Delete Error]', error.message);
+        return res.status(500).json({ error: 'Failed to delete course' });
       }
+      return res.json({ success: true });
     } catch (err: any) {
-      return res.status(500).json({ error: 'Database exception: ' + (err?.message || 'Unknown error') });
+      console.error('[CMS Course Delete Exception]', err);
+      return res.status(500).json({ error: 'Failed to delete course' });
     }
   }
 
@@ -849,24 +1369,27 @@ app.delete('/api/cms/courses/:id', async (req, res) => {
   return res.json({ success: true });
 });
 
-// YOUTUBE SHOWCASE / VIDEOS
+// YOUTUBE VIDEOS (PUBLIC READ)
 app.get('/api/cms/videos', async (req, res) => {
   if (serverSupabase) {
     try {
       const { data, error } = await serverSupabase.from('videos').select('*').order('created_at', { ascending: false });
-      if (error) {
-        return res.status(503).json({ error: 'Database error fetching videos: ' + error.message });
+      if (!error && Array.isArray(data) && data.length > 0) {
+        return res.json(data);
       }
-      return res.json(data || []);
+      if (error) {
+        console.warn('[CMS Videos Read Warning]', error.message);
+      }
     } catch (err: any) {
-      return res.status(503).json({ error: 'Database exception: ' + (err?.message || 'Unknown error') });
+      console.warn('[CMS Videos Read Exception]', err?.message || err);
     }
   }
   const data = readCmsData();
   return res.json(data.videos || []);
 });
 
-app.post('/api/cms/videos', async (req, res) => {
+// YOUTUBE VIDEOS (PROTECTED WRITE)
+app.post('/api/cms/videos', requireAdmin, async (req, res) => {
   const video = req.body;
   if (!video || !video.title) {
     return res.status(400).json({ error: 'Invalid video payload' });
@@ -897,18 +1420,20 @@ app.post('/api/cms/videos', async (req, res) => {
 
       const { data, error } = await serverSupabase.from('videos').upsert(dbPayload).select().single();
       if (error) {
-        return res.status(500).json({ error: 'Database error saving video: ' + error.message });
+        console.error('[CMS Video Save Error]', error.message);
+        return res.status(500).json({ error: 'Failed to save video' });
       }
       if (data) {
         savedVideo = { ...video, id: data.id };
       }
+      return res.json({ success: true, video: savedVideo });
     } catch (err: any) {
-      return res.status(500).json({ error: 'Database exception: ' + (err?.message || 'Unknown error') });
+      console.error('[CMS Video Save Exception]', err);
+      return res.status(500).json({ error: 'Failed to save video' });
     }
-  } else {
-    if (!savedVideo.id) savedVideo.id = 'video-' + Date.now();
   }
 
+  if (!savedVideo.id) savedVideo.id = 'video-' + Date.now();
   const data = readCmsData();
   data.videos = data.videos || [];
   const idx = data.videos.findIndex((v: any) => v.id === savedVideo.id);
@@ -922,17 +1447,24 @@ app.post('/api/cms/videos', async (req, res) => {
   return res.json({ success: true, video: savedVideo });
 });
 
-app.delete('/api/cms/videos/:id', async (req, res) => {
+// YOUTUBE VIDEOS (PROTECTED DELETE)
+app.delete('/api/cms/videos/:id', requireAdmin, async (req, res) => {
   const { id } = req.params;
+  if (!isValidId(id)) {
+    return res.status(400).json({ error: 'Invalid video ID format' });
+  }
 
   if (serverSupabase) {
     try {
       const { error } = await serverSupabase.from('videos').delete().eq('id', id);
       if (error) {
-        return res.status(500).json({ error: 'Database error deleting video: ' + error.message });
+        console.error('[CMS Video Delete Error]', error.message);
+        return res.status(500).json({ error: 'Failed to delete video' });
       }
+      return res.json({ success: true });
     } catch (err: any) {
-      return res.status(500).json({ error: 'Database exception: ' + (err?.message || 'Unknown error') });
+      console.error('[CMS Video Delete Exception]', err);
+      return res.status(500).json({ error: 'Failed to delete video' });
     }
   }
 
@@ -945,24 +1477,26 @@ app.delete('/api/cms/videos/:id', async (req, res) => {
   return res.json({ success: true });
 });
 
-// CONTACT MESSAGES / ENQUIRIES
-app.get('/api/cms/messages', async (req, res) => {
+// CONTACT MESSAGES (PUBLIC POST / PROTECTED GET)
+app.get('/api/cms/messages', requireAdmin, async (req, res) => {
   if (serverSupabase) {
     try {
       const { data, error } = await serverSupabase.from('messages').select('*').order('created_at', { ascending: false });
-      if (error) {
-        return res.status(503).json({ error: 'Database error fetching messages: ' + error.message });
+      if (!error && Array.isArray(data)) {
+        return res.json(data);
       }
-      return res.json(data || []);
+      if (error) {
+        console.warn('[CMS Messages Read Warning]', error.message);
+      }
     } catch (err: any) {
-      return res.status(503).json({ error: 'Database exception: ' + (err?.message || 'Unknown error') });
+      console.warn('[CMS Messages Read Exception]', err?.message || err);
     }
   }
   const data = readCmsData();
   return res.json(data.messages || []);
 });
 
-app.post('/api/cms/messages', async (req, res) => {
+app.post('/api/cms/messages', contactLimiter, async (req, res) => {
   const { name, email, phone, course_interested, subject, message } = req.body;
   if (!name || !email || !message) {
     return res.status(400).json({ error: 'Name, email, and message are required.' });
@@ -983,16 +1517,15 @@ app.post('/api/cms/messages', async (req, res) => {
       }).select().single();
 
       if (error) {
-        console.warn('[CONTACT] Supabase insert warning:', error.message);
-      } else {
-        savedMsg = data;
+        console.error('[CONTACT] Supabase insert error:', error.message);
+        return res.status(503).json({ error: 'Database service unavailable. Unable to send message.' });
       }
+      savedMsg = data;
     } catch (err: any) {
-      console.warn('[CONTACT] Supabase insert exception:', err?.message || 'Unknown error');
+      console.error('[CONTACT] Supabase insert exception:', err);
+      return res.status(503).json({ error: 'Database service unavailable. Unable to send message.' });
     }
-  }
-
-  if (!savedMsg) {
+  } else {
     savedMsg = {
       id: 'msg-' + Date.now(),
       name,
@@ -1004,14 +1537,13 @@ app.post('/api/cms/messages', async (req, res) => {
       status: 'new',
       created_at: new Date().toISOString()
     };
+    const data = readCmsData();
+    data.messages = data.messages || [];
+    data.messages.unshift(savedMsg);
+    writeCmsData(data);
   }
 
-  const data = readCmsData();
-  data.messages = data.messages || [];
-  data.messages.unshift(savedMsg);
-  writeCmsData(data);
-
-  // Trigger contact enquiry notification asynchronously via emailService
+  // Trigger notification email asynchronously
   emailService.sendContactNotification({
     name,
     email,
@@ -1024,8 +1556,11 @@ app.post('/api/cms/messages', async (req, res) => {
   return res.json({ success: true, message: savedMsg });
 });
 
-app.post('/api/cms/messages/:id/reply', async (req, res) => {
+app.post('/api/cms/messages/:id/reply', requireAdmin, async (req, res) => {
   const { id } = req.params;
+  if (!isValidId(id)) {
+    return res.status(400).json({ success: false, message: 'Invalid message ID format' });
+  }
   const { replyText, replySubject } = req.body;
 
   if (!replyText || !replyText.trim()) {
@@ -1044,12 +1579,12 @@ app.post('/api/cms/messages/:id/reply', async (req, res) => {
         .maybeSingle();
 
       if (fetchErr || !dbMsg) {
-        return res.status(404).json({ success: false, message: 'Enquiry message not found in database.' });
+        return res.status(404).json({ success: false, message: 'Enquiry message not found.' });
       }
       recipientEmail = dbMsg.email;
       finalSubject = replySubject || dbMsg.subject || 'Inquiry Reply';
     } catch (err: any) {
-      return res.status(500).json({ success: false, message: 'Database error: ' + err.message });
+      return res.status(500).json({ success: false, message: 'Failed to process reply' });
     }
   } else {
     const localData = readCmsData();
@@ -1061,7 +1596,6 @@ app.post('/api/cms/messages/:id/reply', async (req, res) => {
     finalSubject = replySubject || targetMsg.subject || 'Inquiry Reply';
   }
 
-  // Send email via emailService
   const emailRes = await emailService.sendAdminReply(recipientEmail, finalSubject, replyText);
 
   const updateData = {
@@ -1080,10 +1614,16 @@ app.post('/api/cms/messages/:id/reply', async (req, res) => {
         .eq('id', id);
 
       if (updateErr) {
-        return res.status(500).json({ success: false, message: 'Database error updating reply status: ' + updateErr.message });
+        console.error('[Reply DB Update Error]', updateErr.message);
+        return res.status(500).json({ success: false, message: 'Failed to update reply status' });
       }
+      return res.json({
+        success: true,
+        message: emailRes.message || `Reply sent to ${recipientEmail}`,
+        data: { id, ...updateData }
+      });
     } catch (err: any) {
-      return res.status(500).json({ success: false, message: 'Database exception: ' + err.message });
+      return res.status(500).json({ success: false, message: 'Failed to update reply status' });
     }
   }
 
@@ -1102,8 +1642,11 @@ app.post('/api/cms/messages/:id/reply', async (req, res) => {
   });
 });
 
-app.patch('/api/cms/messages/:id/status', async (req, res) => {
+app.patch('/api/cms/messages/:id/status', requireAdmin, async (req, res) => {
   const { id } = req.params;
+  if (!isValidId(id)) {
+    return res.status(400).json({ error: 'Invalid message ID format' });
+  }
   const { status, adminNotes } = req.body;
 
   if (serverSupabase) {
@@ -1120,20 +1663,13 @@ app.patch('/api/cms/messages/:id/status', async (req, res) => {
         .single();
 
       if (error) {
-        return res.status(500).json({ error: 'Database error updating message status: ' + error.message });
-      }
-
-      const localData = readCmsData();
-      localData.messages = localData.messages || [];
-      const idx = localData.messages.findIndex((m: any) => m.id === id);
-      if (idx >= 0) {
-        localData.messages[idx] = { ...localData.messages[idx], ...updatePayload };
-        writeCmsData(localData);
+        console.error('[Message Status Update Error]', error.message);
+        return res.status(500).json({ error: 'Failed to update message status' });
       }
 
       return res.json({ success: true, message: data });
     } catch (err: any) {
-      return res.status(500).json({ error: 'Database exception: ' + err.message });
+      return res.status(500).json({ error: 'Failed to update message status' });
     }
   }
 
@@ -1149,17 +1685,22 @@ app.patch('/api/cms/messages/:id/status', async (req, res) => {
   return res.status(404).json({ error: 'Message not found' });
 });
 
-app.delete('/api/cms/messages/:id', async (req, res) => {
+app.delete('/api/cms/messages/:id', requireAdmin, async (req, res) => {
   const { id } = req.params;
+  if (!isValidId(id)) {
+    return res.status(400).json({ error: 'Invalid message ID format' });
+  }
 
   if (serverSupabase) {
     try {
       const { error } = await serverSupabase.from('messages').delete().eq('id', id);
       if (error) {
-        return res.status(500).json({ error: 'Database error deleting message: ' + error.message });
+        console.error('[Message Delete Error]', error.message);
+        return res.status(500).json({ error: 'Failed to delete message' });
       }
+      return res.json({ success: true });
     } catch (err: any) {
-      return res.status(500).json({ error: 'Database exception: ' + err.message });
+      return res.status(500).json({ error: 'Failed to delete message' });
     }
   }
 
@@ -1172,24 +1713,26 @@ app.delete('/api/cms/messages/:id', async (req, res) => {
   return res.json({ success: true });
 });
 
-// NEWSLETTER SUBSCRIBERS
-app.get('/api/cms/subscribers', async (req, res) => {
+// SUBSCRIBERS (PROTECTED API ENDPOINTS)
+app.get('/api/cms/subscribers', requireAdmin, async (req, res) => {
   if (serverSupabase) {
     try {
       const { data, error } = await serverSupabase.from('newsletter').select('*').order('created_at', { ascending: false });
-      if (error) {
-        return res.status(503).json({ error: 'Database error fetching subscribers: ' + error.message });
+      if (!error && Array.isArray(data)) {
+        return res.json(data);
       }
-      return res.json(data || []);
+      if (error) {
+        console.warn('[Subscribers Read Warning]', error.message);
+      }
     } catch (err: any) {
-      return res.status(503).json({ error: 'Database exception: ' + err.message });
+      console.warn('[Subscribers Read Exception]', err?.message || err);
     }
   }
   const data = readCmsData();
   return res.json(data.subscribers || []);
 });
 
-app.post('/api/cms/subscribers', async (req, res) => {
+app.post('/api/cms/subscribers', requireAdmin, async (req, res) => {
   const { email } = req.body;
   const cleanEmail = (email || '').trim().toLowerCase();
 
@@ -1208,7 +1751,8 @@ app.post('/api/cms/subscribers', async (req, res) => {
         .maybeSingle();
 
       if (checkErr) {
-        return res.status(500).json({ error: 'Database error checking subscriber: ' + checkErr.message });
+        console.error('[Subscriber Check Error]', checkErr.message);
+        return res.status(500).json({ error: 'Failed to save subscriber' });
       }
 
       if (existing) {
@@ -1221,21 +1765,23 @@ app.post('/api/cms/subscribers', async (req, res) => {
           .single();
 
         if (insertErr) {
-          return res.status(500).json({ error: 'Database error adding subscriber: ' + insertErr.message });
+          console.error('[Subscriber Insert Error]', insertErr.message);
+          return res.status(500).json({ error: 'Failed to add subscriber' });
         }
         subscriberRecord = inserted;
       }
+      return res.json({ success: true, subscriber: subscriberRecord });
     } catch (err: any) {
-      return res.status(500).json({ error: 'Database exception: ' + err.message });
+      return res.status(500).json({ error: 'Failed to add subscriber' });
     }
-  } else {
-    subscriberRecord = {
-      id: 'sub-' + Date.now(),
-      email: cleanEmail,
-      status: 'active',
-      created_at: new Date().toISOString()
-    };
   }
+
+  subscriberRecord = {
+    id: 'sub-' + Date.now(),
+    email: cleanEmail,
+    status: 'active',
+    created_at: new Date().toISOString()
+  };
 
   const data = readCmsData();
   data.subscribers = data.subscribers || [];
@@ -1247,22 +1793,25 @@ app.post('/api/cms/subscribers', async (req, res) => {
   }
   writeCmsData(data);
 
-  await emailService.sendWelcomeEmail(cleanEmail);
-
   return res.json({ success: true, subscriber: subscriberRecord });
 });
 
-app.delete('/api/cms/subscribers/:id', async (req, res) => {
+app.delete('/api/cms/subscribers/:id', requireAdmin, async (req, res) => {
   const { id } = req.params;
+  if (!isValidId(id)) {
+    return res.status(400).json({ error: 'Invalid subscriber ID format' });
+  }
 
   if (serverSupabase) {
     try {
       const { error } = await serverSupabase.from('newsletter').delete().eq('id', id);
       if (error) {
-        return res.status(500).json({ error: 'Database error deleting subscriber: ' + error.message });
+        console.error('[Subscriber Delete Error]', error.message);
+        return res.status(500).json({ error: 'Failed to delete subscriber' });
       }
+      return res.json({ success: true });
     } catch (err: any) {
-      return res.status(500).json({ error: 'Database exception: ' + err.message });
+      return res.status(500).json({ error: 'Failed to delete subscriber' });
     }
   }
 
@@ -1275,12 +1824,9 @@ app.delete('/api/cms/subscribers/:id', async (req, res) => {
   return res.json({ success: true });
 });
 
-// ----------------------------------------------------
-// EMAIL CAMPAIGNS & DIAGNOSTICS API ENDPOINTS
-// ----------------------------------------------------
+// ==================== EMAIL CAMPAIGNS & DIAGNOSTICS ====================
 
-// Server-side email status & diagnostics check
-app.get('/api/admin/email/status', async (req, res) => {
+app.get('/api/admin/email/status', requireAdmin, async (req, res) => {
   const diag = emailService.getDiagnostics();
   if (!diag.GMAIL_CONFIGURED) {
     return res.status(400).json({
@@ -1300,7 +1846,7 @@ app.get('/api/admin/email/status', async (req, res) => {
   });
 });
 
-app.post('/api/admin/email/verify', async (req, res) => {
+app.post('/api/admin/email/verify', requireAdmin, async (req, res) => {
   const diag = emailService.getDiagnostics();
   if (!diag.GMAIL_CONFIGURED) {
     return res.status(400).json({
@@ -1319,19 +1865,19 @@ app.post('/api/admin/email/verify', async (req, res) => {
   });
 });
 
-// Audience Count
-app.get('/api/admin/email-campaigns/audience-count', async (req, res) => {
+app.get('/api/admin/email-campaigns/audience-count', requireAdmin, async (req, res) => {
   let count = 0;
   if (serverSupabase) {
     try {
       const { data, error } = await serverSupabase.from('newsletter').select('id').eq('status', 'active');
       if (error) {
-        return res.status(503).json({ error: 'Database error fetching active audience count: ' + error.message });
+        console.error('[Audience Count Error]', error.message);
+        return res.status(503).json({ error: 'Database service unavailable' });
       }
       count = data ? data.length : 0;
       return res.json({ success: true, count, providerConfigured: campaignEmailService.isConfigured() });
     } catch (err: any) {
-      return res.status(503).json({ error: 'Database exception: ' + err.message });
+      return res.status(503).json({ error: 'Database service unavailable' });
     }
   }
   const data = readCmsData();
@@ -1340,31 +1886,34 @@ app.get('/api/admin/email-campaigns/audience-count', async (req, res) => {
   return res.json({ success: true, count, providerConfigured: campaignEmailService.isConfigured() });
 });
 
-// GET All Campaigns
-app.get('/api/admin/email-campaigns', async (req, res) => {
+app.get('/api/admin/email-campaigns', requireAdmin, async (req, res) => {
   if (serverSupabase) {
     try {
       const { data, error } = await serverSupabase.from('email_campaigns').select('*').order('created_at', { ascending: false });
       if (error) {
-        return res.status(503).json({ error: 'Database error fetching campaigns: ' + error.message });
+        console.error('[Campaigns Read Error]', error.message);
+        return res.status(503).json({ error: 'Database service unavailable' });
       }
       return res.json(data || []);
     } catch (err: any) {
-      return res.status(503).json({ error: 'Database exception: ' + err.message });
+      return res.status(503).json({ error: 'Database service unavailable' });
     }
   }
   const data = readCmsData();
   return res.json(data.campaigns || []);
 });
 
-// GET Single Campaign
-app.get('/api/admin/email-campaigns/:id', async (req, res) => {
+app.get('/api/admin/email-campaigns/:id', requireAdmin, async (req, res) => {
   const { id } = req.params;
+  if (!isValidId(id)) {
+    return res.status(400).json({ error: 'Invalid campaign ID format' });
+  }
   if (serverSupabase) {
     try {
       const { data, error } = await serverSupabase.from('email_campaigns').select('*').eq('id', id).maybeSingle();
       if (error) {
-        return res.status(503).json({ error: 'Database error fetching campaign: ' + error.message });
+        console.error('[Campaign Single Read Error]', error.message);
+        return res.status(503).json({ error: 'Database service unavailable' });
       }
       if (data) {
         const { data: recipients } = await serverSupabase.from('email_campaign_recipients').select('*').eq('campaign_id', id);
@@ -1372,7 +1921,7 @@ app.get('/api/admin/email-campaigns/:id', async (req, res) => {
       }
       return res.status(404).json({ error: 'Campaign not found' });
     } catch (err: any) {
-      return res.status(503).json({ error: 'Database exception: ' + err.message });
+      return res.status(503).json({ error: 'Database service unavailable' });
     }
   }
   const data = readCmsData();
@@ -1384,8 +1933,7 @@ app.get('/api/admin/email-campaigns/:id', async (req, res) => {
   return res.status(404).json({ error: 'Campaign not found' });
 });
 
-// POST Create / Save Campaign
-app.post('/api/admin/email-campaigns', async (req, res) => {
+app.post('/api/admin/email-campaigns', requireAdmin, async (req, res) => {
   const payload = req.body;
   if (!payload || !payload.name || !payload.subject || !payload.content) {
     return res.status(400).json({ error: 'Name, subject, and content are required' });
@@ -1415,18 +1963,19 @@ app.post('/api/admin/email-campaigns', async (req, res) => {
 
       const { data, error } = await serverSupabase.from('email_campaigns').upsert(dbPayload).select().single();
       if (error) {
-        return res.status(500).json({ error: 'Database error saving campaign: ' + error.message });
+        console.error('[Campaign Save Error]', error.message);
+        return res.status(500).json({ error: 'Failed to save campaign' });
       }
       if (data) {
         savedCampaign = { ...payload, id: data.id };
       }
+      return res.json({ success: true, campaign: savedCampaign });
     } catch (err: any) {
-      return res.status(500).json({ error: 'Database exception: ' + err.message });
+      return res.status(500).json({ error: 'Failed to save campaign' });
     }
-  } else {
-    if (!savedCampaign.id) savedCampaign.id = 'camp-' + Date.now();
   }
 
+  if (!savedCampaign.id) savedCampaign.id = 'camp-' + Date.now();
   const data = readCmsData();
   data.campaigns = data.campaigns || [];
   const idx = data.campaigns.findIndex((c: any) => c.id === savedCampaign.id);
@@ -1440,9 +1989,11 @@ app.post('/api/admin/email-campaigns', async (req, res) => {
   return res.json({ success: true, campaign: savedCampaign });
 });
 
-// PATCH Update Campaign
-app.patch('/api/admin/email-campaigns/:id', async (req, res) => {
+app.patch('/api/admin/email-campaigns/:id', requireAdmin, async (req, res) => {
   const { id } = req.params;
+  if (!isValidId(id)) {
+    return res.status(400).json({ error: 'Invalid campaign ID format' });
+  }
   const updates = req.body;
   updates.updated_at = new Date().toISOString();
 
@@ -1450,20 +2001,12 @@ app.patch('/api/admin/email-campaigns/:id', async (req, res) => {
     try {
       const { data, error } = await serverSupabase.from('email_campaigns').update(updates).eq('id', id).select().single();
       if (error) {
-        return res.status(500).json({ error: 'Database error updating campaign: ' + error.message });
+        console.error('[Campaign Update Error]', error.message);
+        return res.status(500).json({ error: 'Failed to update campaign' });
       }
-
-      const localData = readCmsData();
-      localData.campaigns = localData.campaigns || [];
-      const idx = localData.campaigns.findIndex((c: any) => c.id === id);
-      if (idx >= 0) {
-        localData.campaigns[idx] = { ...localData.campaigns[idx], ...updates };
-        writeCmsData(localData);
-      }
-
       return res.json({ success: true, campaign: data });
     } catch (err: any) {
-      return res.status(500).json({ error: 'Database exception: ' + err.message });
+      return res.status(500).json({ error: 'Failed to update campaign' });
     }
   }
 
@@ -1478,18 +2021,22 @@ app.patch('/api/admin/email-campaigns/:id', async (req, res) => {
   return res.json({ success: true, campaign: data.campaigns[idx] || updates });
 });
 
-// DELETE Campaign
-app.delete('/api/admin/email-campaigns/:id', async (req, res) => {
+app.delete('/api/admin/email-campaigns/:id', requireAdmin, async (req, res) => {
   const { id } = req.params;
+  if (!isValidId(id)) {
+    return res.status(400).json({ error: 'Invalid campaign ID format' });
+  }
 
   if (serverSupabase) {
     try {
       const { error } = await serverSupabase.from('email_campaigns').delete().eq('id', id);
       if (error) {
-        return res.status(500).json({ error: 'Database error deleting campaign: ' + error.message });
+        console.error('[Campaign Delete Error]', error.message);
+        return res.status(500).json({ error: 'Failed to delete campaign' });
       }
+      return res.json({ success: true });
     } catch (err: any) {
-      return res.status(500).json({ error: 'Database exception: ' + err.message });
+      return res.status(500).json({ error: 'Failed to delete campaign' });
     }
   }
 
@@ -1503,22 +2050,29 @@ app.delete('/api/admin/email-campaigns/:id', async (req, res) => {
 });
 
 // POST Send Test Email
-app.post('/api/admin/email-campaigns/:id/test', async (req, res) => {
+app.post('/api/admin/email-campaigns/:id/test', requireAdmin, emailTestLimiter, async (req, res) => {
   const { id } = req.params;
+  if (!isValidId(id)) {
+    return res.status(400).json({ success: false, message: 'Invalid campaign ID format' });
+  }
   const { testEmail } = req.body;
 
   if (!testEmail || !testEmail.includes('@')) {
     return res.status(400).json({ success: false, message: 'Valid test email is required' });
   }
 
-  const data = readCmsData();
-  let campaign = (data.campaigns || []).find((c: any) => c.id === id);
+  let campaign: any = null;
 
-  if (!campaign && serverSupabase) {
+  if (serverSupabase) {
     try {
       const { data: sbCamp } = await serverSupabase.from('email_campaigns').select('*').eq('id', id).single();
       if (sbCamp) campaign = sbCamp;
     } catch (e) {}
+  }
+
+  if (!campaign) {
+    const data = readCmsData();
+    campaign = (data.campaigns || []).find((c: any) => c.id === id);
   }
 
   if (!campaign) {
@@ -1527,7 +2081,8 @@ app.post('/api/admin/email-campaigns/:id/test', async (req, res) => {
 
   const reqProtocol = req.headers['x-forwarded-proto'] || req.protocol;
   const reqHost = req.headers['x-forwarded-host'] || req.headers.host;
-  const unsubscribeUrl = `${reqProtocol}://${reqHost}/api/newsletter/unsubscribe?email=${encodeURIComponent(testEmail)}`;
+  const unsubToken = generateUnsubscribeToken(testEmail);
+  const unsubscribeUrl = `${reqProtocol}://${reqHost}/api/newsletter/unsubscribe?token=${unsubToken}`;
 
   const result = await campaignEmailService.sendTestEmail({
     testEmail,
@@ -1541,23 +2096,35 @@ app.post('/api/admin/email-campaigns/:id/test', async (req, res) => {
 });
 
 // POST Send Bulk Campaign to Active Subscribers
-app.post('/api/admin/email-campaigns/:id/send', async (req, res) => {
+app.post('/api/admin/email-campaigns/:id/send', requireAdmin, emailSendLimiter, async (req, res) => {
   const { id } = req.params;
-  const data = readCmsData();
-  let campaign = (data.campaigns || []).find((c: any) => c.id === id);
+  if (!isValidId(id)) {
+    return res.status(400).json({ success: false, message: 'Invalid campaign ID format' });
+  }
 
-  if (!campaign && serverSupabase) {
+  let campaign: any = null;
+
+  if (serverSupabase) {
     try {
-      const { data: sbCamp } = await serverSupabase.from('email_campaigns').select('*').eq('id', id).single();
-      if (sbCamp) campaign = sbCamp;
-    } catch (e) {}
+      const { data: sbCamp, error: campErr } = await serverSupabase.from('email_campaigns').select('*').eq('id', id).single();
+      if (campErr || !sbCamp) {
+        console.error('[Campaign Send Error] Campaign query failed:', campErr?.message);
+        return res.status(404).json({ success: false, message: 'Campaign record not found' });
+      }
+      campaign = sbCamp;
+    } catch (e: any) {
+      console.error('[Campaign Send Error] DB Exception:', e);
+      return res.status(503).json({ success: false, message: 'Database service unavailable' });
+    }
+  } else {
+    const data = readCmsData();
+    campaign = (data.campaigns || []).find((c: any) => c.id === id);
   }
 
   if (!campaign) {
     return res.status(404).json({ success: false, message: 'Campaign record not found' });
   }
 
-  // Check Email Provider Configuration
   if (!campaignEmailService.isConfigured()) {
     return res.status(400).json({
       success: false,
@@ -1567,16 +2134,21 @@ app.post('/api/admin/email-campaigns/:id/send', async (req, res) => {
     });
   }
 
-  // Retrieve Active Subscribers ONLY
   let activeSubscribers: any[] = [];
   if (serverSupabase) {
     try {
-      const { data: sbSubs } = await serverSupabase.from('newsletter').select('*').eq('status', 'active');
-      if (sbSubs && sbSubs.length > 0) activeSubscribers = sbSubs;
-    } catch (e) {}
-  }
-
-  if (activeSubscribers.length === 0) {
+      const { data: sbSubs, error: subErr } = await serverSupabase.from('newsletter').select('*').eq('status', 'active');
+      if (subErr) {
+        console.error('[Campaign Send Error] Active subscribers query failed:', subErr.message);
+        return res.status(503).json({ success: false, message: 'Database service unavailable' });
+      }
+      activeSubscribers = sbSubs || [];
+    } catch (e: any) {
+      console.error('[Campaign Send Error] Subscribers Exception:', e);
+      return res.status(503).json({ success: false, message: 'Database service unavailable' });
+    }
+  } else {
+    const data = readCmsData();
     const subs = data.subscribers || [];
     activeSubscribers = subs.filter((s: any) => s.status === 'active');
   }
@@ -1598,7 +2170,8 @@ app.post('/api/admin/email-campaigns/:id/send', async (req, res) => {
 
   for (const subscriber of activeSubscribers) {
     const subEmail = subscriber.email;
-    const unsubUrl = `${baseUrl}/api/newsletter/unsubscribe?email=${encodeURIComponent(subEmail)}`;
+    const unsubToken = generateUnsubscribeToken(subEmail);
+    const unsubUrl = `${baseUrl}/api/newsletter/unsubscribe?token=${unsubToken}`;
 
     const sendRes = await campaignEmailService.sendSingleRecipient({
       toEmail: subEmail,
@@ -1628,7 +2201,6 @@ app.post('/api/admin/email-campaigns/:id/send', async (req, res) => {
     }
   }
 
-  // Update Campaign Status
   const sentAt = new Date().toISOString();
   const finalStatus = failedCount === 0 ? 'sent' : (successfulCount > 0 ? 'partially_sent' : 'failed');
 
@@ -1639,16 +2211,6 @@ app.post('/api/admin/email-campaigns/:id/send', async (req, res) => {
   campaign.failed_count = failedCount;
   campaign.updated_at = sentAt;
 
-  // Save to CMS Data
-  data.campaigns = data.campaigns || [];
-  const cIdx = data.campaigns.findIndex((c: any) => c.id === campaign.id);
-  if (cIdx >= 0) data.campaigns[cIdx] = campaign;
-
-  data.campaign_recipients = data.campaign_recipients || [];
-  data.campaign_recipients.push(...recipientsLog);
-  writeCmsData(data);
-
-  // Save to Supabase
   if (serverSupabase) {
     try {
       await serverSupabase.from('email_campaigns').upsert(campaign);
@@ -1656,6 +2218,14 @@ app.post('/api/admin/email-campaigns/:id/send', async (req, res) => {
     } catch (e) {
       console.warn('[Supabase Campaign Send Update Warning]', e);
     }
+  } else {
+    const data = readCmsData();
+    data.campaigns = data.campaigns || [];
+    const cIdx = data.campaigns.findIndex((c: any) => c.id === campaign.id);
+    if (cIdx >= 0) data.campaigns[cIdx] = campaign;
+    data.campaign_recipients = data.campaign_recipients || [];
+    data.campaign_recipients.push(...recipientsLog);
+    writeCmsData(data);
   }
 
   return res.json({
@@ -1665,76 +2235,14 @@ app.post('/api/admin/email-campaigns/:id/send', async (req, res) => {
   });
 });
 
-// PUBLIC UNSUBSCRIBE ENDPOINT
-app.get('/api/newsletter/unsubscribe', async (req, res) => {
-  const email = (req.query.email || req.query.token || '').toString().trim();
+// ==================== SOCIAL, NAVIGATION, MEDIA, CATEGORIES ====================
 
-  if (!email || !email.includes('@')) {
-    return res.status(400).send(`
-      <!DOCTYPE html>
-      <html>
-        <head><title>Unsubscribe - ProBitian</title><style>body{font-family:sans-serif;text-align:center;padding:50px;background:#f8fafc;color:#1e293b;}.card{max-width:480px;margin:auto;background:white;padding:32px;border-radius:12px;border:1px solid #e2e8f0;}</style></head>
-        <body>
-          <div class="card">
-            <h2 style="color:#ef4444;">Invalid Unsubscribe Request</h2>
-            <p>No valid subscriber email address was provided in the unsubscribe request.</p>
-          </div>
-        </body>
-      </html>
-    `);
-  }
-
-  // Update in local file store
-  const data = readCmsData();
-  data.subscribers = data.subscribers || [];
-  const target = data.subscribers.find((s: any) => s.email.toLowerCase() === email.toLowerCase());
-  if (target) {
-    target.status = 'unsubscribed';
-    writeCmsData(data);
-  }
-
-  // Update in Supabase
-  if (serverSupabase) {
-    try {
-      await serverSupabase.from('newsletter').update({ status: 'unsubscribed' }).eq('email', email);
-    } catch (e) {}
-  }
-
-  return res.status(200).send(`
-    <!DOCTYPE html>
-    <html lang="en">
-      <head>
-        <meta charset="UTF-8">
-        <title>Unsubscribed - ProBitian</title>
-        <style>
-          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #0f172a; color: #f8fafc; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; }
-          .card { background-color: #1e293b; border: 1px solid #334155; border-radius: 16px; max-width: 500px; width: 100%; padding: 40px; text-align: center; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5); }
-          .badge { display: inline-block; background-color: #f59e0b; color: #0f172a; font-weight: 900; padding: 6px 12px; border-radius: 8px; font-size: 16px; margin-bottom: 16px; }
-          h1 { color: #ffffff; font-size: 24px; font-weight: 800; margin-bottom: 12px; }
-          p { color: #94a3b8; font-size: 15px; line-height: 1.6; margin-bottom: 24px; }
-          .email-highlight { color: #a78bfa; font-weight: 600; }
-          .btn { display: inline-block; background-color: #7c3aed; color: #ffffff; font-weight: 700; padding: 12px 24px; border-radius: 8px; text-decoration: none; transition: all 0.2s; }
-          .btn:hover { background-color: #6d28d9; }
-        </style>
-      </head>
-      <body>
-        <div class="card">
-          <div class="badge">PB</div>
-          <h1>You Have Been Unsubscribed</h1>
-          <p><span class="email-highlight">${email}</span> has been removed from ProBitian newsletter and community campaign emails. You will no longer receive marketing or tutorial updates from us.</p>
-          <a href="/" class="btn">Return to ProBitian Homepage</a>
-        </div>
-      </body>
-    </html>
-  `);
-});
-
-// SOCIAL LINKS
+// SOCIAL LINKS (PUBLIC READ)
 app.get('/api/cms/social', async (req, res) => {
   if (serverSupabase) {
     try {
       const { data, error } = await serverSupabase.from('social_links').select('*').order('display_order', { ascending: true });
-      if (!error && data && data.length > 0) {
+      if (!error && data) {
         return res.json(data);
       }
     } catch (err) {
@@ -1745,34 +2253,38 @@ app.get('/api/cms/social', async (req, res) => {
   return res.json(data.social_links || []);
 });
 
-app.post('/api/cms/social', async (req, res) => {
+// SOCIAL LINKS (PROTECTED WRITE)
+app.post('/api/cms/social', requireAdmin, async (req, res) => {
   const links = req.body;
   if (!Array.isArray(links)) {
     return res.status(400).json({ error: 'Social links payload must be an array' });
   }
-  const data = readCmsData();
-  data.social_links = links;
-  writeCmsData(data);
 
   if (serverSupabase) {
     try {
       for (const link of links) {
         await serverSupabase.from('social_links').upsert(link);
       }
+      return res.json({ success: true, links });
     } catch (err) {
       console.error('[Supabase POST Social Error]', err);
+      return res.status(500).json({ error: 'Failed to update social links' });
     }
   }
+
+  const data = readCmsData();
+  data.social_links = links;
+  writeCmsData(data);
 
   return res.json({ success: true, links });
 });
 
-// NAVIGATION
+// NAVIGATION (PUBLIC READ)
 app.get('/api/cms/navigation', async (req, res) => {
   if (serverSupabase) {
     try {
       const { data, error } = await serverSupabase.from('navigation').select('*').order('display_order', { ascending: true });
-      if (!error && data && data.length > 0) {
+      if (!error && data) {
         return res.json(data);
       }
     } catch (err) {
@@ -1783,45 +2295,53 @@ app.get('/api/cms/navigation', async (req, res) => {
   return res.json(data.navigation || []);
 });
 
-app.post('/api/cms/navigation', async (req, res) => {
+// NAVIGATION (PROTECTED WRITE)
+app.post('/api/cms/navigation', requireAdmin, async (req, res) => {
   const navItems = req.body;
   if (!Array.isArray(navItems)) {
     return res.status(400).json({ error: 'Navigation payload must be an array' });
   }
-  const data = readCmsData();
-  data.navigation = navItems;
-  writeCmsData(data);
 
   if (serverSupabase) {
     try {
       for (const item of navItems) {
         await serverSupabase.from('navigation').upsert(item);
       }
+      return res.json({ success: true, navigation: navItems });
     } catch (err) {
       console.error('[Supabase POST Navigation Error]', err);
+      return res.status(500).json({ error: 'Failed to update navigation' });
     }
   }
+
+  const data = readCmsData();
+  data.navigation = navItems;
+  writeCmsData(data);
 
   return res.json({ success: true, navigation: navItems });
 });
 
-// MEDIA LIBRARY
-app.get('/api/cms/media', async (req, res) => {
+// MEDIA LIBRARY (PROTECTED READ)
+app.get('/api/cms/media', requireAdmin, async (req, res) => {
   if (serverSupabase) {
     try {
       const { data, error } = await serverSupabase.from('media').select('*').order('created_at', { ascending: false });
-      if (!error && data) {
+      if (!error && Array.isArray(data)) {
         return res.json(data);
       }
-    } catch (err) {
-      console.warn('[Supabase GET Media Warning]', err);
+      if (error) {
+        console.warn('[Media Read Warning]', error.message);
+      }
+    } catch (err: any) {
+      console.warn('[Media Read Exception]', err?.message || err);
     }
   }
   const data = readCmsData();
   return res.json(data.media || []);
 });
 
-app.post('/api/cms/media/upload', async (req, res) => {
+// MEDIA UPLOAD (PROTECTED WRITE)
+app.post('/api/cms/media/upload', requireAdmin, uploadLimiter, async (req, res) => {
   try {
     const { filename, fileData, category, folder, altText } = req.body || {};
 
@@ -1829,7 +2349,6 @@ app.post('/api/cms/media/upload', async (req, res) => {
       return res.status(400).json({ error: 'Missing filename or fileData in upload request payload.' });
     }
 
-    // 1. Process base64 / data URL payload
     let mimeType = 'image/png';
     let fileBuffer: Buffer;
 
@@ -1845,13 +2364,11 @@ app.post('/api/cms/media/upload', async (req, res) => {
       fileBuffer = Buffer.from(fileData, 'base64');
     }
 
-    // 2. Validate max upload size (15MB)
     const MAX_SIZE = 15 * 1024 * 1024;
     if (fileBuffer.length > MAX_SIZE) {
       return res.status(400).json({ error: 'File size exceeds maximum permitted threshold of 15MB.' });
     }
 
-    // 3. Validate file extension and MIME type against executable files
     const ext = path.extname(filename).toLowerCase();
     const forbiddenExts = ['.exe', '.sh', '.js', '.php', '.bat', '.cmd', '.py', '.html', '.htm', '.dll', '.so'];
     if (forbiddenExts.includes(ext)) {
@@ -1864,14 +2381,12 @@ app.post('/api/cms/media/upload', async (req, res) => {
       return res.status(400).json({ error: `File MIME type "${mimeType}" is not permitted.` });
     }
 
-    // 4. Sanitize SVG XML if SVG format
     if (ext === '.svg' || mimeType === 'image/svg+xml') {
       const rawSvg = fileBuffer.toString('utf-8');
       const cleanSvg = sanitizeSvg(rawSvg);
       fileBuffer = Buffer.from(cleanSvg, 'utf-8');
     }
 
-    // 5. Select category folder
     const rawCategory = (category || folder || 'general').toLowerCase().replace(/[^a-z0-9_-]/g, '');
     const validFolders = ['media', 'logos', 'banners', 'blog', 'projects', 'courses', 'youtube', 'general'];
     const selectedCategory = validFolders.includes(rawCategory) ? rawCategory : 'general';
@@ -1879,7 +2394,6 @@ app.post('/api/cms/media/upload', async (req, res) => {
     const safeFilename = filename.replace(/[^a-zA-Z0-9_.-]/g, '_');
     const storagePath = `${selectedCategory}/${Date.now()}-${crypto.randomBytes(4).toString('hex')}-${safeFilename}`;
 
-    // 6. Upload file to Supabase Storage
     let publicUrl = '';
     if (serverSupabase) {
       await ensureStorageBucket();
@@ -1892,17 +2406,15 @@ app.post('/api/cms/media/upload', async (req, res) => {
 
       if (uploadErr) {
         console.error('[Supabase Storage Upload Failure]', uploadErr);
-        return res.status(500).json({ error: 'Failed to upload file to Supabase Storage: ' + uploadErr.message });
+        return res.status(500).json({ error: 'Failed to upload file to Supabase Storage' });
       }
 
       const { data: publicUrlData } = serverSupabase.storage.from(PROBITIAN_MEDIA_BUCKET).getPublicUrl(storagePath);
       publicUrl = publicUrlData.publicUrl;
     } else {
-      // Fallback base64 URL when Supabase storage is unconfigured
       publicUrl = `data:${mimeType};base64,${fileBuffer.toString('base64')}`;
     }
 
-    // 7. Assemble complete Media metadata record
     const mediaRecord = {
       id: 'm-' + Date.now() + '-' + crypto.randomBytes(3).toString('hex'),
       filename: safeFilename,
@@ -1921,12 +2433,10 @@ app.post('/api/cms/media/upload', async (req, res) => {
       updated_at: new Date().toISOString()
     };
 
-    // 8. Insert metadata record into Supabase PostgreSQL media table
     if (serverSupabase) {
       try {
         let { error: dbErr } = await serverSupabase.from('media').insert(mediaRecord);
         if (dbErr && (dbErr.message.includes('schema cache') || dbErr.message.includes('column') || dbErr.code === 'PGRST204')) {
-          // Fallback to core columns matching PostgREST schema cache
           const coreRecord = {
             id: mediaRecord.id,
             filename: mediaRecord.filename,
@@ -1946,22 +2456,21 @@ app.post('/api/cms/media/upload', async (req, res) => {
       } catch (err: any) {
         console.warn('[Supabase Media DB Exception]', err?.message || String(err));
       }
+    } else {
+      const cmsData = readCmsData();
+      cmsData.media = cmsData.media || [];
+      cmsData.media.unshift(mediaRecord);
+      writeCmsData(cmsData);
     }
-
-    // Update local JSON cache for offline/fallback access
-    const cmsData = readCmsData();
-    cmsData.media = cmsData.media || [];
-    cmsData.media.unshift(mediaRecord);
-    writeCmsData(cmsData);
 
     return res.json({ success: true, media: mediaRecord });
   } catch (err: any) {
     console.error('[Media Upload Handler Error]', err);
-    return res.status(500).json({ error: err?.message || 'Server error processing file upload.' });
+    return res.status(500).json({ error: 'Server error processing file upload.' });
   }
 });
 
-app.post('/api/cms/media', async (req, res) => {
+app.post('/api/cms/media', requireAdmin, uploadLimiter, async (req, res) => {
   const mediaItem = req.body;
   if (!mediaItem || (!mediaItem.filename && !mediaItem.url)) {
     return res.status(400).json({ error: 'Invalid media item payload' });
@@ -1986,31 +2495,33 @@ app.post('/api/cms/media', async (req, res) => {
     updated_at: new Date().toISOString()
   };
 
+  if (serverSupabase) {
+    try {
+      await serverSupabase.from('media').insert(itemWithId);
+      return res.json({ success: true, media: itemWithId });
+    } catch (err) {
+      console.error('[Supabase POST Media Warning]', err);
+      return res.status(500).json({ error: 'Failed to save media metadata' });
+    }
+  }
+
   const cmsData = readCmsData();
   cmsData.media = cmsData.media || [];
   cmsData.media.unshift(itemWithId);
   writeCmsData(cmsData);
 
-  if (serverSupabase) {
-    try {
-      await serverSupabase.from('media').insert(itemWithId);
-    } catch (err) {
-      console.error('[Supabase POST Media Warning]', err);
-    }
-  }
-
   return res.json({ success: true, media: itemWithId });
 });
 
-app.delete('/api/cms/media/:id', async (req, res) => {
+app.delete('/api/cms/media/:id', requireAdmin, async (req, res) => {
   const { id } = req.params;
-  const cmsData = readCmsData();
-  const localItem = (cmsData.media || []).find((m: any) => m.id === id);
+  if (!isValidId(id)) {
+    return res.status(400).json({ error: 'Invalid media ID format' });
+  }
+  let storagePathToDelete: string | null = null;
+  let targetUrl: string | null = null;
 
-  let storagePathToDelete = localItem?.storage_path;
-  let targetUrl = localItem?.public_url || localItem?.url;
-
-  if (serverSupabase && !storagePathToDelete) {
+  if (serverSupabase) {
     try {
       const { data: dbItem } = await serverSupabase.from('media').select('*').eq('id', id).maybeSingle();
       if (dbItem) {
@@ -2018,6 +2529,11 @@ app.delete('/api/cms/media/:id', async (req, res) => {
         targetUrl = dbItem.public_url || dbItem.url;
       }
     } catch (e) {}
+  } else {
+    const cmsData = readCmsData();
+    const localItem = (cmsData.media || []).find((m: any) => m.id === id);
+    storagePathToDelete = localItem?.storage_path;
+    targetUrl = localItem?.public_url || localItem?.url;
   }
 
   if (!storagePathToDelete && targetUrl && targetUrl.includes('/storage/v1/object/public/probitian-media/')) {
@@ -2027,7 +2543,14 @@ app.delete('/api/cms/media/:id', async (req, res) => {
     }
   }
 
-  // 1. Delete actual asset from Supabase Storage first if present
+  // Prevent directory traversal or illegal characters in storage deletion path
+  if (storagePathToDelete) {
+    storagePathToDelete = storagePathToDelete.replace(/^[/\\]+/, '').trim();
+    if (storagePathToDelete.includes('..') || storagePathToDelete.includes('\0')) {
+      storagePathToDelete = null;
+    }
+  }
+
   if (serverSupabase && storagePathToDelete) {
     const { error: storageErr } = await serverSupabase.storage
       .from(PROBITIAN_MEDIA_BUCKET)
@@ -2035,35 +2558,37 @@ app.delete('/api/cms/media/:id', async (req, res) => {
 
     if (storageErr) {
       console.error('[Supabase Storage Deletion Error]', storageErr);
-      return res.status(500).json({ error: 'Failed to delete asset from Supabase Storage: ' + storageErr.message });
+      return res.status(500).json({ error: 'Failed to delete asset from storage' });
     }
   }
 
-  // 2. Delete metadata record from Supabase media table
   if (serverSupabase) {
     try {
       const { error: dbErr } = await serverSupabase.from('media').delete().eq('id', id);
       if (dbErr) {
         console.error('[Supabase DB Delete Media Warning]', dbErr);
+        return res.status(500).json({ error: 'Failed to delete media record' });
       }
-    } catch (e) {}
-  }
-
-  // 3. Delete metadata from local JSON cache
-  if (cmsData.media) {
-    cmsData.media = cmsData.media.filter((m: any) => m.id !== id);
-    writeCmsData(cmsData);
+    } catch (e) {
+      return res.status(500).json({ error: 'Failed to delete media record' });
+    }
+  } else {
+    const cmsData = readCmsData();
+    if (cmsData.media) {
+      cmsData.media = cmsData.media.filter((m: any) => m.id !== id);
+      writeCmsData(cmsData);
+    }
   }
 
   return res.json({ success: true });
 });
 
-// CATEGORIES
+// CATEGORIES (PUBLIC READ)
 app.get('/api/cms/categories', async (req, res) => {
   if (serverSupabase) {
     try {
       const { data, error } = await serverSupabase.from('categories').select('*');
-      if (!error && data && data.length > 0) {
+      if (!error && data) {
         return res.json(data);
       }
     } catch (err) {
@@ -2074,11 +2599,23 @@ app.get('/api/cms/categories', async (req, res) => {
   return res.json(data.categories || []);
 });
 
-app.post('/api/cms/categories', async (req, res) => {
+// CATEGORIES (PROTECTED WRITE)
+app.post('/api/cms/categories', requireAdmin, async (req, res) => {
   const cat = req.body;
   if (!cat || !cat.id) {
     return res.status(400).json({ error: 'Invalid category payload' });
   }
+
+  if (serverSupabase) {
+    try {
+      await serverSupabase.from('categories').upsert(cat);
+      return res.json({ success: true, category: cat });
+    } catch (err) {
+      console.error('[Supabase POST Category Error]', err);
+      return res.status(500).json({ error: 'Failed to save category' });
+    }
+  }
+
   const data = readCmsData();
   data.categories = data.categories || [];
   const idx = data.categories.findIndex((c: any) => c.id === cat.id);
@@ -2089,42 +2626,39 @@ app.post('/api/cms/categories', async (req, res) => {
   }
   writeCmsData(data);
 
-  if (serverSupabase) {
-    try {
-      await serverSupabase.from('categories').upsert(cat);
-    } catch (err) {
-      console.error('[Supabase POST Category Error]', err);
-    }
-  }
-
   return res.json({ success: true, category: cat });
 });
 
-app.delete('/api/cms/categories/:id', async (req, res) => {
+// CATEGORIES (PROTECTED DELETE)
+app.delete('/api/cms/categories/:id', requireAdmin, async (req, res) => {
   const { id } = req.params;
+  if (!isValidId(id)) {
+    return res.status(400).json({ error: 'Invalid category ID format' });
+  }
+
+  if (serverSupabase) {
+    try {
+      await serverSupabase.from('categories').delete().eq('id', id);
+      return res.json({ success: true });
+    } catch (err) {
+      console.error('[Supabase DELETE Category Error]', err);
+      return res.status(500).json({ error: 'Failed to delete category' });
+    }
+  }
+
   const data = readCmsData();
   if (data.categories) {
     data.categories = data.categories.filter((c: any) => c.id !== id);
     writeCmsData(data);
   }
 
-  if (serverSupabase) {
-    try {
-      await serverSupabase.from('categories').delete().eq('id', id);
-    } catch (err) {
-      console.error('[Supabase DELETE Category Error]', err);
-    }
-  }
-
   return res.json({ success: true });
 });
 
-// ----------------------------------------------------
-// ANALYTICS API ENDPOINTS
-// ----------------------------------------------------
+// ==================== PROTECTED ANALYTICS API ENDPOINTS ====================
 
-// 1. Status Check
-app.get('/api/analytics/status', (req, res) => {
+// Status Check
+app.get('/api/analytics/status', requireAdmin, (req, res) => {
   const measurementId = process.env.VITE_GA4_MEASUREMENT_ID || 'G-G3WJXY6THP';
   const propertyId = process.env.GA4_PROPERTY_ID || '549083163';
   const clientEmail = process.env.GA4_CLIENT_EMAIL || '';
@@ -2142,8 +2676,8 @@ app.get('/api/analytics/status', (req, res) => {
   });
 });
 
-// 2. Real-time Users Endpoint
-app.get('/api/analytics/realtime', async (req, res) => {
+// Real-time Users Endpoint
+app.get('/api/analytics/realtime', requireAdmin, async (req, res) => {
   try {
     const propertyId = process.env.GA4_PROPERTY_ID || '549083163';
     const clientEmail = process.env.GA4_CLIENT_EMAIL;
@@ -2177,7 +2711,7 @@ app.get('/api/analytics/realtime', async (req, res) => {
       return res.status(200).json({
         configured: false,
         activeUsers: 0,
-        error: `GA4 Realtime API Error: ${response.status} - ${errText}`,
+        error: `GA4 Realtime API Error: ${response.status}`,
       });
     }
 
@@ -2194,13 +2728,13 @@ app.get('/api/analytics/realtime', async (req, res) => {
     return res.status(200).json({
       configured: false,
       activeUsers: 0,
-      error: error?.message || 'Failed to connect to GA4 Realtime API.',
+      error: 'Failed to connect to GA4 Realtime API.',
     });
   }
 });
 
-// 3. Complete Report Analytics Endpoint
-app.get('/api/analytics/report', async (req, res) => {
+// Complete Report Analytics Endpoint
+app.get('/api/analytics/report', requireAdmin, async (req, res) => {
   try {
     const propertyId = process.env.GA4_PROPERTY_ID || '549083163';
     const clientEmail = process.env.GA4_CLIENT_EMAIL;
@@ -2210,13 +2744,6 @@ app.get('/api/analytics/report', async (req, res) => {
       return res.status(200).json({
         configured: false,
         message: 'GA4 Service Account credentials not provided in environment variables.',
-        instructions: {
-          step1: 'Create a free GA4 Property in Google Analytics.',
-          step2: 'Add VITE_GA4_MEASUREMENT_ID=G-XXXXXXXXXX in .env',
-          step3: 'Create a Google Cloud Service Account and download the JSON key.',
-          step4: 'Add GA4_PROPERTY_ID, GA4_CLIENT_EMAIL, and GA4_PRIVATE_KEY in .env',
-          step5: 'Grant Viewer permission to GA4_CLIENT_EMAIL inside GA4 Property User Management.',
-        },
       });
     }
 
@@ -2248,7 +2775,6 @@ app.get('/api/analytics/report', async (req, res) => {
 
     const accessToken = await getGA4AccessToken(clientEmail, privateKey);
 
-    // Fetch Overview Metrics
     const overviewRes = await fetch(
       `https://analyticsdata.googleapis.com/v1beta/properties/${propertyId}:runReport`,
       {
@@ -2271,7 +2797,6 @@ app.get('/api/analytics/report', async (req, res) => {
       }
     );
 
-    // Fetch Timeframe Comparison Metrics (Today, 7d, 30d users)
     const timeframesRes = await fetch(
       `https://analyticsdata.googleapis.com/v1beta/properties/${propertyId}:runReport`,
       {
@@ -2291,7 +2816,6 @@ app.get('/api/analytics/report', async (req, res) => {
       }
     );
 
-    // Fetch Page Analytics Table
     const pagesRes = await fetch(
       `https://analyticsdata.googleapis.com/v1beta/properties/${propertyId}:runReport`,
       {
@@ -2314,7 +2838,6 @@ app.get('/api/analytics/report', async (req, res) => {
       }
     );
 
-    // Fetch Traffic Sources
     const sourcesRes = await fetch(
       `https://analyticsdata.googleapis.com/v1beta/properties/${propertyId}:runReport`,
       {
@@ -2332,7 +2855,6 @@ app.get('/api/analytics/report', async (req, res) => {
       }
     );
 
-    // Fetch Custom Click Events
     const eventsRes = await fetch(
       `https://analyticsdata.googleapis.com/v1beta/properties/${propertyId}:runReport`,
       {
@@ -2350,7 +2872,6 @@ app.get('/api/analytics/report', async (req, res) => {
       }
     );
 
-    // Fetch Devices
     const devicesRes = await fetch(
       `https://analyticsdata.googleapis.com/v1beta/properties/${propertyId}:runReport`,
       {
@@ -2367,7 +2888,6 @@ app.get('/api/analytics/report', async (req, res) => {
       }
     );
 
-    // Fetch Browsers
     const browsersRes = await fetch(
       `https://analyticsdata.googleapis.com/v1beta/properties/${propertyId}:runReport`,
       {
@@ -2385,7 +2905,6 @@ app.get('/api/analytics/report', async (req, res) => {
       }
     );
 
-    // Fetch Geography
     const geoRes = await fetch(
       `https://analyticsdata.googleapis.com/v1beta/properties/${propertyId}:runReport`,
       {
@@ -2416,7 +2935,6 @@ app.get('/api/analytics/report', async (req, res) => {
     const newUsersVal = parseInt(overviewData?.rows?.[0]?.metricValues?.[1]?.value || '0', 10);
     const returningUsersVal = Math.max(0, activeUsersVal - newUsersVal);
 
-    // Parse timeframe comparison rows
     let usersToday = 0;
     let users7d = 0;
     let users30d = 0;
@@ -2431,7 +2949,6 @@ app.get('/api/analytics/report', async (req, res) => {
       }
     }
 
-    // Parse page analytics table & aggregate duplicate page paths
     const rawPagesList = pagesData?.rows?.map((r: any) => {
       const pagePath = r.dimensionValues?.[0]?.value || '/';
       const rawTitle = r.dimensionValues?.[1]?.value || 'Untitled Page';
@@ -2547,7 +3064,7 @@ app.get('/api/analytics/report', async (req, res) => {
     console.error('Error fetching GA4 report data:', error);
     res.status(200).json({
       configured: false,
-      error: error?.message || 'Failed to query GA4 Data API.',
+      error: 'Failed to query GA4 Data API.',
     });
   }
 });
@@ -2557,14 +3074,14 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   if (req.path.startsWith('/api/') || req.originalUrl.startsWith('/api/')) {
     console.error('[API Error]', err);
     return res.status(err.status || 500).set('Content-Type', 'application/json').json({
-      error: err.message || 'Internal server error',
+      error: 'An internal server error occurred',
       path: req.originalUrl
     });
   }
   next(err);
 });
 
-// API 404 Catch-All Handler - MUST be placed BEFORE static / Vite / SPA fallback
+// API 404 Catch-All Handler
 app.all('/api/*', (req, res) => {
   res.status(404).set('Content-Type', 'application/json').json({
     error: 'API endpoint not found',

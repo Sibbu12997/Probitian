@@ -28,7 +28,7 @@ export const BlogManager: React.FC = () => {
       category: 'DAX',
       date: new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
       readTime: '5 min read',
-      author: 'Shivam Baghel',
+      author: 'Shivam Singh',
       imageUrl: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=800&q=80',
       status: 'published'
     });

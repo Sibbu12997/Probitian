@@ -113,7 +113,7 @@ export const TermsPage: React.FC<TermsPageProps> = ({ onNavigate }) => {
               Questions About Our Terms?
             </h4>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-              Contact Shivam Baghel for any clarification or inquiries.
+              Contact Shivam Singh for any clarification or inquiries.
             </p>
           </div>
 

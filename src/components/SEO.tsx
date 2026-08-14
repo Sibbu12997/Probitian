@@ -88,7 +88,7 @@ export const SEO: React.FC<SEOProps> = ({
     description: finalDesc,
     founder: {
       '@type': 'Person',
-      name: 'Shivam Baghel',
+      name: 'Shivam Singh',
       email: contactEmail,
     },
     knowsAbout: ['Power BI', 'SQL', 'Excel', 'Power Query', 'DAX', 'Business Intelligence', 'Data Analytics', 'AI Tools'],
@@ -98,7 +98,7 @@ export const SEO: React.FC<SEOProps> = ({
     <React.Fragment>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, '\\u003c') }}
       />
     </React.Fragment>
   );

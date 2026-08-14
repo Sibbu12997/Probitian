@@ -31,6 +31,22 @@ import {
 import { EmailCampaign, MediaItem } from '../../../types';
 import { cmsService } from '../../../services/cmsService';
 
+function sanitizePreviewHtml(rawHtml?: string): string {
+  if (!rawHtml) return '<p class="text-slate-400 italic">No body content written yet.</p>';
+  let clean = rawHtml;
+  // Remove script tags and contents
+  clean = clean.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+  // Remove iframe, object, embed, applet, base, meta, form, link tags
+  clean = clean.replace(/<\/?(?:iframe|object|embed|applet|base|meta|form|link)\b[^>]*>/gi, '');
+  // Remove inline on* event handlers
+  clean = clean.replace(/\s*on[a-zA-Z]+\s*=\s*(['"])[^'"]*\1/gi, '');
+  clean = clean.replace(/\s*on[a-zA-Z]+\s*=\s*[^>\s]+/gi, '');
+  // Neutralize dangerous URI protocols in href and src
+  clean = clean.replace(/href\s*=\s*(['"])\s*(?:javascript|vbscript|data(?!\:image)):[^'"]*\1/gi, 'href="#"');
+  clean = clean.replace(/src\s*=\s*(['"])\s*(?:javascript|vbscript):[^'"]*\1/gi, 'src=""');
+  return clean;
+}
+
 export const CampaignsManager: React.FC = () => {
   const [campaigns, setCampaigns] = useState<EmailCampaign[]>([]);
   const [loading, setLoading] = useState(true);
@@ -664,7 +680,7 @@ export const CampaignsManager: React.FC = () => {
                     </div>
 
                     {/* Mock Content */}
-                    <div className="p-6 text-sm text-slate-700 leading-relaxed space-y-4" dangerouslySetInnerHTML={{ __html: editingCampaign.content || '<p class="text-slate-400 italic">No body content written yet.</p>' }} />
+                    <div className="p-6 text-sm text-slate-700 leading-relaxed space-y-4" dangerouslySetInnerHTML={{ __html: sanitizePreviewHtml(editingCampaign.content) }} />
 
                     {/* Mock Footer */}
                     <div className="bg-slate-50 p-6 border-t border-slate-200 text-center text-xs text-slate-500 space-y-2">
