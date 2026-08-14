@@ -387,11 +387,19 @@ function sanitizeSvg(svgContent: string): string {
   if (!svgContent || typeof svgContent !== 'string') return '';
   let clean = svgContent.trim();
   
+  // Strip XML DOCTYPE and ENTITY declarations to prevent XXE / entity expansion attacks
+  clean = clean.replace(/<!DOCTYPE[\s\S]*?>/gi, '');
+  clean = clean.replace(/<!ENTITY[\s\S]*?>/gi, '');
+
   // Strip all executable script tags and contents
   clean = clean.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
   
   // Strip dangerous embedded content tags
-  const dangerousTags = ['iframe', 'object', 'embed', 'foreignObject', 'applet', 'meta', 'link', 'form', 'base', 'frame', 'frameset'];
+  const dangerousTags = [
+    'iframe', 'object', 'embed', 'foreignObject', 'applet', 'meta',
+    'link', 'form', 'base', 'frame', 'frameset', 'input', 'textarea',
+    'button', 'select', 'option', 'canvas', 'video', 'audio', 'source'
+  ];
   for (const tag of dangerousTags) {
     clean = clean.replace(new RegExp(`<${tag}\\b[^<]*(?:(?!<\\/${tag}>)<[^<]*)*<\\/${tag}>`, 'gi'), '');
     clean = clean.replace(new RegExp(`<${tag}\\b[^>]*\\/?>`, 'gi'), '');
@@ -405,6 +413,86 @@ function sanitizeSvg(svgContent: string): string {
   clean = clean.replace(/(href|src|xlink:href|action|data)\s*=\s*(?:javascript|vbscript|data:text\/html)[^\s>]+/gi, '$1="#"');
 
   return clean;
+}
+
+function validateFileSignature(buffer: Buffer, claimedMime: string, ext: string): { valid: boolean; detectedMime?: string; error?: string } {
+  if (!buffer || buffer.length === 0) {
+    return { valid: false, error: 'Empty file buffer' };
+  }
+
+  // 1. Block known executable & shell script signatures
+  // Windows MZ header (PE executable/DLL)
+  if (buffer.length >= 2 && buffer[0] === 0x4D && buffer[1] === 0x5A) {
+    return { valid: false, error: 'Executable binary files are strictly forbidden' };
+  }
+  // Linux ELF header
+  if (buffer.length >= 4 && buffer[0] === 0x7F && buffer[1] === 0x45 && buffer[2] === 0x4C && buffer[3] === 0x46) {
+    return { valid: false, error: 'Executable binary files are strictly forbidden' };
+  }
+  // Unix Shebang #!
+  if (buffer.length >= 2 && buffer[0] === 0x23 && buffer[1] === 0x21) {
+    return { valid: false, error: 'Shell scripts are strictly forbidden' };
+  }
+  // PHP code tags
+  const startStr = buffer.slice(0, 100).toString('utf-8').toLowerCase();
+  if (startStr.includes('<?php') || startStr.includes('<?=')) {
+    return { valid: false, error: 'PHP scripts are strictly forbidden' };
+  }
+
+  // 2. Validate Allowed File Signatures
+  // PNG: 89 50 4E 47 0D 0A 1A 0A
+  const isPng = buffer.length >= 8 &&
+    buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47 &&
+    buffer[4] === 0x0D && buffer[5] === 0x0A && buffer[6] === 0x1A && buffer[7] === 0x0A;
+
+  // JPEG: FF D8 FF
+  const isJpeg = buffer.length >= 3 &&
+    buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF;
+
+  // GIF: GIF87a or GIF89a (47 49 46 38 37 61 or 47 49 46 38 39 61)
+  const isGif = buffer.length >= 6 &&
+    buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x38;
+
+  // WEBP: RIFF....WEBP
+  const isWebp = buffer.length >= 12 &&
+    buffer.slice(0, 4).toString('ascii') === 'RIFF' &&
+    buffer.slice(8, 12).toString('ascii') === 'WEBP';
+
+  // PDF: %PDF- (25 50 44 46 2D)
+  const isPdf = buffer.length >= 5 &&
+    buffer.slice(0, 5).toString('ascii') === '%PDF-';
+
+  // MP4 / M4V / QuickTime MOV: starts with ftyp at offset 4
+  const isMp4 = buffer.length >= 12 && (
+    buffer.slice(4, 8).toString('ascii') === 'ftyp' ||
+    buffer.slice(4, 12).toString('ascii').includes('isom') ||
+    buffer.slice(4, 12).toString('ascii').includes('mp4')
+  );
+
+  // WEBM / MKV: 1A 45 DF A3
+  const isWebm = buffer.length >= 4 &&
+    buffer[0] === 0x1A && buffer[1] === 0x45 && buffer[2] === 0xDF && buffer[3] === 0xA3;
+
+  // SVG: textual XML/SVG
+  const isSvg = ext === '.svg' || claimedMime === 'image/svg+xml';
+
+  if (isPng) return { valid: true, detectedMime: 'image/png' };
+  if (isJpeg) return { valid: true, detectedMime: 'image/jpeg' };
+  if (isGif) return { valid: true, detectedMime: 'image/gif' };
+  if (isWebp) return { valid: true, detectedMime: 'image/webp' };
+  if (isPdf) return { valid: true, detectedMime: 'application/pdf' };
+  if (isMp4) return { valid: true, detectedMime: 'video/mp4' };
+  if (isWebm) return { valid: true, detectedMime: 'video/webm' };
+
+  if (isSvg) {
+    const textSample = buffer.toString('utf-8').trim().toLowerCase();
+    if (textSample.includes('<svg') && (textSample.startsWith('<') || textSample.startsWith('<?xml'))) {
+      return { valid: true, detectedMime: 'image/svg+xml' };
+    }
+    return { valid: false, error: 'Malformed or invalid SVG content' };
+  }
+
+  return { valid: false, error: 'Unsupported or unverified file signature' };
 }
 
 ensureStorageBucket();
@@ -902,15 +990,15 @@ app.get('/api/cms/status', async (req, res) => {
 app.get('/api/cms/settings/general', async (req, res) => {
   if (serverSupabase) {
     try {
-      const { data, error } = await serverSupabase.from('settings').select('value').eq('key', 'general').single();
-      if (!error && data?.value) {
-        return res.json(data.value);
+      const { data, error } = await serverSupabase.from('settings').select('value').eq('key', 'general').maybeSingle();
+      if (error) {
+        console.error('[CMS Settings General Read Error]', error.message);
+        return res.status(503).json({ error: 'Database service unavailable' });
       }
-      if (error && error.code !== 'PGRST116') {
-        console.warn('[CMS Settings General Read Warning]', error.message);
-      }
+      return res.json(data?.value || null);
     } catch (err: any) {
-      console.warn('[CMS Settings General Read Exception]', err?.message || err);
+      console.error('[CMS Settings General Read Exception]', err);
+      return res.status(503).json({ error: 'Database service unavailable' });
     }
   }
   const data = readCmsData();
@@ -953,15 +1041,15 @@ app.post('/api/cms/settings/general', requireAdmin, async (req, res) => {
 app.get('/api/cms/settings/seo', async (req, res) => {
   if (serverSupabase) {
     try {
-      const { data, error } = await serverSupabase.from('settings').select('value').eq('key', 'seo').single();
-      if (!error && data?.value) {
-        return res.json(data.value);
+      const { data, error } = await serverSupabase.from('settings').select('value').eq('key', 'seo').maybeSingle();
+      if (error) {
+        console.error('[CMS SEO Read Error]', error.message);
+        return res.status(503).json({ error: 'Database service unavailable' });
       }
-      if (error && error.code !== 'PGRST116') {
-        console.warn('[CMS SEO Read Warning]', error.message);
-      }
+      return res.json(data?.value || null);
     } catch (err: any) {
-      console.warn('[CMS SEO Read Exception]', err?.message || err);
+      console.error('[CMS SEO Read Exception]', err);
+      return res.status(503).json({ error: 'Database service unavailable' });
     }
   }
   const data = readCmsData();
@@ -1004,15 +1092,15 @@ app.post('/api/cms/settings/seo', requireAdmin, async (req, res) => {
 app.get('/api/cms/settings/legal', async (req, res) => {
   if (serverSupabase) {
     try {
-      const { data, error } = await serverSupabase.from('settings').select('value').eq('key', 'legal_policies').single();
-      if (!error && data?.value) {
-        return res.json(data.value);
+      const { data, error } = await serverSupabase.from('settings').select('value').eq('key', 'legal_policies').maybeSingle();
+      if (error) {
+        console.error('[CMS Legal Read Error]', error.message);
+        return res.status(503).json({ error: 'Database service unavailable' });
       }
-      if (error && error.code !== 'PGRST116') {
-        console.warn('[CMS Legal Read Warning]', error.message);
-      }
+      return res.json(data?.value || null);
     } catch (err: any) {
-      console.warn('[CMS Legal Read Exception]', err?.message || err);
+      console.error('[CMS Legal Read Exception]', err);
+      return res.status(503).json({ error: 'Database service unavailable' });
     }
   }
   const data = readCmsData();
@@ -1055,8 +1143,12 @@ app.post('/api/cms/settings/legal', requireAdmin, async (req, res) => {
 app.get('/api/cms/settings/home', async (req, res) => {
   if (serverSupabase) {
     try {
-      const { data, error } = await serverSupabase.from('pages').select('*').eq('page_key', 'home').single();
-      if (!error && data) {
+      const { data, error } = await serverSupabase.from('pages').select('*').eq('page_key', 'home').maybeSingle();
+      if (error) {
+        console.error('[CMS Home Config Read Error]', error.message);
+        return res.status(503).json({ error: 'Database service unavailable' });
+      }
+      if (data) {
         return res.json({
           hero_heading: data.hero_heading,
           hero_description: data.hero_description,
@@ -1068,11 +1160,10 @@ app.get('/api/cms/settings/home', async (req, res) => {
           cta: data.cta
         });
       }
-      if (error && error.code !== 'PGRST116') {
-        console.warn('[CMS Home Config Read Warning]', error.message);
-      }
+      return res.json(null);
     } catch (err: any) {
-      console.warn('[CMS Home Config Read Exception]', err?.message || err);
+      console.error('[CMS Home Config Read Exception]', err);
+      return res.status(503).json({ error: 'Database service unavailable' });
     }
   }
   const data = readCmsData();
@@ -1124,14 +1215,14 @@ app.get('/api/cms/projects', async (req, res) => {
   if (serverSupabase) {
     try {
       const { data, error } = await serverSupabase.from('projects').select('*').order('created_at', { ascending: false });
-      if (!error && Array.isArray(data) && data.length > 0) {
-        return res.json(data);
-      }
       if (error) {
-        console.warn('[CMS Projects Read Warning]', error.message);
+        console.error('[CMS Projects Read Error]', error.message);
+        return res.status(503).json({ error: 'Database service unavailable' });
       }
+      return res.json(Array.isArray(data) ? data : []);
     } catch (err: any) {
-      console.warn('[CMS Projects Read Exception]', err?.message || err);
+      console.error('[CMS Projects Read Exception]', err);
+      return res.status(503).json({ error: 'Database service unavailable' });
     }
   }
   const data = readCmsData();
@@ -1235,14 +1326,14 @@ app.get('/api/cms/blogs', async (req, res) => {
   if (serverSupabase) {
     try {
       const { data, error } = await serverSupabase.from('blogs').select('*').order('created_at', { ascending: false });
-      if (!error && Array.isArray(data) && data.length > 0) {
-        return res.json(data);
-      }
       if (error) {
-        console.warn('[CMS Blogs Read Warning]', error.message);
+        console.error('[CMS Blogs Read Error]', error.message);
+        return res.status(503).json({ error: 'Database service unavailable' });
       }
+      return res.json(Array.isArray(data) ? data : []);
     } catch (err: any) {
-      console.warn('[CMS Blogs Read Exception]', err?.message || err);
+      console.error('[CMS Blogs Read Exception]', err);
+      return res.status(503).json({ error: 'Database service unavailable' });
     }
   }
   const data = readCmsData();
@@ -2468,6 +2559,15 @@ app.post(
     const isAllowedType = allowedMimePrefixes.some(p => mimeType.startsWith(p)) || ext === '.svg';
     if (!isAllowedType) {
       return res.status(400).json({ error: `File MIME type "${mimeType}" is not permitted.` });
+    }
+
+    // Validate actual file magic bytes / signature against spoofed MIME types
+    const sigCheck = validateFileSignature(fileBuffer, mimeType, ext);
+    if (!sigCheck.valid) {
+      return res.status(400).json({ error: `File validation rejected: ${sigCheck.error || 'Invalid file content'}` });
+    }
+    if (sigCheck.detectedMime) {
+      mimeType = sigCheck.detectedMime;
     }
 
     if (ext === '.svg' || mimeType === 'image/svg+xml') {
