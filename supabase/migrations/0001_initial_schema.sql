@@ -56,7 +56,7 @@ CREATE TABLE IF NOT EXISTS public.blogs (
   category TEXT NOT NULL,
   tags TEXT[] DEFAULT '{}',
   featured_image TEXT,
-  author TEXT DEFAULT 'Shivam Baghel',
+  author TEXT DEFAULT 'Shivam Singh',
   read_time TEXT DEFAULT '5 min read',
   status TEXT DEFAULT 'published' CHECK (status IN ('draft', 'published', 'scheduled')),
   scheduled_at TIMESTAMPTZ,

@@ -33,8 +33,6 @@ CREATE TABLE IF NOT EXISTS public.email_campaign_recipients (
 ALTER TABLE public.email_campaigns ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.email_campaign_recipients ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Public read email_campaigns" ON public.email_campaigns FOR SELECT USING (true);
-CREATE POLICY "Public read email_campaign_recipients" ON public.email_campaign_recipients FOR SELECT USING (true);
-
+-- Campaign data is private administrative data - only authenticated admins and service role have access
 CREATE POLICY "Admin all email_campaigns" ON public.email_campaigns FOR ALL USING (auth.role() = 'authenticated');
 CREATE POLICY "Admin all email_campaign_recipients" ON public.email_campaign_recipients FOR ALL USING (auth.role() = 'authenticated');

@@ -13,28 +13,25 @@ ALTER TABLE IF EXISTS public.media
   ADD COLUMN IF NOT EXISTS uploaded_at TIMESTAMPTZ DEFAULT NOW(),
   ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
 
--- Grant full table privileges to API roles
-GRANT ALL ON TABLE public.media TO anon, authenticated, service_role;
+-- Grant SELECT on public.media to visitors, and full privileges strictly to service_role
+GRANT SELECT ON TABLE public.media TO anon, authenticated;
+GRANT ALL ON TABLE public.media TO service_role;
 
 -- Ensure storage bucket exists in storage schema
 INSERT INTO storage.buckets (id, name, public)
 VALUES ('probitian-media', 'probitian-media', true)
 ON CONFLICT (id) DO UPDATE SET public = true;
 
--- Ensure public storage bucket objects policy
-DO $$
+-- Ensure public storage bucket read policy (uploads are strictly handled server-side via service_role)
+DO $
 BEGIN
+  -- Drop any legacy public upload policy
+  DROP POLICY IF EXISTS "Public Upload to probitian-media" ON storage.objects;
+
   IF NOT EXISTS (
     SELECT 1 FROM pg_policies WHERE tablename = 'objects' AND policyname = 'Public Access to probitian-media'
   ) THEN
     CREATE POLICY "Public Access to probitian-media" ON storage.objects
       FOR SELECT USING (bucket_id = 'probitian-media');
   END IF;
-
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_policies WHERE tablename = 'objects' AND policyname = 'Public Upload to probitian-media'
-  ) THEN
-    CREATE POLICY "Public Upload to probitian-media" ON storage.objects
-      FOR INSERT WITH CHECK (bucket_id = 'probitian-media');
-  END IF;
-END $$;
+END $;

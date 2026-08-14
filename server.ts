@@ -13,6 +13,9 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
+// Trust reverse proxy (Nginx / Cloud Run) for accurate client IP resolution
+app.set('trust proxy', 1);
+
 app.use(express.json({ limit: '25mb' }));
 app.use(express.urlencoded({ limit: '25mb', extended: true }));
 
@@ -40,13 +43,12 @@ function isAllowedOrigin(origin: string | undefined, req: express.Request): bool
       return true;
     }
 
-    // Google Cloud Run & AI Studio environments
+    // Official ProBitian & Google AI Studio container domains
     if (
-      host.endsWith('.run.app') ||
+      host === 'probitian.ai.studio' ||
       host.endsWith('.ai.studio') ||
       host === 'ai.studio' ||
-      host.endsWith('.google.com') ||
-      host.endsWith('.googleusercontent.com')
+      (host.endsWith('.run.app') && (host.startsWith('ais-dev-') || host.startsWith('ais-pre-') || host.includes('aistudio')))
     ) {
       return true;
     }
@@ -56,6 +58,7 @@ function isAllowedOrigin(origin: string | undefined, req: express.Request): bool
       process.env.APP_URL,
       process.env.FRONTEND_URL,
       process.env.PUBLIC_URL,
+      process.env.VITE_SITE_URL,
       process.env.CORS_ALLOWED_ORIGINS
     ].filter(Boolean).map(s => s!.toLowerCase().trim());
 
@@ -262,8 +265,7 @@ function createRateLimiter(options: RateLimitOptions) {
   }, 5 * 60 * 1000);
 
   return (req: express.Request, res: express.Response, next: express.NextFunction) => {
-    const rawIp = (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || 'unknown';
-    const ip = rawIp.split(',')[0].trim();
+    const ip = (req.ip || (req.socket && req.socket.remoteAddress) || 'unknown').trim();
     const now = Date.now();
     const record = requests.get(ip);
 
@@ -285,17 +287,23 @@ function createRateLimiter(options: RateLimitOptions) {
 
 const loginLimiter = createRateLimiter({ windowMs: 15 * 60 * 1000, max: 10, message: 'Too many login attempts. Please try again in 15 minutes.' });
 const newsletterLimiter = createRateLimiter({ windowMs: 15 * 60 * 1000, max: 10, message: 'Too many subscription attempts. Please try again later.' });
+const unsubscribeLimiter = createRateLimiter({ windowMs: 15 * 60 * 1000, max: 20, message: 'Too many unsubscribe requests. Please try again later.' });
 const contactLimiter = createRateLimiter({ windowMs: 15 * 60 * 1000, max: 10, message: 'Too many contact messages sent. Please try again later.' });
 const uploadLimiter = createRateLimiter({ windowMs: 15 * 60 * 1000, max: 30, message: 'Too many upload requests. Please try again later.' });
 const emailTestLimiter = createRateLimiter({ windowMs: 15 * 60 * 1000, max: 10, message: 'Too many test emails sent. Please try again later.' });
 const emailSendLimiter = createRateLimiter({ windowMs: 15 * 60 * 1000, max: 5, message: 'Too many campaign broadcasts requested. Please try again later.' });
 
 // ==================== SIGNED UNSUBSCRIBE TOKENS ====================
-const UNSUBSCRIBE_SECRET = process.env.ADMIN_PASSKEY || process.env.SUPABASE_SECRET_KEY || 'probitian-unsub-secret-key';
+// Ephemeral fallback key generated per server process instance if no explicit secret key is set in environment
+const EPHEMERAL_SERVER_KEY = crypto.randomBytes(32).toString('hex');
+
+function getUnsubscribeSecret(): string {
+  return (process.env.ADMIN_PASSKEY || process.env.SUPABASE_SECRET_KEY || process.env.UNSUBSCRIBE_SECRET || EPHEMERAL_SERVER_KEY).trim();
+}
 
 function generateUnsubscribeToken(email: string): string {
   const cleanEmail = email.trim().toLowerCase();
-  const hmac = crypto.createHmac('sha256', UNSUBSCRIBE_SECRET);
+  const hmac = crypto.createHmac('sha256', getUnsubscribeSecret());
   hmac.update(cleanEmail);
   const sig = hmac.digest('hex').slice(0, 16);
   return Buffer.from(`${cleanEmail}:${sig}`).toString('base64url');
@@ -307,10 +315,13 @@ function verifyUnsubscribeToken(tokenStr: string): string | null {
     const [email, sig] = decoded.split(':');
     if (!email || !sig) return null;
     const cleanEmail = email.trim().toLowerCase();
-    const hmac = crypto.createHmac('sha256', UNSUBSCRIBE_SECRET);
+    const hmac = crypto.createHmac('sha256', getUnsubscribeSecret());
     hmac.update(cleanEmail);
     const expectedSig = hmac.digest('hex').slice(0, 16);
-    if (crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expectedSig))) {
+    
+    const sigBuf = Buffer.from(sig);
+    const expectedSigBuf = Buffer.from(expectedSig);
+    if (sigBuf.length === expectedSigBuf.length && crypto.timingSafeEqual(sigBuf, expectedSigBuf)) {
       return cleanEmail;
     }
   } catch (e) {
@@ -720,7 +731,7 @@ app.post('/api/newsletter', newsletterLimiter, async (req, res) => {
 });
 
 // Public Unsubscribe Endpoint
-app.get('/api/newsletter/unsubscribe', async (req, res) => {
+app.get('/api/newsletter/unsubscribe', unsubscribeLimiter, async (req, res) => {
   const token = (req.query.token || '').toString().trim();
   const rawEmail = (req.query.email || '').toString().trim();
 

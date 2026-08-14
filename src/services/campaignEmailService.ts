@@ -64,7 +64,7 @@ export const campaignEmailService = {
       
       <div class="footer-links">
         <a href="${unsubscribeUrl}" target="_blank" rel="noopener noreferrer">Unsubscribe from Newsletter</a> &bull; 
-        <a href="https://probitian.ai.st/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>
+        <a href="https://probitian.ai.studio/#/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>
       </div>
       <p style="margin-top: 12px; font-size: 11px; color: #94a3b8;">&copy; ${new Date().getFullYear()} ProBitian. All rights reserved.</p>
     </div>
