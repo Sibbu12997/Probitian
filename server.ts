@@ -16,8 +16,9 @@ const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 // Trust reverse proxy (Nginx / Cloud Run) for accurate client IP resolution
 app.set('trust proxy', 1);
 
-app.use(express.json({ limit: '25mb' }));
-app.use(express.urlencoded({ limit: '25mb', extended: true }));
+// Safe baseline body limit for API routes (large uploads use route-specific parser)
+app.use(express.json({ limit: '500kb' }));
+app.use(express.urlencoded({ limit: '500kb', extended: true }));
 
 // ==================== ORIGIN ALLOWLIST & CORS VALIDATOR ====================
 function isAllowedOrigin(origin: string | undefined, req: express.Request): boolean {
@@ -305,24 +306,35 @@ function generateUnsubscribeToken(email: string): string {
   const cleanEmail = email.trim().toLowerCase();
   const hmac = crypto.createHmac('sha256', getUnsubscribeSecret());
   hmac.update(cleanEmail);
-  const sig = hmac.digest('hex').slice(0, 16);
+  const sig = hmac.digest('hex');
   return Buffer.from(`${cleanEmail}:${sig}`).toString('base64url');
 }
 
 function verifyUnsubscribeToken(tokenStr: string): string | null {
   try {
     const decoded = Buffer.from(tokenStr, 'base64url').toString('utf-8');
-    const [email, sig] = decoded.split(':');
+    const parts = decoded.split(':');
+    if (parts.length < 2) return null;
+    const sig = parts.pop()!;
+    const email = parts.join(':');
     if (!email || !sig) return null;
     const cleanEmail = email.trim().toLowerCase();
     const hmac = crypto.createHmac('sha256', getUnsubscribeSecret());
     hmac.update(cleanEmail);
-    const expectedSig = hmac.digest('hex').slice(0, 16);
+    const expectedSig = hmac.digest('hex');
     
     const sigBuf = Buffer.from(sig);
     const expectedSigBuf = Buffer.from(expectedSig);
     if (sigBuf.length === expectedSigBuf.length && crypto.timingSafeEqual(sigBuf, expectedSigBuf)) {
       return cleanEmail;
+    }
+
+    // Backward compatibility for legacy 16-char sliced signatures
+    if (sig.length === 16) {
+      const expected16Buf = Buffer.from(expectedSig.slice(0, 16));
+      if (sigBuf.length === expected16Buf.length && crypto.timingSafeEqual(sigBuf, expected16Buf)) {
+        return cleanEmail;
+      }
     }
   } catch (e) {
     return null;
@@ -372,13 +384,26 @@ async function ensureStorageBucket() {
 }
 
 function sanitizeSvg(svgContent: string): string {
-  let clean = svgContent;
+  if (!svgContent || typeof svgContent !== 'string') return '';
+  let clean = svgContent.trim();
+  
+  // Strip all executable script tags and contents
   clean = clean.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
-  clean = clean.replace(/\s*on\w+\s*=\s*(['"])[^'"]*\1/gi, '');
-  clean = clean.replace(/\s*on\w+\s*=\s*[^>\s]+/gi, '');
-  clean = clean.replace(/href\s*=\s*(['"])\s*javascript:[^'"]*\1/gi, 'href="#"');
-  clean = clean.replace(/href\s*=\s*javascript:[^\s>]+/gi, 'href="#"');
-  clean = clean.replace(/<foreignObject\b[^<]*(?:(?!<\/foreignObject>)<[^<]*)*<\/foreignObject>/gi, '');
+  
+  // Strip dangerous embedded content tags
+  const dangerousTags = ['iframe', 'object', 'embed', 'foreignObject', 'applet', 'meta', 'link', 'form', 'base', 'frame', 'frameset'];
+  for (const tag of dangerousTags) {
+    clean = clean.replace(new RegExp(`<${tag}\\b[^<]*(?:(?!<\\/${tag}>)<[^<]*)*<\\/${tag}>`, 'gi'), '');
+    clean = clean.replace(new RegExp(`<${tag}\\b[^>]*\\/?>`, 'gi'), '');
+  }
+
+  // Strip all inline DOM event handlers (onload, onerror, onclick, onmouseover, etc.)
+  clean = clean.replace(/\s+on[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '');
+
+  // Strip dangerous URL schemes in attributes (javascript:, data:text/html, vbscript:)
+  clean = clean.replace(/(href|src|xlink:href|action|data)\s*=\s*(?:"\s*(?:javascript|vbscript|data:text\/html)[^"]*"|'\s*(?:javascript|vbscript|data:text\/html)[^']*')/gi, '$1="#"');
+  clean = clean.replace(/(href|src|xlink:href|action|data)\s*=\s*(?:javascript|vbscript|data:text\/html)[^\s>]+/gi, '$1="#"');
+
   return clean;
 }
 
@@ -538,7 +563,7 @@ app.post('/api/admin/verify-supabase-session', loginLimiter, async (req, res) =>
   }
 
   try {
-    let verifiedUser: { email?: string; id: string } | null = null;
+    let verifiedUser: { email?: string; id: string; app_metadata?: any; user_metadata?: any } | null = null;
 
     if (serverSupabase) {
       const { data, error } = await serverSupabase.auth.getUser(accessToken);
@@ -563,6 +588,53 @@ app.post('/api/admin/verify-supabase-session', loginLimiter, async (req, res) =>
     }
 
     const userEmail = verifiedUser.email.toLowerCase().trim();
+
+    // Explicit Admin Authorization Check
+    let isAuthorizedAdmin = false;
+
+    // 1. Check authorized administrator email allowlist
+    const configuredAdminEmails = [
+      'probitianofficial@gmail.com',
+      'shivam@probitian.com',
+      'shivambaghel79@gmail.com',
+      ...(process.env.ADMIN_EMAILS ? process.env.ADMIN_EMAILS.split(',').map(e => e.trim().toLowerCase()) : [])
+    ];
+
+    if (configuredAdminEmails.includes(userEmail)) {
+      isAuthorizedAdmin = true;
+    }
+
+    // 2. Check profiles table in Supabase if serverSupabase is available
+    if (!isAuthorizedAdmin && serverSupabase) {
+      try {
+        const { data: profile, error: profErr } = await serverSupabase
+          .from('profiles')
+          .select('role, email')
+          .eq('id', verifiedUser.id)
+          .maybeSingle();
+
+        if (!profErr && profile && profile.role === 'admin') {
+          isAuthorizedAdmin = true;
+        }
+      } catch (profCheckErr) {
+        console.warn('[Admin Authorization Profile Check Warning]', profCheckErr);
+      }
+    }
+
+    // 3. Check Supabase app_metadata / user_metadata role
+    if (!isAuthorizedAdmin) {
+      const appRole = verifiedUser.app_metadata?.role;
+      const userRole = verifiedUser.user_metadata?.role;
+      if (appRole === 'admin' || userRole === 'admin') {
+        isAuthorizedAdmin = true;
+      }
+    }
+
+    if (!isAuthorizedAdmin) {
+      console.warn(`[SECURITY] Unauthorized Supabase user attempted admin login: ${userEmail} (${verifiedUser.id})`);
+      return res.status(403).json({ error: 'Forbidden: Account does not have administrator privileges' });
+    }
+
     const token = crypto.randomBytes(32).toString('hex');
     const expiresAt = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
 
@@ -2352,7 +2424,13 @@ app.get('/api/cms/media', requireAdmin, async (req, res) => {
 });
 
 // MEDIA UPLOAD (PROTECTED WRITE)
-app.post('/api/cms/media/upload', requireAdmin, uploadLimiter, async (req, res) => {
+app.post(
+  '/api/cms/media/upload',
+  requireAdmin,
+  uploadLimiter,
+  express.json({ limit: '20mb' }),
+  express.urlencoded({ limit: '20mb', extended: true }),
+  async (req, res) => {
   try {
     const { filename, fileData, category, folder, altText } = req.body || {};
 
