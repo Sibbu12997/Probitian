@@ -25,7 +25,10 @@ ProBitian adheres to enterprise security standards to protect administrative con
 - **Passkey Verification**: Protected endpoint `POST /api/admin/verify-passkey` verifies the administrator passkey against `ADMIN_PASSKEY`.
 - **Supabase Auth Bridge**: Administrator authentication through Supabase Auth is validated server-side (`POST /api/admin/supabase-login`) and upgraded to a verified admin session only after verifying admin permissions.
 - **Header & Bearer Compatibility**: Requests from trusted origins support standard `Authorization: Bearer <token>` and `x-admin-token` headers alongside HttpOnly cookies.
-- **Session Revocation**: Logout endpoint `POST /api/admin/logout` immediately clears cookies and invalidates session tokens in the server cache.
+- **Session Revocation & Multi-Instance Behavior**:
+  - Administrative session tokens are signed with HMAC-SHA256 containing embedded cryptographically verified expirations (`expiresAt`) and random nonces.
+  - When an administrator logs out via `POST /api/admin/logout`, the `admin_session` cookie is cleared (`Max-Age=0`) and the token is added to the in-memory revocation set on that container instance.
+  - In horizontal scaling / multi-instance deployments (such as Google Cloud Run), the client-side cookie deletion guarantees immediate termination on the user's browser, while HMAC cryptographic expiration provides hard boundary expiry across all instances. In-memory revocation sets operate at the per-instance container level.
 
 ---
 

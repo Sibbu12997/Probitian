@@ -574,22 +574,34 @@ function isValidId(id?: string): boolean {
   return /^[a-zA-Z0-9_.-]+$/.test(clean);
 }
 
-// Local storage files for offline / unconfigured dev environment
+// Local storage files for offline / unconfigured dev environment ONLY (NODE_ENV !== 'production')
 const CMS_DATA_FILE = path.join(process.cwd(), 'data', 'cms_settings.json');
 
+function isDevEnvironment(): boolean {
+  return process.env.NODE_ENV !== 'production' || 
+    Boolean(process.env.DISABLE_HMR) || 
+    Boolean(process.env.AI_STUDIO_APPLET_ID);
+}
+
 function readCmsData() {
+  if (process.env.NODE_ENV === 'production' && !process.env.AI_STUDIO_APPLET_ID) {
+    throw new Error('Local JSON fallback is strictly disabled in production. Supabase PostgreSQL is the required source of truth.');
+  }
   try {
     if (fs.existsSync(CMS_DATA_FILE)) {
       const content = fs.readFileSync(CMS_DATA_FILE, 'utf-8');
       return JSON.parse(content);
     }
   } catch (err) {
-    console.error('Error reading CMS data file:', err);
+    console.error('Error reading CMS data file in dev:', err);
   }
   return {};
 }
 
 function writeCmsData(data: any) {
+  if (process.env.NODE_ENV === 'production' && !process.env.AI_STUDIO_APPLET_ID) {
+    throw new Error('Local JSON fallback is strictly disabled in production. Supabase PostgreSQL is the required source of truth.');
+  }
   try {
     const dir = path.dirname(CMS_DATA_FILE);
     if (!fs.existsSync(dir)) {
@@ -597,7 +609,7 @@ function writeCmsData(data: any) {
     }
     fs.writeFileSync(CMS_DATA_FILE, JSON.stringify(data, null, 2), 'utf-8');
   } catch (err) {
-    console.error('Error writing CMS data file:', err);
+    console.error('Error writing CMS data file in dev:', err);
   }
 }
 
