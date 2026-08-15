@@ -1,4 +1,3 @@
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import {
   WebsiteGeneralSettings,
   SeoSettings,
@@ -21,13 +20,11 @@ import {
   PROJECTS,
   BLOG_ARTICLES,
   LEARN_TOPICS,
-  YOUTUBE_VIDEOS,
-  WHY_PROBITIAN_CARDS
+  YOUTUBE_VIDEOS
 } from '../data/mockData';
-
 import { DEFAULT_LEGAL_SETTINGS, LegalSettings } from '../data/defaultLegalData';
 
-// LOCAL STORAGE KEYS
+// LOCAL STORAGE KEYS (for optimistic updates and client resilience)
 const STORAGE_KEYS = {
   SETTINGS_GENERAL: 'probitian_cms_general_settings',
   SETTINGS_SEO: 'probitian_cms_seo_settings',
@@ -127,7 +124,7 @@ const DEFAULT_MEDIA: MediaItem[] = [
   { id: 'm-2', filename: 'banner.svg', url: '/banner.svg', size_bytes: 18400, mime_type: 'image/svg+xml', folder: 'branding', created_at: new Date().toISOString() }
 ];
 
-// Helper to get from LocalStorage or default
+// Helper to get from LocalStorage or fallback
 function getLocal<T>(key: string, fallback: T): T {
   try {
     const item = localStorage.getItem(key);
@@ -146,8 +143,7 @@ function setLocal<T>(key: string, value: T): void {
 }
 
 /**
- * Helper to safely perform API fetch requests and guarantee JSON response handling.
- * Throws a descriptive error if the status is not OK or if the response is HTML.
+ * Safe fetch helper for Express API routes
  */
 async function safeFetchJson<T = any>(url: string, options?: RequestInit): Promise<T> {
   const fetchOptions: RequestInit = {
@@ -183,240 +179,175 @@ async function safeFetchJson<T = any>(url: string, options?: RequestInit): Promi
   return response.json() as Promise<T>;
 }
 
-// ==================== CMS SERVICE API ====================
+// ==================== CMS SERVICE API (EXPRESS ROUTED) ====================
 
 export const cmsService = {
   // --- GENERAL SETTINGS ---
   async getGeneralSettings(): Promise<WebsiteGeneralSettings> {
     try {
       const data = await safeFetchJson<WebsiteGeneralSettings | null>('/api/cms/settings/general');
-      if (data && data.logo_url) {
-        setLocal(STORAGE_KEYS.SETTINGS_GENERAL, data);
-        return data as WebsiteGeneralSettings;
+      if (data && typeof data === 'object') {
+        const settings: WebsiteGeneralSettings = {
+          website_name: data.website_name || DEFAULT_GENERAL_SETTINGS.website_name,
+          tagline: data.tagline || DEFAULT_GENERAL_SETTINGS.tagline,
+          contact_email: data.contact_email || DEFAULT_GENERAL_SETTINGS.contact_email,
+          logo_url: data.logo_url || DEFAULT_GENERAL_SETTINGS.logo_url,
+          favicon_url: data.favicon_url || DEFAULT_GENERAL_SETTINGS.favicon_url,
+          banner_url: data.banner_url || DEFAULT_GENERAL_SETTINGS.banner_url,
+          theme_color: data.theme_color || DEFAULT_GENERAL_SETTINGS.theme_color,
+          footer_copyright: data.footer_copyright || DEFAULT_GENERAL_SETTINGS.footer_copyright,
+          community_hub_name: data.community_hub_name || DEFAULT_GENERAL_SETTINGS.community_hub_name,
+          community_hub_address: data.community_hub_address || DEFAULT_GENERAL_SETTINGS.community_hub_address,
+          community_hub_maps_url: data.community_hub_maps_url || DEFAULT_GENERAL_SETTINGS.community_hub_maps_url
+        };
+        setLocal(STORAGE_KEYS.SETTINGS_GENERAL, settings);
+        return settings;
       }
     } catch (e: any) {
-      console.warn('[CMS Service] getGeneralSettings API error:', e?.message || e);
-    }
-
-    if (isSupabaseConfigured()) {
-      try {
-        const { data } = await supabase.from('settings').select('value').eq('key', 'general').single();
-        if (data?.value) return data.value as WebsiteGeneralSettings;
-      } catch (err) {
-        console.warn('Supabase fetch general settings error, using fallback:', err);
-      }
+      console.warn('[CMS Service] getGeneralSettings API warning:', e?.message || e);
     }
     return getLocal(STORAGE_KEYS.SETTINGS_GENERAL, DEFAULT_GENERAL_SETTINGS);
   },
 
   async saveGeneralSettings(settings: WebsiteGeneralSettings): Promise<boolean> {
     setLocal(STORAGE_KEYS.SETTINGS_GENERAL, settings);
-
     try {
       await safeFetchJson('/api/cms/settings/general', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(settings)
       });
+      return true;
     } catch (e: any) {
-      console.error('Failed to post general settings to server store:', e?.message || e);
+      console.error('Failed to save general settings via Express API:', e?.message || e);
+      return false;
     }
-
-    if (isSupabaseConfigured()) {
-      try {
-        await supabase.from('settings').upsert({ key: 'general', value: settings, updated_at: new Date().toISOString() });
-      } catch (err) {
-        console.error('Supabase save error:', err);
-      }
-    }
-    return true;
   },
 
   // --- SEO SETTINGS ---
   async getSeoSettings(): Promise<SeoSettings> {
     try {
       const data = await safeFetchJson<SeoSettings | null>('/api/cms/settings/seo');
-      if (data && data.meta_title) {
-        setLocal(STORAGE_KEYS.SETTINGS_SEO, data);
-        return data as SeoSettings;
+      if (data && typeof data === 'object') {
+        const seo: SeoSettings = {
+          meta_title: data.meta_title || DEFAULT_SEO_SETTINGS.meta_title,
+          meta_description: data.meta_description || DEFAULT_SEO_SETTINGS.meta_description,
+          keywords: data.keywords || DEFAULT_SEO_SETTINGS.keywords,
+          og_image: data.og_image || DEFAULT_SEO_SETTINGS.og_image,
+          twitter_handle: data.twitter_handle || DEFAULT_SEO_SETTINGS.twitter_handle,
+          robots_txt: data.robots_txt || DEFAULT_SEO_SETTINGS.robots_txt
+        };
+        setLocal(STORAGE_KEYS.SETTINGS_SEO, seo);
+        return seo;
       }
     } catch (e: any) {
-      console.warn('[CMS Service] getSeoSettings API error:', e?.message || e);
-    }
-
-    if (isSupabaseConfigured()) {
-      try {
-        const { data } = await supabase.from('settings').select('value').eq('key', 'seo').single();
-        if (data?.value) return data.value as SeoSettings;
-      } catch (e) {}
+      console.warn('[CMS Service] getSeoSettings API warning:', e?.message || e);
     }
     return getLocal(STORAGE_KEYS.SETTINGS_SEO, DEFAULT_SEO_SETTINGS);
   },
 
   async saveSeoSettings(seo: SeoSettings): Promise<boolean> {
     setLocal(STORAGE_KEYS.SETTINGS_SEO, seo);
-
     try {
       await safeFetchJson('/api/cms/settings/seo', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(seo)
       });
+      return true;
     } catch (e: any) {
-      console.error('Failed to post SEO settings to server store:', e?.message || e);
+      console.error('Failed to save SEO settings via Express API:', e?.message || e);
+      return false;
     }
-
-    if (isSupabaseConfigured()) {
-      try {
-        await supabase.from('settings').upsert({ key: 'seo', value: seo, updated_at: new Date().toISOString() });
-      } catch (e) {}
-    }
-    return true;
   },
 
   // --- LEGAL & POLICIES SETTINGS ---
   async getLegalSettings(): Promise<LegalSettings> {
     try {
       const data = await safeFetchJson<LegalSettings | null>('/api/cms/settings/legal');
-      if (data && data.terms && data.privacy) {
+      if (data && typeof data === 'object' && (data.terms || data.privacy)) {
         setLocal(STORAGE_KEYS.LEGAL_POLICIES, data);
         return data as LegalSettings;
       }
     } catch (e: any) {
-      console.warn('[CMS Service] getLegalSettings API error:', e?.message || e);
-    }
-
-    if (isSupabaseConfigured()) {
-      try {
-        const { data } = await supabase.from('settings').select('value').eq('key', 'legal_policies').single();
-        if (data?.value) return data.value as LegalSettings;
-      } catch (e) {}
+      console.warn('[CMS Service] getLegalSettings API warning:', e?.message || e);
     }
     return getLocal(STORAGE_KEYS.LEGAL_POLICIES, DEFAULT_LEGAL_SETTINGS);
   },
 
   async saveLegalSettings(legal: LegalSettings): Promise<boolean> {
     setLocal(STORAGE_KEYS.LEGAL_POLICIES, legal);
-
     try {
       await safeFetchJson('/api/cms/settings/legal', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(legal)
       });
+      return true;
     } catch (e: any) {
-      console.error('Failed to post legal settings to server store:', e?.message || e);
+      console.error('Failed to save legal settings via Express API:', e?.message || e);
+      return false;
     }
-
-    if (isSupabaseConfigured()) {
-      try {
-        await supabase.from('settings').upsert({ key: 'legal_policies', value: legal, updated_at: new Date().toISOString() });
-      } catch (e) {}
-    }
-    return true;
   },
 
   // --- HOME PAGE CONFIG ---
   async getHomePageConfig(): Promise<HomePageConfig> {
     try {
       const data = await safeFetchJson<HomePageConfig | null>('/api/cms/settings/home');
-      if (data && data.hero_heading) {
+      if (data && typeof data === 'object' && data.hero_heading) {
         setLocal(STORAGE_KEYS.HOME_PAGE, data);
         return data as HomePageConfig;
       }
     } catch (e: any) {
-      console.warn('[CMS Service] getHomePageConfig API error:', e?.message || e);
-    }
-
-    if (isSupabaseConfigured()) {
-      try {
-        const { data } = await supabase.from('pages').select('*').eq('page_key', 'home').single();
-        if (data) {
-          return {
-            hero_heading: data.hero_heading || DEFAULT_HOME_PAGE.hero_heading,
-            hero_description: data.hero_description || DEFAULT_HOME_PAGE.hero_description,
-            buttons: data.buttons || DEFAULT_HOME_PAGE.buttons,
-            banner_url: data.banner_url || DEFAULT_HOME_PAGE.banner_url,
-            statistics: data.statistics || DEFAULT_HOME_PAGE.statistics,
-            feature_cards: data.feature_cards || DEFAULT_HOME_PAGE.feature_cards,
-            testimonials: data.testimonials || DEFAULT_HOME_PAGE.testimonials,
-            cta: data.cta || DEFAULT_HOME_PAGE.cta
-          };
-        }
-      } catch (e) {}
+      console.warn('[CMS Service] getHomePageConfig API warning:', e?.message || e);
     }
     return getLocal(STORAGE_KEYS.HOME_PAGE, DEFAULT_HOME_PAGE);
   },
 
   async saveHomePageConfig(config: HomePageConfig): Promise<boolean> {
     setLocal(STORAGE_KEYS.HOME_PAGE, config);
-
     try {
       await safeFetchJson('/api/cms/settings/home', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(config)
       });
+      return true;
     } catch (e: any) {
-      console.error('Failed to post home config to server store:', e?.message || e);
+      console.error('Failed to save home config via Express API:', e?.message || e);
+      return false;
     }
-
-    if (isSupabaseConfigured()) {
-      try {
-        await supabase.from('pages').upsert({
-          page_key: 'home',
-          title: 'Home Page Configuration',
-          hero_heading: config.hero_heading,
-          hero_description: config.hero_description,
-          buttons: config.buttons,
-          banner_url: config.banner_url,
-          statistics: config.statistics,
-          feature_cards: config.feature_cards,
-          testimonials: config.testimonials,
-          cta: config.cta,
-          updated_at: new Date().toISOString()
-        });
-      } catch (e) {}
-    }
-    return true;
   },
 
   // --- PROJECTS ---
   async getProjects(): Promise<ProjectItem[]> {
     try {
-      const data = await safeFetchJson<ProjectItem[]>('/api/cms/projects');
-      if (Array.isArray(data) && data.length > 0) {
-        setLocal(STORAGE_KEYS.PROJECTS, data);
-        return data as ProjectItem[];
+      const data = await safeFetchJson<any[]>('/api/cms/projects');
+      if (Array.isArray(data)) {
+        const normalized: ProjectItem[] = data.map((p: any) => ({
+          id: String(p.id),
+          title: p.title || 'Untitled Project',
+          category: p.category || 'General',
+          description: p.description || '',
+          fullDescription: p.full_description || p.fullDescription || p.description || '',
+          toolsUsed: p.tools_used || p.toolsUsed || [],
+          imagePlaceholder: p.image_url || p.imagePlaceholder || 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=1200&q=80',
+          galleryUrls: p.gallery_urls || p.galleryUrls || [],
+          kpis: Array.isArray(p.kpis) ? p.kpis : [],
+          featured: Boolean(p.featured),
+          published: p.published !== false,
+          githubUrl: p.github_url || p.githubUrl,
+          liveDemoUrl: p.live_demo_url || p.liveDemoUrl,
+          youtubeUrl: p.youtube_url || p.youtubeUrl,
+          tags: p.tags || [],
+          displayOrder: p.display_order ?? p.displayOrder,
+          created_at: p.created_at
+        }));
+        setLocal(STORAGE_KEYS.PROJECTS, normalized);
+        return normalized;
       }
     } catch (e: any) {
       console.warn('[CMS Service] getProjects API warning:', e?.message || e);
-    }
-
-    if (isSupabaseConfigured()) {
-      try {
-        const { data } = await supabase.from('projects').select('*').order('created_at', { ascending: false });
-        if (data && data.length > 0) {
-          return data.map(p => ({
-            id: p.id,
-            title: p.title,
-            category: p.category,
-            description: p.description,
-            fullDescription: p.full_description || p.description,
-            toolsUsed: p.tools_used || [],
-            imagePlaceholder: p.image_url || 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=1200&q=80',
-            galleryUrls: p.gallery_urls || [],
-            kpis: p.kpis || [],
-            featured: p.featured,
-            published: p.published !== false,
-            githubUrl: p.github_url,
-            liveDemoUrl: p.live_demo_url,
-            youtubeUrl: p.youtube_url,
-            tags: p.tags || [],
-            created_at: p.created_at
-          }));
-        }
-      } catch (e) {}
     }
     return getLocal(STORAGE_KEYS.PROJECTS, PROJECTS);
   },
@@ -439,33 +370,11 @@ export const cmsService = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(project)
       });
+      return true;
     } catch (e: any) {
       console.warn('[CMS Service] saveProject API warning:', e?.message || e);
+      return false;
     }
-
-    if (isSupabaseConfigured()) {
-      try {
-        await supabase.from('projects').upsert({
-          id: project.id.includes('-') && project.id.length > 20 ? project.id : undefined,
-          title: project.title,
-          category: project.category,
-          description: project.description,
-          full_description: project.fullDescription,
-          tools_used: project.toolsUsed,
-          image_url: project.imagePlaceholder,
-          gallery_urls: project.galleryUrls || [],
-          kpis: project.kpis,
-          featured: project.featured,
-          published: project.published !== false,
-          github_url: project.githubUrl,
-          live_demo_url: project.liveDemoUrl,
-          youtube_url: project.youtubeUrl,
-          tags: project.tags || [],
-          updated_at: new Date().toISOString()
-        });
-      } catch (e) {}
-    }
-    return true;
   },
 
   async deleteProject(id: string): Promise<boolean> {
@@ -475,52 +384,41 @@ export const cmsService = {
 
     try {
       await safeFetchJson(`/api/cms/projects/${id}`, { method: 'DELETE' });
+      return true;
     } catch (e: any) {
       console.warn('[CMS Service] deleteProject API warning:', e?.message || e);
+      return false;
     }
-
-    if (isSupabaseConfigured()) {
-      try {
-        await supabase.from('projects').delete().eq('id', id);
-      } catch (e) {}
-    }
-    return true;
   },
 
   // --- BLOGS ---
   async getBlogs(): Promise<BlogArticle[]> {
     try {
-      const data = await safeFetchJson<BlogArticle[]>('/api/cms/blogs');
-      if (Array.isArray(data) && data.length > 0) {
-        setLocal(STORAGE_KEYS.BLOGS, data);
-        return data as BlogArticle[];
+      const data = await safeFetchJson<any[]>('/api/cms/blogs');
+      if (Array.isArray(data)) {
+        const normalized: BlogArticle[] = data.map((b: any) => ({
+          id: String(b.id),
+          title: b.title || 'Untitled Article',
+          slug: b.slug || (b.title ? b.title.toLowerCase().replace(/[^a-z0-9]+/g, '-') : 'article'),
+          excerpt: b.excerpt || '',
+          content: b.content || '',
+          category: b.category || 'Data Analytics',
+          tags: b.tags || [],
+          date: b.date || (b.created_at ? new Date(b.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recent'),
+          readTime: b.read_time || b.readTime || '5 min read',
+          author: b.author || 'Shivam Singh',
+          imageUrl: b.featured_image || b.imageUrl || 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=800&q=80',
+          status: b.status || 'published',
+          scheduledAt: b.scheduled_at || b.scheduledAt,
+          metaTitle: b.meta_title || b.metaTitle,
+          metaDescription: b.meta_description || b.metaDescription,
+          created_at: b.created_at
+        }));
+        setLocal(STORAGE_KEYS.BLOGS, normalized);
+        return normalized;
       }
     } catch (e: any) {
       console.warn('[CMS Service] getBlogs API warning:', e?.message || e);
-    }
-
-    if (isSupabaseConfigured()) {
-      try {
-        const { data } = await supabase.from('blogs').select('*').order('created_at', { ascending: false });
-        if (data && data.length > 0) {
-          return data.map(b => ({
-            id: b.id,
-            title: b.title,
-            slug: b.slug,
-            excerpt: b.excerpt,
-            content: b.content,
-            category: b.category,
-            tags: b.tags || [],
-            date: new Date(b.created_at || Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-            readTime: b.read_time || '5 min read',
-            author: b.author || 'Shivam Singh',
-            imageUrl: b.featured_image || 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=800&q=80',
-            status: b.status || 'published',
-            scheduledAt: b.scheduled_at,
-            created_at: b.created_at
-          }));
-        }
-      } catch (e) {}
     }
     return getLocal(STORAGE_KEYS.BLOGS, BLOG_ARTICLES);
   },
@@ -543,31 +441,11 @@ export const cmsService = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(blog)
       });
+      return true;
     } catch (e: any) {
       console.warn('[CMS Service] saveBlog API warning:', e?.message || e);
+      return false;
     }
-
-    if (isSupabaseConfigured()) {
-      try {
-        const slug = blog.slug || blog.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-        await supabase.from('blogs').upsert({
-          id: blog.id.includes('-') && blog.id.length > 20 ? blog.id : undefined,
-          title: blog.title,
-          slug,
-          excerpt: blog.excerpt,
-          content: blog.content,
-          category: blog.category,
-          tags: blog.tags || [],
-          featured_image: blog.imageUrl,
-          author: blog.author,
-          read_time: blog.readTime,
-          status: blog.status || 'published',
-          scheduled_at: blog.scheduledAt,
-          updated_at: new Date().toISOString()
-        });
-      } catch (e) {}
-    }
-    return true;
   },
 
   async deleteBlog(id: string): Promise<boolean> {
@@ -577,55 +455,42 @@ export const cmsService = {
 
     try {
       await safeFetchJson(`/api/cms/blogs/${id}`, { method: 'DELETE' });
+      return true;
     } catch (e: any) {
       console.warn('[CMS Service] deleteBlog API warning:', e?.message || e);
+      return false;
     }
-
-    if (isSupabaseConfigured()) {
-      try {
-        await supabase.from('blogs').delete().eq('id', id);
-      } catch (e) {}
-    }
-    return true;
   },
 
   // --- COURSES / LEARN TOPICS ---
   async getCourses(): Promise<LearnTopic[]> {
     try {
-      const data = await safeFetchJson<LearnTopic[]>('/api/cms/courses');
-      if (Array.isArray(data) && data.length > 0) {
-        setLocal(STORAGE_KEYS.COURSES, data);
-        return data as LearnTopic[];
+      const data = await safeFetchJson<any[]>('/api/cms/courses');
+      if (Array.isArray(data)) {
+        const normalized: LearnTopic[] = data.map((c: any) => ({
+          id: String(c.id),
+          title: c.title || 'Untitled Course',
+          slug: c.slug || (c.title ? c.title.toLowerCase().replace(/[^a-z0-9]+/g, '-') : 'course'),
+          icon: c.icon || 'BarChart3',
+          level: c.level || 'All Levels',
+          description: c.description || '',
+          modulesCount: c.modules_count ?? c.modulesCount ?? 5,
+          duration: c.duration || '5 Hours',
+          keyTakeaways: c.key_takeaways || c.keyTakeaways || [],
+          syllabus: Array.isArray(c.syllabus) ? c.syllabus : (Array.isArray(c.curriculum) ? c.curriculum : []),
+          thumbnail: c.thumbnail || c.thumbnail_url,
+          videoUrl: c.video_url || c.videoUrl,
+          pdfUrl: c.pdf_url || c.pdfUrl,
+          category: c.category || 'Data Analytics',
+          published: c.published !== false,
+          resources: c.resources || [],
+          created_at: c.created_at
+        }));
+        setLocal(STORAGE_KEYS.COURSES, normalized);
+        return normalized;
       }
     } catch (e: any) {
       console.warn('[CMS Service] getCourses API warning:', e?.message || e);
-    }
-
-    if (isSupabaseConfigured()) {
-      try {
-        const { data } = await supabase.from('courses').select('*').order('created_at', { ascending: false });
-        if (data && data.length > 0) {
-          return data.map(c => ({
-            id: c.id,
-            title: c.title,
-            slug: c.slug,
-            icon: c.icon || 'BarChart3',
-            level: c.level || 'All Levels',
-            description: c.description,
-            modulesCount: c.modules_count || 5,
-            duration: c.duration || '5 Hours',
-            keyTakeaways: c.key_takeaways || [],
-            syllabus: c.syllabus || [],
-            thumbnail: c.thumbnail,
-            videoUrl: c.video_url,
-            pdfUrl: c.pdf_url,
-            category: c.category,
-            published: c.published !== false,
-            resources: c.resources || [],
-            created_at: c.created_at
-          }));
-        }
-      } catch (e) {}
     }
     return getLocal(STORAGE_KEYS.COURSES, LEARN_TOPICS);
   },
@@ -648,35 +513,11 @@ export const cmsService = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(course)
       });
+      return true;
     } catch (e: any) {
       console.warn('[CMS Service] saveCourse API warning:', e?.message || e);
+      return false;
     }
-
-    if (isSupabaseConfigured()) {
-      try {
-        const slug = course.slug || course.title.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-        await supabase.from('courses').upsert({
-          id: course.id.includes('-') && course.id.length > 20 ? course.id : undefined,
-          title: course.title,
-          slug,
-          icon: course.icon,
-          level: course.level,
-          description: course.description,
-          category: course.category || 'Data Analytics',
-          thumbnail: course.thumbnail,
-          video_url: course.videoUrl,
-          pdf_url: course.pdfUrl,
-          modules_count: course.modulesCount,
-          duration: course.duration,
-          key_takeaways: course.keyTakeaways,
-          syllabus: course.syllabus,
-          resources: course.resources || [],
-          published: course.published !== false,
-          updated_at: new Date().toISOString()
-        });
-      } catch (e) {}
-    }
-    return true;
   },
 
   async deleteCourse(id: string): Promise<boolean> {
@@ -686,50 +527,37 @@ export const cmsService = {
 
     try {
       await safeFetchJson(`/api/cms/courses/${id}`, { method: 'DELETE' });
+      return true;
     } catch (e: any) {
       console.warn('[CMS Service] deleteCourse API warning:', e?.message || e);
+      return false;
     }
-
-    if (isSupabaseConfigured()) {
-      try {
-        await supabase.from('courses').delete().eq('id', id);
-      } catch (e) {}
-    }
-    return true;
   },
 
   // --- YOUTUBE VIDEOS ---
   async getVideos(): Promise<YouTubeVideo[]> {
     try {
-      const data = await safeFetchJson<YouTubeVideo[]>('/api/cms/videos');
-      if (Array.isArray(data) && data.length > 0) {
-        setLocal(STORAGE_KEYS.VIDEOS, data);
-        return data as YouTubeVideo[];
+      const data = await safeFetchJson<any[]>('/api/cms/videos');
+      if (Array.isArray(data)) {
+        const normalized: YouTubeVideo[] = data.map((v: any) => ({
+          id: String(v.id),
+          title: v.title || 'Untitled Video',
+          description: v.description || '',
+          thumbnail: v.thumbnail || '',
+          duration: v.duration || '10:00',
+          views: v.views || (v.views_count ? `${v.views_count} views` : '1K views'),
+          url: v.youtube_url || v.url || '',
+          youtubeId: v.youtube_id || v.youtubeId || '',
+          category: v.category || 'Power BI',
+          playlist: v.playlist,
+          tags: v.tags || [],
+          created_at: v.created_at
+        }));
+        setLocal(STORAGE_KEYS.VIDEOS, normalized);
+        return normalized;
       }
     } catch (e: any) {
       console.warn('[CMS Service] getVideos API warning:', e?.message || e);
-    }
-
-    if (isSupabaseConfigured()) {
-      try {
-        const { data } = await supabase.from('videos').select('*').order('created_at', { ascending: false });
-        if (data && data.length > 0) {
-          return data.map(v => ({
-            id: v.id,
-            title: v.title,
-            description: v.description || '',
-            thumbnail: v.thumbnail,
-            duration: v.duration || '10:00',
-            views: v.views || '1K views',
-            url: v.youtube_url,
-            youtubeId: v.youtube_id,
-            category: v.category,
-            playlist: v.playlist,
-            tags: v.tags || [],
-            created_at: v.created_at
-          }));
-        }
-      } catch (e) {}
     }
     return getLocal(STORAGE_KEYS.VIDEOS, YOUTUBE_VIDEOS);
   },
@@ -752,28 +580,11 @@ export const cmsService = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(video)
       });
+      return true;
     } catch (e: any) {
       console.warn('[CMS Service] saveVideo API warning:', e?.message || e);
+      return false;
     }
-
-    if (isSupabaseConfigured()) {
-      try {
-        await supabase.from('videos').upsert({
-          id: video.id.includes('-') && video.id.length > 20 ? video.id : undefined,
-          title: video.title,
-          description: video.description,
-          youtube_url: video.url,
-          youtube_id: video.youtubeId || 'video-id',
-          thumbnail: video.thumbnail,
-          duration: video.duration,
-          views: video.views,
-          category: video.category || 'Power BI',
-          playlist: video.playlist,
-          tags: video.tags || []
-        });
-      } catch (e) {}
-    }
-    return true;
   },
 
   async deleteVideo(id: string): Promise<boolean> {
@@ -783,55 +594,39 @@ export const cmsService = {
 
     try {
       await safeFetchJson(`/api/cms/videos/${id}`, { method: 'DELETE' });
+      return true;
     } catch (e: any) {
       console.warn('[CMS Service] deleteVideo API warning:', e?.message || e);
+      return false;
     }
-
-    if (isSupabaseConfigured()) {
-      try {
-        await supabase.from('videos').delete().eq('id', id);
-      } catch (e) {}
-    }
-    return true;
   },
 
   // --- CONTACT MESSAGES / REAL ENQUIRIES ---
   async getMessages(): Promise<ContactMessage[]> {
     try {
-      const data = await safeFetchJson<ContactMessage[]>('/api/cms/messages');
+      const data = await safeFetchJson<any[]>('/api/cms/messages');
       if (Array.isArray(data)) {
-        setLocal(STORAGE_KEYS.MESSAGES, data);
-        return data as ContactMessage[];
+        const normalized: ContactMessage[] = data.map((m: any) => ({
+          id: String(m.id || ('msg-' + m.created_at)),
+          name: m.name || '',
+          email: m.email || '',
+          phone: m.phone || m.phone_number || '',
+          course_interested: m.course_interested || m.course || '',
+          subject: m.subject || '',
+          message: m.message || '',
+          status: m.status || 'new',
+          admin_notes: m.admin_notes || '',
+          reply_message: m.reply_message || '',
+          replied_at: m.replied_at || '',
+          reply_status: m.reply_status || (m.status === 'replied' ? 'sent' : 'none'),
+          email_sent_status: m.email_sent_status || '',
+          created_at: m.created_at || new Date().toISOString()
+        }));
+        setLocal(STORAGE_KEYS.MESSAGES, normalized);
+        return normalized;
       }
     } catch (e: any) {
-      console.warn('Failed to fetch backend messages:', e?.message || e);
-    }
-
-    if (isSupabaseConfigured()) {
-      try {
-        const { data, error } = await supabase.from('messages').select('*').order('created_at', { ascending: false });
-        if (!error && data) {
-          const sbMsgs: ContactMessage[] = data.map((m: any) => ({
-            id: String(m.id || ('msg-' + m.created_at)),
-            name: m.name || '',
-            email: m.email || '',
-            phone: m.phone || m.phone_number || '',
-            course_interested: m.course_interested || m.course || '',
-            subject: m.subject || '',
-            message: m.message || '',
-            status: m.status || 'new',
-            admin_notes: m.admin_notes || '',
-            reply_message: m.reply_message || '',
-            replied_at: m.replied_at || '',
-            reply_status: m.reply_status || (m.status === 'replied' ? 'sent' : 'none'),
-            email_sent_status: m.email_sent_status || '',
-            created_at: m.created_at || new Date().toISOString()
-          }));
-          return sbMsgs;
-        }
-      } catch (e) {
-        console.error('Error fetching messages from Supabase:', e);
-      }
+      console.warn('Failed to fetch messages via Express API:', e?.message || e);
     }
     return getLocal<ContactMessage[]>(STORAGE_KEYS.MESSAGES, []);
   },
@@ -845,7 +640,7 @@ export const cmsService = {
     message: string;
   }): Promise<{ success: boolean; error?: string }> {
     try {
-      const responseData = await safeFetchJson<{ message?: ContactMessage }>('/api/cms/messages', {
+      const responseData = await safeFetchJson<{ success?: boolean; message?: ContactMessage; error?: string }>('/api/cms/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(msg)
@@ -856,39 +651,9 @@ export const cmsService = {
       }
       return { success: true };
     } catch (e: any) {
-      console.error('Backend submission failed:', e?.message || e);
+      console.error('Contact submission error:', e?.message || e);
+      return { success: false, error: e?.message || 'Failed to submit contact message' };
     }
-
-    const newMsg: ContactMessage = {
-      id: 'msg-' + Date.now(),
-      name: msg.name,
-      email: msg.email,
-      phone: msg.phone,
-      course_interested: msg.course_interested || '',
-      subject: msg.subject || '',
-      message: msg.message,
-      status: 'new',
-      created_at: new Date().toISOString()
-    };
-
-    const list = getLocal<ContactMessage[]>(STORAGE_KEYS.MESSAGES, []);
-    setLocal(STORAGE_KEYS.MESSAGES, [newMsg, ...list]);
-
-    if (isSupabaseConfigured()) {
-      try {
-        await supabase.from('messages').insert({
-          name: msg.name,
-          email: msg.email,
-          phone: msg.phone,
-          course_interested: msg.course_interested || null,
-          subject: msg.subject || null,
-          message: msg.message,
-          status: 'new'
-        });
-      } catch (e) {}
-    }
-
-    return { success: true };
   },
 
   async sendReplyMessage(
@@ -897,7 +662,7 @@ export const cmsService = {
     replySubject?: string
   ): Promise<{ success: boolean; message: string }> {
     try {
-      const data = await safeFetchJson<{ message?: string }>(`/api/cms/messages/${id}/reply`, {
+      const data = await safeFetchJson<{ success?: boolean; message?: string }>(`/api/cms/messages/${id}/reply`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -908,9 +673,8 @@ export const cmsService = {
       return { success: true, message: data.message || 'Reply sent successfully.' };
     } catch (e: any) {
       console.error('API reply failed:', e?.message || e);
+      return { success: false, message: e?.message || 'Failed to send reply via server endpoint.' };
     }
-
-    return { success: false, message: 'Failed to send reply via server endpoint.' };
   },
 
   async updateMessageStatus(id: string, status: ContactMessage['status'], adminNotes?: string): Promise<boolean> {
@@ -920,41 +684,31 @@ export const cmsService = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status, adminNotes })
       });
+      const list = await this.getMessages();
+      const idx = list.findIndex(m => m.id === id);
+      if (idx >= 0) {
+        list[idx].status = status;
+        if (adminNotes !== undefined) list[idx].admin_notes = adminNotes;
+        setLocal(STORAGE_KEYS.MESSAGES, list);
+      }
+      return true;
     } catch (e: any) {
-      console.warn('Failed to update message status:', e?.message || e);
+      console.warn('Failed to update message status via API:', e?.message || e);
+      return false;
     }
-
-    const list = await this.getMessages();
-    const idx = list.findIndex(m => m.id === id);
-    if (idx >= 0) {
-      list[idx].status = status;
-      if (adminNotes !== undefined) list[idx].admin_notes = adminNotes;
-      setLocal(STORAGE_KEYS.MESSAGES, list);
-    }
-    if (isSupabaseConfigured()) {
-      try {
-        await supabase.from('messages').update({ status, admin_notes: adminNotes }).eq('id', id);
-      } catch (e) {}
-    }
-    return true;
   },
 
   async deleteMessage(id: string): Promise<boolean> {
     try {
       await safeFetchJson(`/api/cms/messages/${id}`, { method: 'DELETE' });
+      const list = await this.getMessages();
+      const filtered = list.filter(m => m.id !== id);
+      setLocal(STORAGE_KEYS.MESSAGES, filtered);
+      return true;
     } catch (e: any) {
-      console.warn('Failed to delete message:', e?.message || e);
+      console.warn('Failed to delete message via API:', e?.message || e);
+      return false;
     }
-
-    const list = await this.getMessages();
-    const filtered = list.filter(m => m.id !== id);
-    setLocal(STORAGE_KEYS.MESSAGES, filtered);
-    if (isSupabaseConfigured()) {
-      try {
-        await supabase.from('messages').delete().eq('id', id);
-      } catch (e) {}
-    }
-    return true;
   },
 
   // --- NEWSLETTER SUBSCRIBERS ---
@@ -966,23 +720,21 @@ export const cmsService = {
         return data as NewsletterSubscriber[];
       }
     } catch (e: any) {
-      console.warn('Failed to fetch subscribers:', e?.message || e);
+      console.warn('Failed to fetch subscribers via Express API:', e?.message || e);
     }
-
     return getLocal<NewsletterSubscriber[]>(STORAGE_KEYS.NEWSLETTER, []);
   },
 
   async subscribeNewsletter(email: string): Promise<{ success: boolean; message: string }> {
     try {
-      const data = await safeFetchJson<{ message?: string }>('/api/newsletter', {
+      const data = await safeFetchJson<{ success?: boolean; message?: string }>('/api/newsletter', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email })
       });
-      await this.getNewsletterSubscribers();
       return { success: true, message: data.message || 'Successfully subscribed!' };
     } catch (e: any) {
-      console.warn('Failed to subscribe via API:', e?.message || e);
+      console.warn('Newsletter subscription API error:', e?.message || e);
       throw e;
     }
   },
@@ -990,14 +742,14 @@ export const cmsService = {
   async deleteSubscriber(id: string): Promise<boolean> {
     try {
       await safeFetchJson(`/api/cms/subscribers/${id}`, { method: 'DELETE' });
+      const list = await this.getNewsletterSubscribers();
+      const filtered = list.filter(s => s.id !== id);
+      setLocal(STORAGE_KEYS.NEWSLETTER, filtered);
+      return true;
     } catch (e: any) {
-      console.warn('Failed to delete subscriber:', e?.message || e);
+      console.warn('Failed to delete subscriber via API:', e?.message || e);
+      return false;
     }
-
-    const list = await this.getNewsletterSubscribers();
-    const filtered = list.filter(s => s.id !== id);
-    setLocal(STORAGE_KEYS.NEWSLETTER, filtered);
-    return true;
   },
 
   // --- EMAIL CAMPAIGNS ---
@@ -1006,9 +758,8 @@ export const cmsService = {
       const data = await safeFetchJson<{ count?: number; providerConfigured?: boolean }>('/api/admin/email-campaigns/audience-count');
       return { count: data.count || 0, providerConfigured: Boolean(data.providerConfigured) };
     } catch (e: any) {
-      console.warn('Failed to fetch audience count:', e?.message || e);
+      console.warn('Failed to fetch audience count via API:', e?.message || e);
     }
-
     const subs = await this.getNewsletterSubscribers();
     const activeCount = subs.filter(s => s.status === 'active').length;
     return { count: activeCount, providerConfigured: false };
@@ -1022,16 +773,8 @@ export const cmsService = {
         return data as EmailCampaign[];
       }
     } catch (e: any) {
-      console.warn('Failed to fetch campaigns:', e?.message || e);
+      console.warn('Failed to fetch campaigns via API:', e?.message || e);
     }
-
-    if (isSupabaseConfigured()) {
-      try {
-        const { data } = await supabase.from('email_campaigns').select('*').order('created_at', { ascending: false });
-        if (data && data.length > 0) return data as EmailCampaign[];
-      } catch (e) {}
-    }
-
     return getLocal<EmailCampaign[]>(STORAGE_KEYS.CAMPAIGNS, []);
   },
 
@@ -1039,16 +782,15 @@ export const cmsService = {
     try {
       return await safeFetchJson(`/api/admin/email-campaigns/${id}`);
     } catch (e: any) {
-      console.warn(`Failed to fetch campaign ${id}:`, e?.message || e);
+      console.warn(`Failed to fetch campaign ${id} via API:`, e?.message || e);
     }
-
     const campaigns = await this.getCampaigns();
     return campaigns.find(c => c.id === id) || null;
   },
 
   async saveCampaign(campaign: Partial<EmailCampaign>): Promise<{ success: boolean; campaign?: EmailCampaign }> {
     try {
-      const data = await safeFetchJson<{ campaign?: EmailCampaign }>('/api/admin/email-campaigns', {
+      const data = await safeFetchJson<{ success?: boolean; campaign?: EmailCampaign }>('/api/admin/email-campaigns', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(campaign)
@@ -1062,7 +804,7 @@ export const cmsService = {
         return { success: true, campaign: data.campaign };
       }
     } catch (e: any) {
-      console.warn('Failed to save campaign:', e?.message || e);
+      console.warn('Failed to save campaign via API:', e?.message || e);
     }
 
     const fullCampaign: EmailCampaign = {
@@ -1087,12 +829,6 @@ export const cmsService = {
     else list.unshift(fullCampaign);
     setLocal(STORAGE_KEYS.CAMPAIGNS, list);
 
-    if (isSupabaseConfigured()) {
-      try {
-        await supabase.from('email_campaigns').upsert(fullCampaign);
-      } catch (e) {}
-    }
-
     return { success: true, campaign: fullCampaign };
   },
 
@@ -1100,19 +836,11 @@ export const cmsService = {
     try {
       await safeFetchJson(`/api/admin/email-campaigns/${id}`, { method: 'DELETE' });
     } catch (e: any) {
-      console.warn('Failed to delete campaign:', e?.message || e);
+      console.warn('Failed to delete campaign via API:', e?.message || e);
     }
-
     const list = await this.getCampaigns();
     const filtered = list.filter(c => c.id !== id);
     setLocal(STORAGE_KEYS.CAMPAIGNS, filtered);
-
-    if (isSupabaseConfigured()) {
-      try {
-        await supabase.from('email_campaigns').delete().eq('id', id);
-      } catch (e) {}
-    }
-
     return true;
   },
 
@@ -1147,20 +875,21 @@ export const cmsService = {
   // --- SOCIAL LINKS ---
   async getSocialLinks(): Promise<SocialLinkItem[]> {
     try {
-      const data = await safeFetchJson<SocialLinkItem[]>('/api/cms/social');
-      if (Array.isArray(data) && data.length > 0) {
-        setLocal(STORAGE_KEYS.SOCIAL_LINKS, data);
-        return data as SocialLinkItem[];
+      const data = await safeFetchJson<any[]>('/api/cms/social');
+      if (Array.isArray(data)) {
+        const normalized: SocialLinkItem[] = data.map((s: any) => ({
+          id: String(s.id),
+          platform: s.platform || 'youtube',
+          url: s.url || '',
+          icon: s.icon || 'Youtube',
+          is_active: s.is_active !== false,
+          display_order: s.display_order ?? 0
+        }));
+        setLocal(STORAGE_KEYS.SOCIAL_LINKS, normalized);
+        return normalized;
       }
     } catch (e: any) {
       console.warn('Social links fetch warning:', e?.message || e);
-    }
-
-    if (isSupabaseConfigured()) {
-      try {
-        const { data } = await supabase.from('social_links').select('*').order('display_order', { ascending: true });
-        if (data && data.length > 0) return data as SocialLinkItem[];
-      } catch (e) {}
     }
     return getLocal(STORAGE_KEYS.SOCIAL_LINKS, DEFAULT_SOCIAL_LINKS);
   },
@@ -1183,74 +912,48 @@ export const cmsService = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updated)
       });
+      return true;
     } catch (e: any) {
       console.warn('Failed to save social links via API:', e?.message || e);
+      return false;
     }
-
-    if (isSupabaseConfigured()) {
-      try {
-        await supabase.from('social_links').upsert({
-          id: item.id.length > 20 ? item.id : undefined,
-          platform: item.platform,
-          url: item.url,
-          icon: item.icon,
-          is_active: item.is_active,
-          display_order: item.display_order
-        });
-      } catch (e) {}
-    }
-    return true;
   },
 
   // --- NAVIGATION ---
   async getNavigation(): Promise<NavigationItem[]> {
     try {
-      const data = await safeFetchJson<NavigationItem[]>('/api/cms/navigation');
-      if (Array.isArray(data) && data.length > 0) {
-        setLocal(STORAGE_KEYS.NAVIGATION, data);
-        return data as NavigationItem[];
+      const data = await safeFetchJson<any[]>('/api/cms/navigation');
+      if (Array.isArray(data)) {
+        const normalized: NavigationItem[] = data.map((n: any) => ({
+          id: String(n.id),
+          label: n.label || '',
+          path: n.path || '',
+          icon: n.icon || 'Home',
+          display_order: n.display_order ?? 0,
+          is_visible: n.is_visible !== false
+        }));
+        setLocal(STORAGE_KEYS.NAVIGATION, normalized);
+        return normalized;
       }
     } catch (e: any) {
       console.warn('Navigation fetch warning:', e?.message || e);
-    }
-
-    if (isSupabaseConfigured()) {
-      try {
-        const { data } = await supabase.from('navigation').select('*').order('display_order', { ascending: true });
-        if (data && data.length > 0) return data as NavigationItem[];
-      } catch (e) {}
     }
     return getLocal(STORAGE_KEYS.NAVIGATION, DEFAULT_NAVIGATION);
   },
 
   async saveNavigation(items: NavigationItem[]): Promise<boolean> {
     setLocal(STORAGE_KEYS.NAVIGATION, items);
-
     try {
       await safeFetchJson('/api/cms/navigation', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(items)
       });
+      return true;
     } catch (e: any) {
       console.warn('Failed to save navigation via API:', e?.message || e);
+      return false;
     }
-
-    if (isSupabaseConfigured()) {
-      try {
-        for (const nav of items) {
-          await supabase.from('navigation').upsert({
-            id: nav.id.length > 20 ? nav.id : undefined,
-            label: nav.label,
-            path: nav.path,
-            icon: nav.icon,
-            display_order: nav.display_order,
-            is_visible: nav.is_visible
-          });
-        }
-      } catch (e) {}
-    }
-    return true;
   },
 
   async getMedia(): Promise<MediaItem[]> {
@@ -1299,20 +1002,29 @@ export const cmsService = {
 
   async getMediaItems(): Promise<MediaItem[]> {
     try {
-      const data = await safeFetchJson<MediaItem[]>('/api/cms/media');
+      const data = await safeFetchJson<any[]>('/api/cms/media');
       if (Array.isArray(data)) {
-        setLocal(STORAGE_KEYS.MEDIA, data);
-        return data as MediaItem[];
+        const normalized: MediaItem[] = data.map((m: any) => ({
+          id: String(m.id),
+          filename: m.filename || 'asset',
+          original_filename: m.original_filename || m.filename,
+          storage_path: m.storage_path,
+          public_url: m.public_url || m.url || '',
+          url: m.url || m.public_url || '',
+          size_bytes: m.size_bytes || m.file_size || 0,
+          file_size: m.file_size || m.size_bytes || 0,
+          mime_type: m.mime_type || 'image/png',
+          alt_text: m.alt_text || m.filename,
+          category: m.category || m.folder || 'general',
+          folder: m.folder || m.category || 'general',
+          uploaded_at: m.uploaded_at || m.created_at || new Date().toISOString(),
+          created_at: m.created_at || new Date().toISOString()
+        }));
+        setLocal(STORAGE_KEYS.MEDIA, normalized);
+        return normalized;
       }
     } catch (e: any) {
       console.warn('Media fetch warning:', e?.message || e);
-    }
-
-    if (isSupabaseConfigured()) {
-      try {
-        const { data } = await supabase.from('media').select('*').order('created_at', { ascending: false });
-        if (data) return data as MediaItem[];
-      } catch (e) {}
     }
     return getLocal(STORAGE_KEYS.MEDIA, DEFAULT_MEDIA);
   },
@@ -1327,7 +1039,7 @@ export const cmsService = {
     setLocal(STORAGE_KEYS.MEDIA, [newItem, ...list]);
 
     try {
-      const resData = await safeFetchJson<{ media?: MediaItem }>('/api/cms/media', {
+      const resData = await safeFetchJson<{ success?: boolean; media?: MediaItem }>('/api/cms/media', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newItem)
@@ -1335,19 +1047,6 @@ export const cmsService = {
       if (resData && resData.media) return resData.media as MediaItem;
     } catch (e: any) {
       console.warn('Add media item API warning:', e?.message || e);
-    }
-
-    if (isSupabaseConfigured()) {
-      try {
-        const { data } = await supabase.from('media').insert({
-          filename: item.filename,
-          url: item.url,
-          size_bytes: item.size_bytes,
-          mime_type: item.mime_type,
-          folder: item.folder
-        }).select().single();
-        if (data) return data as MediaItem;
-      } catch (e) {}
     }
     return newItem;
   },
@@ -1377,20 +1076,20 @@ export const cmsService = {
   // --- CATEGORIES ---
   async getCategories(): Promise<CategoryItem[]> {
     try {
-      const data = await safeFetchJson<CategoryItem[]>('/api/cms/categories');
-      if (Array.isArray(data) && data.length > 0) {
-        setLocal(STORAGE_KEYS.CATEGORIES, data);
-        return data as CategoryItem[];
+      const data = await safeFetchJson<any[]>('/api/cms/categories');
+      if (Array.isArray(data)) {
+        const normalized: CategoryItem[] = data.map((c: any) => ({
+          id: String(c.id),
+          name: c.name || '',
+          type: c.type || 'project',
+          slug: c.slug || (c.name ? c.name.toLowerCase().replace(/[^a-z0-9]+/g, '-') : 'category'),
+          description: c.description || ''
+        }));
+        setLocal(STORAGE_KEYS.CATEGORIES, normalized);
+        return normalized;
       }
     } catch (e: any) {
       console.warn('Categories fetch warning:', e?.message || e);
-    }
-
-    if (isSupabaseConfigured()) {
-      try {
-        const { data } = await supabase.from('categories').select('*');
-        if (data && data.length > 0) return data as CategoryItem[];
-      } catch (e) {}
     }
     return getLocal(STORAGE_KEYS.CATEGORIES, DEFAULT_CATEGORIES);
   },
@@ -1413,22 +1112,11 @@ export const cmsService = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(cat)
       });
+      return true;
     } catch (e: any) {
       console.warn('Failed to save category via API:', e?.message || e);
+      return false;
     }
-
-    if (isSupabaseConfigured()) {
-      try {
-        await supabase.from('categories').upsert({
-          id: cat.id.length > 20 ? cat.id : undefined,
-          name: cat.name,
-          type: cat.type,
-          slug: cat.slug || cat.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-          description: cat.description
-        });
-      } catch (e) {}
-    }
-    return true;
   },
 
   async deleteCategory(id: string): Promise<boolean> {
@@ -1438,16 +1126,11 @@ export const cmsService = {
 
     try {
       await safeFetchJson(`/api/cms/categories/${id}`, { method: 'DELETE' });
+      return true;
     } catch (e: any) {
       console.warn('Failed to delete category via API:', e?.message || e);
+      return false;
     }
-
-    if (isSupabaseConfigured()) {
-      try {
-        await supabase.from('categories').delete().eq('id', id);
-      } catch (e) {}
-    }
-    return true;
   },
 
   // --- FULL DATABASE BACKUP & RESTORE ---

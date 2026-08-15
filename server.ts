@@ -188,7 +188,64 @@ interface AdminSession {
   expiresAt: number;
 }
 
+// In-memory cache for ultra-fast lookup and token revocation tracking
 const adminSessions = new Map<string, AdminSession>();
+const revokedSessions = new Set<string>();
+
+// Ephemeral fallback key generated per server process instance if no explicit secret key is set in environment
+const EPHEMERAL_SERVER_KEY = crypto.randomBytes(32).toString('hex');
+
+function getSessionSecret(): string {
+  return (process.env.ADMIN_PASSKEY || process.env.SUPABASE_SECRET_KEY || process.env.SESSION_SECRET || EPHEMERAL_SERVER_KEY).trim();
+}
+
+function createSignedSessionToken(email: string, maxAgeMs: number = 24 * 60 * 60 * 1000): string {
+  const cleanEmail = (email || 'admin@probitian.com').toLowerCase().trim();
+  const payload = {
+    email: cleanEmail,
+    createdAt: Date.now(),
+    expiresAt: Date.now() + maxAgeMs,
+    nonce: crypto.randomBytes(16).toString('hex')
+  };
+  const payloadStr = Buffer.from(JSON.stringify(payload)).toString('base64url');
+  const hmac = crypto.createHmac('sha256', getSessionSecret());
+  hmac.update(payloadStr);
+  const sig = hmac.digest('base64url');
+  return `${payloadStr}.${sig}`;
+}
+
+function verifySignedSessionToken(token: string): AdminSession | null {
+  if (!token || typeof token !== 'string' || !token.includes('.')) return null;
+  const parts = token.split('.');
+  if (parts.length !== 2) return null;
+  const [payloadStr, sig] = parts;
+  if (!payloadStr || !sig) return null;
+
+  try {
+    const hmac = crypto.createHmac('sha256', getSessionSecret());
+    hmac.update(payloadStr);
+    const expectedSig = hmac.digest('base64url');
+
+    const sigBuf = Buffer.from(sig);
+    const expBuf = Buffer.from(expectedSig);
+    if (sigBuf.length !== expBuf.length || !crypto.timingSafeEqual(sigBuf, expBuf)) {
+      return null;
+    }
+
+    const payload = JSON.parse(Buffer.from(payloadStr, 'base64url').toString('utf-8'));
+    if (!payload || !payload.email || !payload.expiresAt) return null;
+    if (Date.now() > payload.expiresAt) return null;
+
+    return {
+      token,
+      email: payload.email,
+      createdAt: payload.createdAt || Date.now(),
+      expiresAt: payload.expiresAt
+    };
+  } catch (e) {
+    return null;
+  }
+}
 
 function getAdminCookieHeader(token: string, req: express.Request, maxAgeSeconds: number = 86400): string {
   const isHttps = req.secure || 
@@ -227,16 +284,25 @@ function getAdminSession(req: express.Request): AdminSession | null {
   const token = cookies['admin_session'];
 
   if (!token) return null;
+  if (revokedSessions.has(token)) return null;
 
   const session = adminSessions.get(token);
-  if (!session) return null;
-
-  if (Date.now() > session.expiresAt) {
-    adminSessions.delete(token);
-    return null;
+  if (session) {
+    if (Date.now() > session.expiresAt) {
+      adminSessions.delete(token);
+      return null;
+    }
+    return session;
   }
 
-  return session;
+  // Stateless cryptographic fallback for multi-instance / Cloud Run deployments
+  const verified = verifySignedSessionToken(token);
+  if (verified) {
+    adminSessions.set(token, verified);
+    return verified;
+  }
+
+  return null;
 }
 
 function requireAdmin(req: express.Request, res: express.Response, next: express.NextFunction) {
@@ -266,7 +332,16 @@ function createRateLimiter(options: RateLimitOptions) {
   }, 5 * 60 * 1000);
 
   return (req: express.Request, res: express.Response, next: express.NextFunction) => {
-    const ip = (req.ip || (req.socket && req.socket.remoteAddress) || 'unknown').trim();
+    const forwarded = req.headers['x-forwarded-for'];
+    let rawIp = '';
+    if (typeof forwarded === 'string') {
+      rawIp = forwarded.split(',')[0].trim();
+    } else if (Array.isArray(forwarded) && forwarded.length > 0) {
+      rawIp = forwarded[0].trim();
+    } else {
+      rawIp = (req.ip || (req.socket && req.socket.remoteAddress) || 'unknown').trim();
+    }
+    const ip = rawIp || 'unknown';
     const now = Date.now();
     const record = requests.get(ip);
 
@@ -295,9 +370,6 @@ const emailTestLimiter = createRateLimiter({ windowMs: 15 * 60 * 1000, max: 10, 
 const emailSendLimiter = createRateLimiter({ windowMs: 15 * 60 * 1000, max: 5, message: 'Too many campaign broadcasts requested. Please try again later.' });
 
 // ==================== SIGNED UNSUBSCRIBE TOKENS ====================
-// Ephemeral fallback key generated per server process instance if no explicit secret key is set in environment
-const EPHEMERAL_SERVER_KEY = crypto.randomBytes(32).toString('hex');
-
 function getUnsubscribeSecret(): string {
   return (process.env.ADMIN_PASSKEY || process.env.SUPABASE_SECRET_KEY || process.env.UNSUBSCRIBE_SECRET || EPHEMERAL_SERVER_KEY).trim();
 }
@@ -541,12 +613,16 @@ function writeCmsData(data: any) {
 async function getGA4AccessToken(clientEmail: string, privateKey: string): Promise<string> {
   const header = { alg: 'RS256', typ: 'JWT' };
   const now = Math.floor(Date.now() / 1000);
+  const safeSkew = 60; // 60s tolerance for clock drift
+  const iat = now - safeSkew;
+  const exp = iat + 3600; // Strictly 3600s lifetime from iat per Google OAuth RFC 7523
+
   const claimSet = {
     iss: clientEmail,
     scope: 'https://www.googleapis.com/auth/analytics.readonly',
     aud: 'https://oauth2.googleapis.com/token',
-    exp: now + 3600,
-    iat: now - 60,
+    exp,
+    iat,
   };
 
   const base64Url = (str: string) =>
@@ -626,7 +702,7 @@ app.post('/api/admin/verify-passkey', loginLimiter, (req, res) => {
       }
     }
 
-    const token = crypto.randomBytes(32).toString('hex');
+    const token = createSignedSessionToken(adminEmail);
     const expiresAt = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
 
     adminSessions.set(token, {
@@ -723,7 +799,7 @@ app.post('/api/admin/verify-supabase-session', loginLimiter, async (req, res) =>
       return res.status(403).json({ error: 'Forbidden: Account does not have administrator privileges' });
     }
 
-    const token = crypto.randomBytes(32).toString('hex');
+    const token = createSignedSessionToken(userEmail);
     const expiresAt = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
 
     adminSessions.set(token, {
@@ -756,6 +832,7 @@ app.post('/api/admin/logout', (req, res) => {
   const token = cookies['admin_session'];
   if (token) {
     adminSessions.delete(token);
+    revokedSessions.add(token);
   }
   res.setHeader('Set-Cookie', getAdminCookieHeader('', req, 0));
   return res.json({ success: true });
@@ -1435,14 +1512,14 @@ app.get('/api/cms/courses', async (req, res) => {
   if (serverSupabase) {
     try {
       const { data, error } = await serverSupabase.from('courses').select('*').order('created_at', { ascending: false });
-      if (!error && Array.isArray(data) && data.length > 0) {
-        return res.json(data);
-      }
       if (error) {
-        console.warn('[CMS Courses Read Warning]', error.message);
+        console.error('[CMS Courses Read Error]', error.message);
+        return res.status(503).json({ error: 'Database service unavailable' });
       }
+      return res.json(Array.isArray(data) ? data : []);
     } catch (err: any) {
-      console.warn('[CMS Courses Read Exception]', err?.message || err);
+      console.error('[CMS Courses Read Exception]', err);
+      return res.status(503).json({ error: 'Database service unavailable' });
     }
   }
   const data = readCmsData();
@@ -1548,14 +1625,14 @@ app.get('/api/cms/videos', async (req, res) => {
   if (serverSupabase) {
     try {
       const { data, error } = await serverSupabase.from('videos').select('*').order('created_at', { ascending: false });
-      if (!error && Array.isArray(data) && data.length > 0) {
-        return res.json(data);
-      }
       if (error) {
-        console.warn('[CMS Videos Read Warning]', error.message);
+        console.error('[CMS Videos Read Error]', error.message);
+        return res.status(503).json({ error: 'Database service unavailable' });
       }
+      return res.json(Array.isArray(data) ? data : []);
     } catch (err: any) {
-      console.warn('[CMS Videos Read Exception]', err?.message || err);
+      console.error('[CMS Videos Read Exception]', err);
+      return res.status(503).json({ error: 'Database service unavailable' });
     }
   }
   const data = readCmsData();
@@ -1656,14 +1733,14 @@ app.get('/api/cms/messages', requireAdmin, async (req, res) => {
   if (serverSupabase) {
     try {
       const { data, error } = await serverSupabase.from('messages').select('*').order('created_at', { ascending: false });
-      if (!error && Array.isArray(data)) {
-        return res.json(data);
-      }
       if (error) {
-        console.warn('[CMS Messages Read Warning]', error.message);
+        console.error('[CMS Messages Read Error]', error.message);
+        return res.status(503).json({ error: 'Database service unavailable' });
       }
+      return res.json(Array.isArray(data) ? data : []);
     } catch (err: any) {
-      console.warn('[CMS Messages Read Exception]', err?.message || err);
+      console.error('[CMS Messages Read Exception]', err);
+      return res.status(503).json({ error: 'Database service unavailable' });
     }
   }
   const data = readCmsData();
@@ -1892,14 +1969,14 @@ app.get('/api/cms/subscribers', requireAdmin, async (req, res) => {
   if (serverSupabase) {
     try {
       const { data, error } = await serverSupabase.from('newsletter').select('*').order('created_at', { ascending: false });
-      if (!error && Array.isArray(data)) {
-        return res.json(data);
-      }
       if (error) {
-        console.warn('[Subscribers Read Warning]', error.message);
+        console.error('[Subscribers Read Error]', error.message);
+        return res.status(503).json({ error: 'Database service unavailable' });
       }
+      return res.json(Array.isArray(data) ? data : []);
     } catch (err: any) {
-      console.warn('[Subscribers Read Exception]', err?.message || err);
+      console.error('[Subscribers Read Exception]', err);
+      return res.status(503).json({ error: 'Database service unavailable' });
     }
   }
   const data = readCmsData();
@@ -2239,12 +2316,17 @@ app.post('/api/admin/email-campaigns/:id/test', requireAdmin, emailTestLimiter, 
 
   if (serverSupabase) {
     try {
-      const { data: sbCamp } = await serverSupabase.from('email_campaigns').select('*').eq('id', id).single();
-      if (sbCamp) campaign = sbCamp;
-    } catch (e) {}
-  }
-
-  if (!campaign) {
+      const { data: sbCamp, error: campErr } = await serverSupabase.from('email_campaigns').select('*').eq('id', id).maybeSingle();
+      if (campErr) {
+        console.error('[Test Email DB Error]', campErr.message);
+        return res.status(503).json({ success: false, message: 'Database service unavailable' });
+      }
+      campaign = sbCamp;
+    } catch (e: any) {
+      console.error('[Test Email DB Exception]', e);
+      return res.status(503).json({ success: false, message: 'Database service unavailable' });
+    }
+  } else {
     const data = readCmsData();
     campaign = (data.campaigns || []).find((c: any) => c.id === id);
   }
@@ -2416,11 +2498,14 @@ app.get('/api/cms/social', async (req, res) => {
   if (serverSupabase) {
     try {
       const { data, error } = await serverSupabase.from('social_links').select('*').order('display_order', { ascending: true });
-      if (!error && data) {
-        return res.json(data);
+      if (error) {
+        console.error('[Supabase GET Social Error]', error.message);
+        return res.status(503).json({ error: 'Database service unavailable' });
       }
+      return res.json(data || []);
     } catch (err) {
-      console.warn('[Supabase GET Social Warning]', err);
+      console.error('[Supabase GET Social Exception]', err);
+      return res.status(503).json({ error: 'Database service unavailable' });
     }
   }
   const data = readCmsData();
@@ -2437,7 +2522,11 @@ app.post('/api/cms/social', requireAdmin, async (req, res) => {
   if (serverSupabase) {
     try {
       for (const link of links) {
-        await serverSupabase.from('social_links').upsert(link);
+        const { error: upsertErr } = await serverSupabase.from('social_links').upsert(link);
+        if (upsertErr) {
+          console.error('[Supabase POST Social Item Error]', upsertErr.message);
+          return res.status(500).json({ error: 'Failed to update social link' });
+        }
       }
       return res.json({ success: true, links });
     } catch (err) {
@@ -2458,11 +2547,14 @@ app.get('/api/cms/navigation', async (req, res) => {
   if (serverSupabase) {
     try {
       const { data, error } = await serverSupabase.from('navigation').select('*').order('display_order', { ascending: true });
-      if (!error && data) {
-        return res.json(data);
+      if (error) {
+        console.error('[Supabase GET Navigation Error]', error.message);
+        return res.status(503).json({ error: 'Database service unavailable' });
       }
+      return res.json(data || []);
     } catch (err) {
-      console.warn('[Supabase GET Navigation Warning]', err);
+      console.error('[Supabase GET Navigation Exception]', err);
+      return res.status(503).json({ error: 'Database service unavailable' });
     }
   }
   const data = readCmsData();
@@ -2479,7 +2571,11 @@ app.post('/api/cms/navigation', requireAdmin, async (req, res) => {
   if (serverSupabase) {
     try {
       for (const item of navItems) {
-        await serverSupabase.from('navigation').upsert(item);
+        const { error: upsertErr } = await serverSupabase.from('navigation').upsert(item);
+        if (upsertErr) {
+          console.error('[Supabase POST Navigation Item Error]', upsertErr.message);
+          return res.status(500).json({ error: 'Failed to update navigation item' });
+        }
       }
       return res.json({ success: true, navigation: navItems });
     } catch (err) {
@@ -2500,14 +2596,14 @@ app.get('/api/cms/media', requireAdmin, async (req, res) => {
   if (serverSupabase) {
     try {
       const { data, error } = await serverSupabase.from('media').select('*').order('created_at', { ascending: false });
-      if (!error && Array.isArray(data)) {
-        return res.json(data);
-      }
       if (error) {
-        console.warn('[Media Read Warning]', error.message);
+        console.error('[Media Read Error]', error.message);
+        return res.status(503).json({ error: 'Database service unavailable' });
       }
+      return res.json(Array.isArray(data) ? data : []);
     } catch (err: any) {
-      console.warn('[Media Read Exception]', err?.message || err);
+      console.error('[Media Read Exception]', err);
+      return res.status(503).json({ error: 'Database service unavailable' });
     }
   }
   const data = readCmsData();
@@ -2605,7 +2701,7 @@ app.post(
     }
 
     const mediaRecord = {
-      id: 'm-' + Date.now() + '-' + crypto.randomBytes(3).toString('hex'),
+      id: crypto.randomUUID(),
       filename: safeFilename,
       original_filename: filename,
       storage_path: storagePath,
@@ -2666,8 +2762,9 @@ app.post('/api/cms/media', requireAdmin, uploadLimiter, async (req, res) => {
   }
 
   const cleanFilename = (mediaItem.filename || 'asset').replace(/[^a-zA-Z0-9_.-]/g, '_');
+  const validUuid = isValidUuid(mediaItem.id);
   const itemWithId = {
-    id: mediaItem.id || ('m-' + Date.now()),
+    id: validUuid ? mediaItem.id : crypto.randomUUID(),
     filename: cleanFilename,
     original_filename: mediaItem.original_filename || mediaItem.filename || 'asset',
     storage_path: mediaItem.storage_path || '',
@@ -2710,7 +2807,7 @@ app.delete('/api/cms/media/:id', requireAdmin, async (req, res) => {
   let storagePathToDelete: string | null = null;
   let targetUrl: string | null = null;
 
-  if (serverSupabase) {
+  if (serverSupabase && isValidUuid(id)) {
     try {
       const { data: dbItem } = await serverSupabase.from('media').select('*').eq('id', id).maybeSingle();
       if (dbItem) {
@@ -2751,7 +2848,7 @@ app.delete('/api/cms/media/:id', requireAdmin, async (req, res) => {
     }
   }
 
-  if (serverSupabase) {
+  if (serverSupabase && isValidUuid(id)) {
     try {
       const { error: dbErr } = await serverSupabase.from('media').delete().eq('id', id);
       if (dbErr) {
@@ -2761,12 +2858,13 @@ app.delete('/api/cms/media/:id', requireAdmin, async (req, res) => {
     } catch (e) {
       return res.status(500).json({ error: 'Failed to delete media record' });
     }
-  } else {
-    const cmsData = readCmsData();
-    if (cmsData.media) {
-      cmsData.media = cmsData.media.filter((m: any) => m.id !== id);
-      writeCmsData(cmsData);
-    }
+  }
+
+  // Always keep local fallback in sync
+  const cmsData = readCmsData();
+  if (cmsData.media) {
+    cmsData.media = cmsData.media.filter((m: any) => m.id !== id);
+    writeCmsData(cmsData);
   }
 
   return res.json({ success: true });
@@ -2777,11 +2875,14 @@ app.get('/api/cms/categories', async (req, res) => {
   if (serverSupabase) {
     try {
       const { data, error } = await serverSupabase.from('categories').select('*');
-      if (!error && data) {
-        return res.json(data);
+      if (error) {
+        console.error('[Supabase GET Categories Error]', error.message);
+        return res.status(503).json({ error: 'Database service unavailable' });
       }
+      return res.json(data || []);
     } catch (err) {
-      console.warn('[Supabase GET Categories Warning]', err);
+      console.error('[Supabase GET Categories Exception]', err);
+      return res.status(503).json({ error: 'Database service unavailable' });
     }
   }
   const data = readCmsData();
@@ -2797,10 +2898,14 @@ app.post('/api/cms/categories', requireAdmin, async (req, res) => {
 
   if (serverSupabase) {
     try {
-      await serverSupabase.from('categories').upsert(cat);
+      const { error } = await serverSupabase.from('categories').upsert(cat);
+      if (error) {
+        console.error('[Supabase POST Category Error]', error.message);
+        return res.status(500).json({ error: 'Failed to save category' });
+      }
       return res.json({ success: true, category: cat });
     } catch (err) {
-      console.error('[Supabase POST Category Error]', err);
+      console.error('[Supabase POST Category Exception]', err);
       return res.status(500).json({ error: 'Failed to save category' });
     }
   }
@@ -2827,10 +2932,14 @@ app.delete('/api/cms/categories/:id', requireAdmin, async (req, res) => {
 
   if (serverSupabase) {
     try {
-      await serverSupabase.from('categories').delete().eq('id', id);
+      const { error } = await serverSupabase.from('categories').delete().eq('id', id);
+      if (error) {
+        console.error('[Supabase DELETE Category Error]', error.message);
+        return res.status(500).json({ error: 'Failed to delete category' });
+      }
       return res.json({ success: true });
     } catch (err) {
-      console.error('[Supabase DELETE Category Error]', err);
+      console.error('[Supabase DELETE Category Exception]', err);
       return res.status(500).json({ error: 'Failed to delete category' });
     }
   }
