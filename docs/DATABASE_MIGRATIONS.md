@@ -62,7 +62,7 @@ When schema modifications are required:
 3. **Back Up Production Data**: Export a full JSON database snapshot from the Admin Control Center (**Backup & Restore** module) prior to applying schema changes.
 4. **Apply Migration**: Execute the SQL migration script in the Supabase SQL Editor.
 5. **Verify Schema**: Confirm column types, default values, foreign keys, and indexes in the Supabase Dashboard.
-6. **Verify Permissions & RLS**: Ensure `GRANT ALL ON ALL TABLES IN SCHEMA public TO service_role;` is executed for newly created tables.
+6. **Verify Permissions & RLS**: Ensure `GRANT ALL ON ALL TABLES IN SCHEMA public TO service_role;` is executed for newly created tables (this applies strictly to backend `service_role` and keeps `anon`/`authenticated` locked down under RLS).
 7. **Test Application Endpoints**: Test Express backend API routes against the updated schema.
 8. **Record Migration Status**: Document the applied migration timestamp and version in deployment logs.
 9. **Never Run Destructive Startup Operations**: Application startup (`server.ts`) must **NEVER** drop tables, clear data, or run destructive resets on boot.

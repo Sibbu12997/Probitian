@@ -31,7 +31,7 @@ This document outlines the step-by-step production deployment workflow for ProBi
         ├── If Schema Updated: Create new migration in `supabase/migrations/`
         ├── Review SQL for idempotency (CREATE IF NOT EXISTS, ADD COLUMN IF NOT EXISTS)
         ├── Apply SQL in Supabase Dashboard SQL Editor
-        ├── Execute Grants (`GRANT ALL ON ALL TABLES IN SCHEMA public TO service_role;`)
+        ├── Execute Grants (`GRANT ALL ON ALL TABLES IN SCHEMA public TO service_role;` for backend API only)
         └── Verify RLS and Table Permissions
         ↓
 5. API & SYSTEM SMOKE TESTS

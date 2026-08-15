@@ -30,6 +30,7 @@ Official Communication Email: [probitianofficial@gmail.com](mailto:probitianoffi
   GRANT ALL ON ALL TABLES IN SCHEMA public TO service_role;
   GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO service_role;
   ```
+  *(Note: This grants access strictly to the backend `service_role` and does not expose tables to public `anon` or `authenticated` roles, which are governed strictly by Row-Level Security).*
 - **Prevention**: Always include explicit `GRANT ALL` statements in migration scripts that create new database tables.
 
 ---

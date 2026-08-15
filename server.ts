@@ -332,16 +332,8 @@ function createRateLimiter(options: RateLimitOptions) {
   }, 5 * 60 * 1000);
 
   return (req: express.Request, res: express.Response, next: express.NextFunction) => {
-    const forwarded = req.headers['x-forwarded-for'];
-    let rawIp = '';
-    if (typeof forwarded === 'string') {
-      rawIp = forwarded.split(',')[0].trim();
-    } else if (Array.isArray(forwarded) && forwarded.length > 0) {
-      rawIp = forwarded[0].trim();
-    } else {
-      rawIp = (req.ip || (req.socket && req.socket.remoteAddress) || 'unknown').trim();
-    }
-    const ip = rawIp || 'unknown';
+    // Express with 'trust proxy' configured securely resolves req.ip from trusted upstream headers.
+    const ip = (req.ip || (req.socket && req.socket.remoteAddress) || 'unknown').trim();
     const now = Date.now();
     const record = requests.get(ip);
 
@@ -785,11 +777,10 @@ app.post('/api/admin/verify-supabase-session', loginLimiter, async (req, res) =>
       }
     }
 
-    // 3. Check Supabase app_metadata / user_metadata role
+    // 3. Check Supabase app_metadata role (set strictly by server/admin, never user_metadata)
     if (!isAuthorizedAdmin) {
       const appRole = verifiedUser.app_metadata?.role;
-      const userRole = verifiedUser.user_metadata?.role;
-      if (appRole === 'admin' || userRole === 'admin') {
+      if (appRole === 'admin') {
         isAuthorizedAdmin = true;
       }
     }

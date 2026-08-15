@@ -47,7 +47,7 @@ The frontend application (`src/lib/analytics.ts`) automatically emits standard p
 
 ## 4. Admin GA4 Command Center Dashboard
 
-The Admin Control Center (`#/admin`) includes an integrated GA4 Analytics Command Center module (`/api/admin/ga4/*`):
+The Admin Control Center (`#/admin`) includes an integrated GA4 Analytics Command Center module (`/api/analytics/status`, `/api/analytics/realtime`, `/api/analytics/report`):
 
 - **Real-Time Active Visitors**: Live active session count.
 - **Audience Metrics**: Total users, new users, sessions, average engagement time, and bounce rate.

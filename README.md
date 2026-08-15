@@ -118,7 +118,7 @@ Email services run server-side using **Nodemailer** over **Gmail SMTP**:
 
 - **Platform**: Google Analytics 4 (GA4).
 - **Measurement ID**: Configured via `VITE_GA4_MEASUREMENT_ID`.
-- **Server API**: Express proxies GA4 Data API calls (`/api/admin/ga4/*`) to render visitor traffic charts, top pages, country distribution, and conversion event counters directly inside the Admin Portal.
+- **Server API**: Express proxies GA4 Data API calls (`/api/analytics/status`, `/api/analytics/realtime`, `/api/analytics/report`) to render visitor traffic charts, top pages, country distribution, and conversion event counters directly inside the Admin Portal.
 
 ---
 
@@ -241,7 +241,7 @@ npm start
 2. Review migration SQL for destructive actions.
 3. Test migration on a staging environment or backup database.
 4. Execute SQL in Supabase Dashboard SQL Editor or via Supabase CLI.
-5. Verify schema updates and grants (`GRANT ALL ON ALL TABLES IN SCHEMA public TO service_role;`).
+5. Verify schema updates and grants (`GRANT ALL ON ALL TABLES IN SCHEMA public TO service_role;`). *Note: This grant applies strictly to the backend `service_role` and does not grant public `anon` or `authenticated` clients permissions, which remain restricted under RLS.*
 6. Test application API handlers.
 7. Record migration completion status.
 
