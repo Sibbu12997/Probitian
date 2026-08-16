@@ -18,7 +18,7 @@ Welcome to the **ProBitian** contribution guidelines! We are excited that you ar
 10. [Database & Migration Rules](#10-database--migration-rules)
 11. [Educational Content Standards](#11-educational-content-standards)
 12. [Commit Guidelines](#12-commit-guidelines)
-13. [Issue Guidelines](#13-issue-guidelines)
+13. [Issues and Pull Requests](#13-issues-and-pull-requests)
 14. [Code of Conduct](#14-code-of-conduct)
 15. [Contributor Recognition](#15-contributor-recognition)
 
@@ -298,17 +298,29 @@ git commit -m "refactor: extract campaign recipient table into modular component
 
 ---
 
-## 13. Issue Guidelines
+## 13. Issues and Pull Requests
 
-We track bugs, feature requests, and educational proposals via GitHub Issues.
+We use GitHub Issues and Pull Requests to coordinate improvements, track bug fixes, and review educational content.
 
-### Issue Types
+### Working with Issues
 
-1. **Bug Reports**: Include clear steps to reproduce, expected behavior, actual behavior, browser/OS details, and error logs if applicable.
-2. **Feature Requests**: Outline the proposed capability, target user (Learner or Admin), and why it benefits the ProBitian ecosystem.
-3. **Educational Content Proposals**: Describe the course path, tutorial topic, or sample dataset to be added.
-4. **Documentation Issues**: Identify typos, outdated guides, or missing architectural details.
-5. **Security Reports**: Do NOT file public security issues. Refer to [SECURITY.md](SECURITY.md).
+- **Search Existing Issues First**: Before creating a new issue, search both open and closed issues to ensure your topic has not already been addressed or reported.
+- **Use the Appropriate Issue Template**: When creating an issue, select the matching template from [`.github/ISSUE_TEMPLATE/`](.github/ISSUE_TEMPLATE/):
+  - [**Bug Report**](.github/ISSUE_TEMPLATE/bug_report.md) (`[BUG]`): For defects, UI glitches, API failures, or broken workflows.
+  - [**Feature Request**](.github/ISSUE_TEMPLATE/feature_request.md) (`[FEATURE]`): For proposed learning modules, DAX recipes, analytics capabilities, or admin tooling.
+  - [**Documentation Issue**](.github/ISSUE_TEMPLATE/documentation.md) (`[DOCS]`): For corrections, clarifications, or expansions in manuals or architecture guides.
+  - [**Security Guidance**](.github/ISSUE_TEMPLATE/security.md) (`[SECURITY]`): Non-sensitive security documentation inquiries only.
+- **One Problem or Feature Per Issue**: Keep each issue focused on a single actionable problem or capability rather than bundling multiple unrelated topics.
+- **Provide Reproducible Technical Information**: For bug reports, include exact reproduction steps, affected URL/hash routes, browser/OS version, and DevTools console/network snippets where helpful.
+- **Never Publicly Disclose Security Vulnerabilities**: If you discover an authorization bypass, credential exposure, or exploit, **do NOT file a public issue**. Follow our private disclosure process in [SECURITY.md](SECURITY.md) by contacting [probitianofficial@gmail.com](mailto:probitianofficial@gmail.com).
+
+### Working with Pull Requests
+
+- **Use the PR Template**: Every pull request should fill out our [Pull Request Template](.github/pull_request_template.md).
+- **Explain What and Why**: Clearly state what changes were made, the architectural impact (frontend, Express, Supabase, GA4), and the reasoning behind the implementation.
+- **Document Testing & Verification**: Mention the specific tests performed and ensure both `npm run lint` (TypeScript validation) and `npm run build` (Vite + esbuild bundling) pass cleanly.
+- **Security-Sensitive Review**: Changes affecting authentication (`requireAdmin`), passkey issuance, Supabase RLS, SVG sanitization, CORS, or server environment variables undergo rigorous manual review before merging.
+- **Keep Documentation Synchronized**: Whenever modifying existing workflows, schemas, environment variables, or UI components, update the relevant user guides or architectural documentation in [`docs/`](docs/) within the same PR.
 
 ---
 

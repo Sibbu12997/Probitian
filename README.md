@@ -357,10 +357,22 @@ ProBitian is an open and collaborative learning ecosystem. We welcome thoughtful
 
 Whether you are fixing a bug, adding a Power BI DAX tutorial, refining SQL examples, improving UI accessibility, optimizing database queries, or translating documentation, your contributions help data practitioners around the world!
 
-- 📖 **Contributing Guide**: Read [CONTRIBUTING.md](CONTRIBUTING.md) for local development setup, code standards, database migration rules, educational content guidelines, and pull request requirements.
-- 🤝 **Code of Conduct**: Review [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for our community standards, respectful collaboration guidelines, and pledge.
-- 🛡️ **Security Policy**: Read [SECURITY.md](SECURITY.md) for responsible disclosure guidelines and private vulnerability reporting.
-- ⚖️ **License Information**: Review [LICENSE](LICENSE) for software licensing terms and trademark/educational content scope.
+### How to Engage
+
+- 🐛 **Bug Reports**: Encountered a defect or UI issue? Use our [Bug Report Template](.github/ISSUE_TEMPLATE/bug_report.md) to submit detailed reproduction steps and logs.
+- 💡 **Feature Requests**: Have an idea for a new course module, DAX recipe, or admin capability? Propose it with the [Feature Request Template](.github/ISSUE_TEMPLATE/feature_request.md).
+- 📝 **Documentation Contributions**: Notice a typo, missing architectural detail, or outdated guide? Submit a report via the [Documentation Issue Template](.github/ISSUE_TEMPLATE/documentation.md).
+- 🔀 **Pull Requests**: Ready to submit code or curriculum improvements? Follow the [Contributing Guide](CONTRIBUTING.md) and use our structured [Pull Request Template](.github/pull_request_template.md).
+- 🛡️ **Security Reporting**: Found a security vulnerability or credential risk? **Do NOT open a public issue.** Follow our private disclosure process in [SECURITY.md](SECURITY.md) by contacting [probitianofficial@gmail.com](mailto:probitianofficial@gmail.com).
+
+### Community Documents & Policies
+
+- 📖 **[CONTRIBUTING.md](CONTRIBUTING.md)**: Local development setup, code quality standards, Supabase migration rules, educational content guidelines, and PR workflow.
+- 🤝 **[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)**: Community pledge, behavioral standards, and respectful collaboration policies.
+- 🛡️ **[SECURITY.md](SECURITY.md)**: Responsible vulnerability disclosure procedures and private reporting channels.
+- ⚖️ **[LICENSE](LICENSE)**: MIT License for software source code and trademark/educational content scope.
+
+Please make sure to use the appropriate issue template in `.github/ISSUE_TEMPLATE/` when opening new issues on the repository.
 
 ---
 

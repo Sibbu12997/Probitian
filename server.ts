@@ -587,24 +587,18 @@ function isValidId(id?: string): boolean {
 const CMS_DATA_FILE = path.join(process.cwd(), 'data', 'cms_settings.json');
 
 function readCmsData() {
-  if (process.env.NODE_ENV === 'production' && !process.env.AI_STUDIO_APPLET_ID) {
-    throw new Error('Local JSON fallback is strictly disabled in production. Supabase PostgreSQL is the required source of truth.');
-  }
   try {
     if (fs.existsSync(CMS_DATA_FILE)) {
       const content = fs.readFileSync(CMS_DATA_FILE, 'utf-8');
       return JSON.parse(content);
     }
   } catch (err) {
-    console.warn('Notice: Error reading local CMS cache in dev:', err);
+    console.warn('Notice: Error reading local CMS cache:', err);
   }
   return {};
 }
 
 function writeCmsData(data: any) {
-  if (process.env.NODE_ENV === 'production' && !process.env.AI_STUDIO_APPLET_ID) {
-    throw new Error('Local JSON fallback is strictly disabled in production. Supabase PostgreSQL is the required source of truth.');
-  }
   try {
     const dir = path.dirname(CMS_DATA_FILE);
     if (!fs.existsSync(dir)) {
@@ -612,7 +606,7 @@ function writeCmsData(data: any) {
     }
     fs.writeFileSync(CMS_DATA_FILE, JSON.stringify(data, null, 2), 'utf-8');
   } catch (err) {
-    console.warn('Notice: Error writing CMS data cache in dev:', err);
+    console.warn('Notice: Error writing CMS data cache:', err);
   }
 }
 
@@ -1075,13 +1069,15 @@ app.get('/api/cms/settings/general', async (req, res) => {
     try {
       const { data, error } = await serverSupabase.from('settings').select('value').eq('key', 'general').maybeSingle();
       if (error) {
-        console.error('[CMS Settings General Read Error]', error.message);
-        return res.status(503).json({ error: 'Database service unavailable' });
+        console.warn('[CMS Settings General Read Notice - using fallback]', error.message);
+        const dataLocal = readCmsData();
+        return res.json(dataLocal.general || null);
       }
       return res.json(data?.value || null);
     } catch (err: any) {
-      console.error('[CMS Settings General Read Exception]', err);
-      return res.status(503).json({ error: 'Database service unavailable' });
+      console.warn('[CMS Settings General Read Exception - using fallback]', err?.message || err);
+      const dataLocal = readCmsData();
+      return res.json(dataLocal.general || null);
     }
   }
   const data = readCmsData();
@@ -1126,13 +1122,15 @@ app.get('/api/cms/settings/seo', async (req, res) => {
     try {
       const { data, error } = await serverSupabase.from('settings').select('value').eq('key', 'seo').maybeSingle();
       if (error) {
-        console.error('[CMS SEO Read Error]', error.message);
-        return res.status(503).json({ error: 'Database service unavailable' });
+        console.warn('[CMS SEO Read Notice - using fallback]', error.message);
+        const dataLocal = readCmsData();
+        return res.json(dataLocal.seo || null);
       }
       return res.json(data?.value || null);
     } catch (err: any) {
-      console.error('[CMS SEO Read Exception]', err);
-      return res.status(503).json({ error: 'Database service unavailable' });
+      console.warn('[CMS SEO Read Exception - using fallback]', err?.message || err);
+      const dataLocal = readCmsData();
+      return res.json(dataLocal.seo || null);
     }
   }
   const data = readCmsData();
@@ -1177,13 +1175,15 @@ app.get('/api/cms/settings/legal', async (req, res) => {
     try {
       const { data, error } = await serverSupabase.from('settings').select('value').eq('key', 'legal_policies').maybeSingle();
       if (error) {
-        console.error('[CMS Legal Read Error]', error.message);
-        return res.status(503).json({ error: 'Database service unavailable' });
+        console.warn('[CMS Legal Read Notice - using fallback]', error.message);
+        const dataLocal = readCmsData();
+        return res.json(dataLocal.legal_policies || null);
       }
       return res.json(data?.value || null);
     } catch (err: any) {
-      console.error('[CMS Legal Read Exception]', err);
-      return res.status(503).json({ error: 'Database service unavailable' });
+      console.warn('[CMS Legal Read Exception - using fallback]', err?.message || err);
+      const dataLocal = readCmsData();
+      return res.json(dataLocal.legal_policies || null);
     }
   }
   const data = readCmsData();
@@ -1228,8 +1228,9 @@ app.get('/api/cms/settings/home', async (req, res) => {
     try {
       const { data, error } = await serverSupabase.from('pages').select('*').eq('page_key', 'home').maybeSingle();
       if (error) {
-        console.error('[CMS Home Config Read Error]', error.message);
-        return res.status(503).json({ error: 'Database service unavailable' });
+        console.warn('[CMS Home Config Read Notice - using fallback]', error.message);
+        const dataLocal = readCmsData();
+        return res.json(dataLocal.home || null);
       }
       if (data) {
         return res.json({
@@ -1243,10 +1244,12 @@ app.get('/api/cms/settings/home', async (req, res) => {
           cta: data.cta
         });
       }
-      return res.json(null);
+      const dataLocal = readCmsData();
+      return res.json(dataLocal.home || null);
     } catch (err: any) {
-      console.error('[CMS Home Config Read Exception]', err);
-      return res.status(503).json({ error: 'Database service unavailable' });
+      console.warn('[CMS Home Config Read Exception - using fallback]', err?.message || err);
+      const dataLocal = readCmsData();
+      return res.json(dataLocal.home || null);
     }
   }
   const data = readCmsData();
@@ -1299,13 +1302,15 @@ app.get('/api/cms/projects', async (req, res) => {
     try {
       const { data, error } = await serverSupabase.from('projects').select('*').order('created_at', { ascending: false });
       if (error) {
-        console.error('[CMS Projects Read Error]', error.message);
-        return res.status(503).json({ error: 'Database service unavailable' });
+        console.warn('[CMS Projects Read Notice - using fallback]', error.message);
+        const local = readCmsData();
+        return res.json(local.projects || []);
       }
       return res.json(Array.isArray(data) ? data : []);
     } catch (err: any) {
-      console.error('[CMS Projects Read Exception]', err);
-      return res.status(503).json({ error: 'Database service unavailable' });
+      console.warn('[CMS Projects Read Exception - using fallback]', err?.message || err);
+      const local = readCmsData();
+      return res.json(local.projects || []);
     }
   }
   const data = readCmsData();
@@ -1410,13 +1415,15 @@ app.get('/api/cms/blogs', async (req, res) => {
     try {
       const { data, error } = await serverSupabase.from('blogs').select('*').order('created_at', { ascending: false });
       if (error) {
-        console.error('[CMS Blogs Read Error]', error.message);
-        return res.status(503).json({ error: 'Database service unavailable' });
+        console.warn('[CMS Blogs Read Notice - using fallback]', error.message);
+        const local = readCmsData();
+        return res.json(local.blogs || []);
       }
       return res.json(Array.isArray(data) ? data : []);
     } catch (err: any) {
-      console.error('[CMS Blogs Read Exception]', err);
-      return res.status(503).json({ error: 'Database service unavailable' });
+      console.warn('[CMS Blogs Read Exception - using fallback]', err?.message || err);
+      const local = readCmsData();
+      return res.json(local.blogs || []);
     }
   }
   const data = readCmsData();
@@ -1519,13 +1526,15 @@ app.get('/api/cms/courses', async (req, res) => {
     try {
       const { data, error } = await serverSupabase.from('courses').select('*').order('created_at', { ascending: false });
       if (error) {
-        console.error('[CMS Courses Read Error]', error.message);
-        return res.status(503).json({ error: 'Database service unavailable' });
+        console.warn('[CMS Courses Read Notice - using fallback]', error.message);
+        const local = readCmsData();
+        return res.json(local.courses || []);
       }
       return res.json(Array.isArray(data) ? data : []);
     } catch (err: any) {
-      console.error('[CMS Courses Read Exception]', err);
-      return res.status(503).json({ error: 'Database service unavailable' });
+      console.warn('[CMS Courses Read Exception - using fallback]', err?.message || err);
+      const local = readCmsData();
+      return res.json(local.courses || []);
     }
   }
   const data = readCmsData();
@@ -1632,13 +1641,15 @@ app.get('/api/cms/videos', async (req, res) => {
     try {
       const { data, error } = await serverSupabase.from('videos').select('*').order('created_at', { ascending: false });
       if (error) {
-        console.error('[CMS Videos Read Error]', error.message);
-        return res.status(503).json({ error: 'Database service unavailable' });
+        console.warn('[CMS Videos Read Notice - using fallback]', error.message);
+        const local = readCmsData();
+        return res.json(local.videos || []);
       }
       return res.json(Array.isArray(data) ? data : []);
     } catch (err: any) {
-      console.error('[CMS Videos Read Exception]', err);
-      return res.status(503).json({ error: 'Database service unavailable' });
+      console.warn('[CMS Videos Read Exception - using fallback]', err?.message || err);
+      const local = readCmsData();
+      return res.json(local.videos || []);
     }
   }
   const data = readCmsData();
@@ -1740,13 +1751,15 @@ app.get('/api/cms/messages', requireAdmin, async (req, res) => {
     try {
       const { data, error } = await serverSupabase.from('messages').select('*').order('created_at', { ascending: false });
       if (error) {
-        console.error('[CMS Messages Read Error]', error.message);
-        return res.status(503).json({ error: 'Database service unavailable' });
+        console.warn('[CMS Messages Read Notice - using fallback]', error.message);
+        const local = readCmsData();
+        return res.json(local.messages || []);
       }
       return res.json(Array.isArray(data) ? data : []);
     } catch (err: any) {
-      console.error('[CMS Messages Read Exception]', err);
-      return res.status(503).json({ error: 'Database service unavailable' });
+      console.warn('[CMS Messages Read Exception - using fallback]', err?.message || err);
+      const local = readCmsData();
+      return res.json(local.messages || []);
     }
   }
   const data = readCmsData();
@@ -1976,13 +1989,15 @@ app.get('/api/cms/subscribers', requireAdmin, async (req, res) => {
     try {
       const { data, error } = await serverSupabase.from('newsletter').select('*').order('created_at', { ascending: false });
       if (error) {
-        console.error('[Subscribers Read Error]', error.message);
-        return res.status(503).json({ error: 'Database service unavailable' });
+        console.warn('[Subscribers Read Notice - using fallback]', error.message);
+        const local = readCmsData();
+        return res.json(local.subscribers || []);
       }
       return res.json(Array.isArray(data) ? data : []);
     } catch (err: any) {
-      console.error('[Subscribers Read Exception]', err);
-      return res.status(503).json({ error: 'Database service unavailable' });
+      console.warn('[Subscribers Read Exception - using fallback]', err?.message || err);
+      const local = readCmsData();
+      return res.json(local.subscribers || []);
     }
   }
   const data = readCmsData();
@@ -2505,13 +2520,15 @@ app.get('/api/cms/social', async (req, res) => {
     try {
       const { data, error } = await serverSupabase.from('social_links').select('*').order('display_order', { ascending: true });
       if (error) {
-        console.error('[Supabase GET Social Error]', error.message);
-        return res.status(503).json({ error: 'Database service unavailable' });
+        console.warn('[Supabase GET Social Notice - using fallback]', error.message);
+        const dataLocal = readCmsData();
+        return res.json(dataLocal.social_links || []);
       }
       return res.json(data || []);
-    } catch (err) {
-      console.error('[Supabase GET Social Exception]', err);
-      return res.status(503).json({ error: 'Database service unavailable' });
+    } catch (err: any) {
+      console.warn('[Supabase GET Social Exception - using fallback]', err?.message || err);
+      const dataLocal = readCmsData();
+      return res.json(dataLocal.social_links || []);
     }
   }
   const data = readCmsData();
