@@ -10,7 +10,7 @@
 endobj
 4 0 obj
 <<
-/Length 5737
+/Length 5875
 >>
 stream
 0.200025 w
@@ -73,17 +73,24 @@ BT
 (Official Communication Email: probitianofficial@gmail.com) Tj
 ET
 BT
+/F1 10 Tf
+11.5 TL
+0.2 0.255 0.333 rg
+40. 625.8899999999999864 Td
+(Official LinkedIn: https://www.linkedin.com/company/probitian/) Tj
+ET
+BT
 /F2 13 Tf
 14.9499999999999993 TL
 0.118 0.161 0.231 rg
-40. 609.8899999999999864 Td
+40. 594.8899999999999864 Td
 (1. Introduction & Security Guidance) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-40. 597.8899999999999864 Td
+40. 582.8899999999999864 Td
 (The ProBitian Admin Control Center \(#/admin\) is a secure management portal for authorized administrators to control) Tj
 T* (website content, analyze GA4 traffic, manage contact inquiries, send email responses, maintain subscribers,) Tj
 T* (broadcast email campaigns, manage media assets, and configure brand settings.) Tj
@@ -92,21 +99,21 @@ BT
 /F2 11 Tf
 12.6499999999999986 TL
 0.278 0.333 0.412 rg
-40. 542.8899999999999864 Td
+40. 527.8899999999999864 Td
 (Critical Security Instructions) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 532.8899999999999864 Td
+48. 517.8899999999999864 Td
 (� **Never Share Credentials**: Do not share the Admin Passkey or login URL.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 517.8899999999999864 Td
+48. 502.8899999999999864 Td
 (� **Server-Side Secret Isolation**: Secret environment variables \(ADMIN_PASSKEY, SUPABASE_SECRET_KEY,) Tj
 T* (GMAIL_APP_PASSWORD, GEMINI_API_KEY\) must remain strictly server-side.) Tj
 ET
@@ -114,7 +121,7 @@ BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 489.8899999999999864 Td
+48. 474.8899999999999864 Td
 (� **No Client Secrets**: Never place server secrets in frontend code, git commits, README files, or public) Tj
 T* (documentation.) Tj
 ET
@@ -122,28 +129,28 @@ BT
 /F2 13 Tf
 14.9499999999999993 TL
 0.118 0.161 0.231 rg
-40. 445.8899999999999864 Td
+40. 430.8899999999999864 Td
 (2. Production Architecture Overview) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-40. 433.8899999999999864 Td
+40. 418.8899999999999864 Td
 (ProBitian utilizes a clean, server-side verified architecture:) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 418.8899999999999864 Td
+48. 403.8899999999999864 Td
 (� **Database**: Supabase PostgreSQL is the SINGLE authoritative source of truth.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 403.8899999999999864 Td
+48. 388.8899999999999864 Td
 (� **Media Storage**: Supabase Storage \(`probitian-media` bucket\) stores all uploaded images, PDFs, logos, and) Tj
 T* (banners.) Tj
 ET
@@ -151,63 +158,63 @@ BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 375.8899999999999864 Td
+48. 360.8899999999999864 Td
 (� **Email Delivery**: Server-side Express engine via **Gmail SMTP** \(`probitianofficial@gmail.com`\).) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 360.8899999999999864 Td
+48. 345.8899999999999864 Td
 (� **Analytics**: Google Analytics 4 \(GA4\) integration.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 345.8899999999999864 Td
+48. 330.8899999999999864 Td
 (� **Removed / Unused Infrastructure**: Firebase, Cloud SQL, Drizzle, and Resend are NOT used in production.) Tj
 ET
 BT
 /F2 13 Tf
 14.9499999999999993 TL
 0.118 0.161 0.231 rg
-40. 314.8899999999999864 Td
+40. 299.8899999999999864 Td
 (3. Admin Authentication & Access Control) Tj
 ET
 BT
 /F2 11 Tf
 12.6499999999999986 TL
 0.278 0.333 0.412 rg
-40. 294.8899999999999864 Td
+40. 279.8899999999999864 Td
 (Accessing the Admin Portal) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 284.8899999999999864 Td
+48. 269.8899999999999864 Td
 (1. Append #/admin to the website URL \(e.g., https://probitian.ai.studio/#/admin\).) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 269.8899999999999864 Td
+48. 254.8899999999999864 Td
 (2. Enter the authorized **Admin Passkey**.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 254.8899999999999864 Td
+48. 239.8899999999999864 Td
 (3. Click **Unlock Admin Portal**.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 239.8899999999999864 Td
+48. 224.8899999999999864 Td
 (4. The server validates the passkey via `POST /api/admin/verify-passkey` against) Tj
 T* (`process.env.ADMIN_PASSKEY` and issues an authenticated session token.) Tj
 ET
@@ -215,56 +222,56 @@ BT
 /F2 11 Tf
 12.6499999999999986 TL
 0.278 0.333 0.412 rg
-40. 197.8899999999999864 Td
+40. 182.8899999999999864 Td
 (Navigation Controls) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 187.8899999999999864 Td
+48. 172.8899999999999864 Td
 (� **Back to Website**: Returns to the public site without terminating the session.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 172.8899999999999864 Td
+48. 157.8899999999999864 Td
 (� **Logout**: Instantly clears the admin session token and redirects to the login screen.) Tj
 ET
 BT
 /F2 13 Tf
 14.9499999999999993 TL
 0.118 0.161 0.231 rg
-40. 141.8899999999999864 Td
+40. 126.8899999999999864 Td
 (4. Comprehensive Admin Modules Guide) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-40. 129.8899999999999864 Td
+40. 114.8899999999999864 Td
 (The Admin Portal contains integrated management modules:) Tj
 ET
 BT
 /F2 11 Tf
 12.6499999999999986 TL
 0.278 0.333 0.412 rg
-40. 100.8899999999999864 Td
+40. 85.8899999999999864 Td
 (1. Dashboard Overview) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 90.8899999999999864 Td
+48. 75.8899999999999864 Td
 (� **Function**: Command center summary and quick launchpad.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 75.8899999999999864 Td
+48. 60.8899999999999864 Td
 (� **Features**: KPI metrics \(Active Users Now, Today's Visitors, Pending Inquiries, Total Subscribers\), quick) Tj
 T* (shortcuts to core CMS actions, and recent activity logs.) Tj
 ET
@@ -1337,7 +1344,7 @@ endobj
 25 0 obj
 <<
 /Producer (jsPDF 4.2.1)
-/CreationDate (D:20260815135549-00'00')
+/CreationDate (D:20260816072636-00'00')
 >>
 endobj
 26 0 obj
@@ -1351,39 +1358,39 @@ endobj
 xref
 0 27
 0000000000 65535 f 
-0000023322 00000 n 
-0000025162 00000 n 
+0000023460 00000 n 
+0000025300 00000 n 
 0000000015 00000 n 
 0000000152 00000 n 
-0000005941 00000 n 
-0000006078 00000 n 
-0000012803 00000 n 
-0000012940 00000 n 
-0000019587 00000 n 
+0000006079 00000 n 
+0000006216 00000 n 
+0000012941 00000 n 
+0000013078 00000 n 
 0000019725 00000 n 
-0000023397 00000 n 
-0000023523 00000 n 
-0000023654 00000 n 
-0000023788 00000 n 
+0000019863 00000 n 
+0000023535 00000 n 
+0000023661 00000 n 
+0000023792 00000 n 
 0000023926 00000 n 
-0000024050 00000 n 
-0000024179 00000 n 
-0000024311 00000 n 
-0000024447 00000 n 
-0000024575 00000 n 
-0000024702 00000 n 
-0000024831 00000 n 
-0000024964 00000 n 
-0000025066 00000 n 
-0000025415 00000 n 
-0000025501 00000 n 
+0000024064 00000 n 
+0000024188 00000 n 
+0000024317 00000 n 
+0000024449 00000 n 
+0000024585 00000 n 
+0000024713 00000 n 
+0000024840 00000 n 
+0000024969 00000 n 
+0000025102 00000 n 
+0000025204 00000 n 
+0000025553 00000 n 
+0000025639 00000 n 
 trailer
 <<
 /Size 27
 /Root 26 0 R
 /Info 25 0 R
-/ID [ <40AFE3102C2DD62E2031D38D8CA88B35> <40AFE3102C2DD62E2031D38D8CA88B35> ]
+/ID [ <F180D1075D9C4FC6005C938BBBA72B4B> <F180D1075D9C4FC6005C938BBBA72B4B> ]
 >>
 startxref
-25605
+25743
 %%EOF

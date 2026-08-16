@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { NavPage } from '../types';
-import { Youtube, Instagram, Facebook, Github, Mail, ArrowUpRight, Send, CheckCircle2 } from 'lucide-react';
+import { Youtube, Instagram, Facebook, Github, Linkedin, Mail, ArrowUpRight, Send, CheckCircle2 } from 'lucide-react';
 import { trackSocialClick, trackContactClick, trackCtaClick, trackNewsletterSubscribe } from '../lib/analytics';
 import { cmsService } from '../services/cmsService';
 
@@ -123,6 +123,16 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
                 aria-label="GitHub Profile"
               >
                 <Github className="w-4 h-4" />
+              </a>
+              <a
+                href="https://www.linkedin.com/company/probitian/"
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => trackSocialClick('linkedin', 'https://www.linkedin.com/company/probitian/')}
+                className="p-2.5 rounded-xl bg-slate-800 hover:bg-blue-600/20 hover:text-blue-400 text-slate-300 border border-slate-700/60 transition-all"
+                aria-label="LinkedIn Company Page"
+              >
+                <Linkedin className="w-4 h-4" />
               </a>
               <a
                 href={`mailto:${contactEmail}`}

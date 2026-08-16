@@ -15,43 +15,35 @@ import {
   MediaItem,
   CategoryItem
 } from '../types';
-import { LegalSettings } from '../data/defaultLegalData';
+import { LegalSettings, DEFAULT_LEGAL_SETTINGS } from '../data/defaultLegalData';
 
 /**
  * Safe fetch helper for Express API routes (Single source of truth: Supabase via Express)
  */
-async function safeFetchJson<T = any>(url: string, options?: RequestInit): Promise<T> {
-  const fetchOptions: RequestInit = {
-    credentials: 'include',
-    ...options,
-    headers: {
-      ...options?.headers
-    }
-  };
-  const response = await fetch(url, fetchOptions);
-  const contentType = response.headers.get('content-type') || '';
-
-  if (!response.ok) {
-    let errorText = '';
-    if (contentType.includes('application/json')) {
-      try {
-        const json = await response.json();
-        errorText = json.error || JSON.stringify(json);
-      } catch (e) {
-        errorText = await response.text();
+async function safeFetchJson<T = any>(url: string, options?: RequestInit): Promise<T | null> {
+  try {
+    const fetchOptions: RequestInit = {
+      credentials: 'include',
+      ...options,
+      headers: {
+        ...options?.headers
       }
-    } else {
-      errorText = await response.text();
+    };
+    const response = await fetch(url, fetchOptions);
+    const contentType = response.headers.get('content-type') || '';
+
+    if (!response.ok) {
+      return null;
     }
-    throw new Error(`API ${response.status} (${url}): ${errorText.slice(0, 300)}`);
-  }
 
-  if (!contentType.includes('application/json')) {
-    const text = await response.text();
-    throw new Error(`Expected JSON from ${url} but received ${contentType}: ${text.slice(0, 300)}`);
-  }
+    if (!contentType.includes('application/json')) {
+      return null;
+    }
 
-  return response.json() as Promise<T>;
+    return await response.json() as T;
+  } catch (err: any) {
+    return null;
+  }
 }
 
 // ==================== CMS SERVICE API (EXPRESS ROUTED TO SUPABASE) ====================
@@ -60,32 +52,29 @@ export const cmsService = {
   // --- GENERAL SETTINGS ---
   async getGeneralSettings(): Promise<WebsiteGeneralSettings> {
     const data = await safeFetchJson<WebsiteGeneralSettings | null>('/api/cms/settings/general');
-    if (data && typeof data === 'object') {
-      return {
-        website_name: data.website_name || 'ProBitian',
-        tagline: data.tagline || 'Master Business Intelligence',
-        contact_email: data.contact_email || 'probitianofficial@gmail.com',
-        logo_url: data.logo_url || '/logo.svg',
-        favicon_url: data.favicon_url || '/logo.svg',
-        banner_url: data.banner_url || '/banner.svg',
-        theme_color: data.theme_color || 'purple',
-        footer_copyright: data.footer_copyright || '© 2026 ProBitian. All Rights Reserved.',
-        community_hub_name: data.community_hub_name || 'ProBitian Community Hub',
-        community_hub_address: data.community_hub_address || 'M93M+688, Salaiya, Madhya Pradesh 486440, India',
-        community_hub_maps_url: data.community_hub_maps_url || 'https://maps.app.goo.gl/T4426JADcNHHFPqb7'
-      };
-    }
-    throw new Error('Failed to load general settings from server');
+    return {
+      website_name: data?.website_name || 'ProBitian',
+      tagline: data?.tagline || 'Master Business Intelligence',
+      contact_email: data?.contact_email || 'probitianofficial@gmail.com',
+      logo_url: data?.logo_url || '/logo.svg',
+      favicon_url: data?.favicon_url || '/logo.svg',
+      banner_url: data?.banner_url || '/banner.svg',
+      theme_color: data?.theme_color || 'purple',
+      footer_copyright: data?.footer_copyright || '© 2026 ProBitian. All Rights Reserved.',
+      community_hub_name: data?.community_hub_name || 'ProBitian Community Hub',
+      community_hub_address: data?.community_hub_address || 'M93M+688, Salaiya, Madhya Pradesh 486440, India',
+      community_hub_maps_url: data?.community_hub_maps_url || 'https://maps.app.goo.gl/T4426JADcNHHFPqb7'
+    };
   },
 
   async saveGeneralSettings(settings: WebsiteGeneralSettings): Promise<boolean> {
     try {
-      await safeFetchJson('/api/cms/settings/general', {
+      const res = await safeFetchJson('/api/cms/settings/general', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(settings)
       });
-      return true;
+      return Boolean(res);
     } catch (e: any) {
       console.error('Failed to save general settings via Express API:', e?.message || e);
       return false;
@@ -95,27 +84,24 @@ export const cmsService = {
   // --- SEO SETTINGS ---
   async getSeoSettings(): Promise<SeoSettings> {
     const data = await safeFetchJson<SeoSettings | null>('/api/cms/settings/seo');
-    if (data && typeof data === 'object') {
-      return {
-        meta_title: data.meta_title || 'ProBitian | Master Business Intelligence',
-        meta_description: data.meta_description || 'Master Power BI, SQL, Excel, Power Query, AI Tools, and Dashboard Design through practical projects and industry-focused tutorials.',
-        keywords: data.keywords || 'Power BI, SQL, DAX, Power Query, Data Analytics, Business Intelligence, Excel, AI, ProBitian',
-        og_image: data.og_image || '/banner.svg',
-        twitter_handle: data.twitter_handle || '@probitian',
-        robots_txt: data.robots_txt || 'User-agent: *\nAllow: /'
-      };
-    }
-    throw new Error('Failed to load SEO settings from server');
+    return {
+      meta_title: data?.meta_title || 'ProBitian | Master Business Intelligence',
+      meta_description: data?.meta_description || 'Master Power BI, SQL, Excel, Power Query, AI Tools, and Dashboard Design through practical projects and industry-focused tutorials.',
+      keywords: data?.keywords || 'Power BI, SQL, DAX, Power Query, Data Analytics, Business Intelligence, Excel, AI, ProBitian',
+      og_image: data?.og_image || '/banner.svg',
+      twitter_handle: data?.twitter_handle || '@probitian',
+      robots_txt: data?.robots_txt || 'User-agent: *\nAllow: /'
+    };
   },
 
   async saveSeoSettings(seo: SeoSettings): Promise<boolean> {
     try {
-      await safeFetchJson('/api/cms/settings/seo', {
+      const res = await safeFetchJson('/api/cms/settings/seo', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(seo)
       });
-      return true;
+      return Boolean(res);
     } catch (e: any) {
       console.error('Failed to save SEO settings via Express API:', e?.message || e);
       return false;
@@ -128,17 +114,17 @@ export const cmsService = {
     if (data && typeof data === 'object' && (data.terms || data.privacy)) {
       return data as LegalSettings;
     }
-    throw new Error('Failed to load legal settings from server');
+    return DEFAULT_LEGAL_SETTINGS;
   },
 
   async saveLegalSettings(legal: LegalSettings): Promise<boolean> {
     try {
-      await safeFetchJson('/api/cms/settings/legal', {
+      const res = await safeFetchJson('/api/cms/settings/legal', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(legal)
       });
-      return true;
+      return Boolean(res);
     } catch (e: any) {
       console.error('Failed to save legal settings via Express API:', e?.message || e);
       return false;
@@ -146,12 +132,12 @@ export const cmsService = {
   },
 
   // --- HOME PAGE CONFIG ---
-  async getHomePageConfig(): Promise<HomePageConfig> {
+  async getHomePageConfig(): Promise<HomePageConfig | null> {
     const data = await safeFetchJson<HomePageConfig | null>('/api/cms/settings/home');
     if (data && typeof data === 'object' && data.hero_heading) {
       return data as HomePageConfig;
     }
-    throw new Error('Failed to load home page configuration from server');
+    return null;
   },
 
   async saveHomePageConfig(config: HomePageConfig): Promise<boolean> {

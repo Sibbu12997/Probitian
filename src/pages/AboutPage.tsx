@@ -16,6 +16,7 @@ import {
   ArrowRight, 
   Youtube, 
   Instagram, 
+  Linkedin,
   Mail, 
   GraduationCap 
 } from 'lucide-react';
@@ -237,6 +238,16 @@ export const AboutPage: React.FC<AboutPageProps> = ({ onNavigate }) => {
             className="btn-radius px-5 py-2.5 bg-pink-600 hover:bg-pink-500 text-white text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer shadow-sm"
           >
             <Instagram className="w-4 h-4" /> Instagram
+          </a>
+          <a
+            href="https://www.linkedin.com/company/probitian/"
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => trackSocialClick('linkedin', 'https://www.linkedin.com/company/probitian/')}
+            className="btn-radius px-5 py-2.5 bg-[#0077b5] hover:bg-[#006396] text-white text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer shadow-sm"
+            aria-label="LinkedIn Company Page"
+          >
+            <Linkedin className="w-4 h-4" /> LinkedIn
           </a>
           <a
             href={`mailto:${contactEmail}`}

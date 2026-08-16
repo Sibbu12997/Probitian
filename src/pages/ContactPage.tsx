@@ -8,6 +8,7 @@ import {
   Instagram, 
   Facebook, 
   Github, 
+  Linkedin,
   MessageSquare, 
   User, 
   Phone, 
@@ -134,7 +135,9 @@ export const ContactPage: React.FC = () => {
     if (p.includes('instagram')) return <Instagram className="w-4 h-4 text-pink-500" />;
     if (p.includes('facebook')) return <Facebook className="w-4 h-4 text-blue-500" />;
     if (p.includes('github')) return <Github className="w-4 h-4 text-purple-400" />;
-    return <Globe className="w-4 h-4 text-purple-400" />;
+    if (p.includes('linkedin')) return <Linkedin className="w-4 h-4 text-blue-600 dark:text-blue-400" />;
+    if (p.includes('email') || p.includes('mail')) return <Mail className="w-4 h-4 text-emerald-500" />;
+    return <Mail className="w-4 h-4 text-emerald-500" />;
   };
 
   return (
@@ -417,6 +420,24 @@ export const ContactPage: React.FC = () => {
                       className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-purple-50 dark:hover:bg-purple-950/30 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2 transition-all"
                     >
                       <Github className="w-4 h-4 text-purple-400" /> GitHub
+                    </a>
+                    <a
+                      href="https://www.linkedin.com/company/probitian/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => trackSocialClick('linkedin', 'https://www.linkedin.com/company/probitian/')}
+                      className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-950/30 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2 transition-all"
+                      aria-label="LinkedIn Company Page"
+                    >
+                      <Linkedin className="w-4 h-4 text-blue-600 dark:text-blue-400" /> LinkedIn
+                    </a>
+                    <a
+                      href={`mailto:${contactEmail}`}
+                      onClick={() => trackSocialClick('email', `mailto:${contactEmail}`)}
+                      className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2 transition-all"
+                      aria-label="Direct Email"
+                    >
+                      <Mail className="w-4 h-4 text-emerald-500" /> Email
                     </a>
                   </>
                 )}

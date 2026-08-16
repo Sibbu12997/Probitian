@@ -264,7 +264,8 @@ INSERT INTO public.social_links (platform, url, icon, is_active, display_order) 
 ('instagram', 'https://instagram.com/probitian', 'Instagram', true, 2),
 ('facebook', 'https://facebook.com/probitian', 'Facebook', true, 3),
 ('github', 'https://github.com/probitian', 'Github', true, 4),
-('email', 'mailto:Probitianofficial@gmail.com', 'Mail', true, 5)
+('linkedin', 'https://www.linkedin.com/company/probitian/', 'Linkedin', true, 5),
+('email', 'mailto:Probitianofficial@gmail.com', 'Mail', true, 6)
 ON CONFLICT (platform) DO NOTHING;
 
 -- 4. NAVIGATION SEED

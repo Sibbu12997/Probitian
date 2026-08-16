@@ -84,6 +84,7 @@ export const SEO: React.FC<SEOProps> = ({
       'https://instagram.com/probitian',
       'https://facebook.com/probitian',
       'https://github.com/probitian',
+      'https://www.linkedin.com/company/probitian/',
     ],
     description: finalDesc,
     founder: {

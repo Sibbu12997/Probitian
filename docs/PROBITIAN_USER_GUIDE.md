@@ -5,6 +5,7 @@ Official User & Learner Guide for the ProBitian Business Intelligence & Data Ana
 Project Owner: **Shivam Singh**
 Official Website: https://probitian.ai.studio/
 Official Communication Email: probitianofficial@gmail.com
+Official LinkedIn: https://www.linkedin.com/company/probitian/
 
 ## 1. Introduction & Platform Overview
 ProBitian is a premium, end-to-end Business Intelligence and Data Analytics learning ecosystem maintained by **Shivam Singh**. The platform is designed to help students, data analysts, BI developers, and technology enthusiasts master practical skills in Power BI, SQL, Python, Advanced Excel, Financial Modeling, and AI-assisted analytics.

@@ -4,6 +4,7 @@
 
 Official Website: [https://probitian.ai.studio/](https://probitian.ai.studio/)  
 Official Communication Email: [probitianofficial@gmail.com](mailto:probitianofficial@gmail.com)  
+Official LinkedIn: [https://www.linkedin.com/company/probitian/](https://www.linkedin.com/company/probitian/)  
 Project Owner: **Shivam Singh**
 
 ---
@@ -354,6 +355,7 @@ npm start
 - **Project**: ProBitian
 - **Website**: [https://probitian.ai.studio/](https://probitian.ai.studio/)
 - **Official Email**: [probitianofficial@gmail.com](mailto:probitianofficial@gmail.com)
+- **Official LinkedIn**: [https://www.linkedin.com/company/probitian/](https://www.linkedin.com/company/probitian/)
 
 ---
 

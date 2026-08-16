@@ -5,6 +5,7 @@ Official Administrative Management Guide for Authorized ProBitian Portal Adminis
 Project Owner: **Shivam Singh**
 Official Website: https://probitian.ai.studio/
 Official Communication Email: probitianofficial@gmail.com
+Official LinkedIn: https://www.linkedin.com/company/probitian/
 
 ## 1. Introduction & Security Guidance
 The ProBitian Admin Control Center (#/admin) is a secure management portal for authorized administrators to control website content, analyze GA4 traffic, manage contact inquiries, send email responses, maintain subscribers, broadcast email campaigns, manage media assets, and configure brand settings.
