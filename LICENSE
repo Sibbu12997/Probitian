@@ -1,0 +1,42 @@
+MIT License
+
+Copyright (c) 2026 ProBitian (Shivam Singh)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+---
+
+### TRADEMARKS, BRAND ASSETS, AND EDUCATIONAL CONTENT RESERVATION
+
+The open-source MIT license granted above applies strictly to the software code,
+application logic, build scripts, and developer tooling within this repository.
+It does NOT grant permission to use proprietary trademarks, brand assets, or
+proprietary educational content:
+
+1. **Brand Names and Logos**: The names "ProBitian", "ProBitian Community Hub",
+   associated logos, icons (`public/logo.svg`, `public/favicon.svg`, `public/banner.svg`),
+   trade dress, and branding assets are the proprietary trademarks of Shivam Singh
+   and ProBitian. They may not be used in derivative commercial products or for
+   promotional endorsements without prior written consent.
+2. **Original Educational Content & Datasets**: Original curriculum designs, course
+   walkthrough scripts, proprietary sample datasets, and specific educational guides
+   authored by ProBitian are protected by copyright. They are made available for
+   individual personal learning, research, and non-commercial educational use.
+   Redistribution or republishing of course curricula as paid third-party offerings
+   is strictly prohibited without explicit authorization.

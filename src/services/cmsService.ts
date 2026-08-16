@@ -19,31 +19,40 @@ import { LegalSettings, DEFAULT_LEGAL_SETTINGS } from '../data/defaultLegalData'
 
 /**
  * Safe fetch helper for Express API routes (Single source of truth: Supabase via Express)
+ * Throws explicit error on HTTP non-2xx so callers can distinguish between valid empty data and API failures.
  */
-async function safeFetchJson<T = any>(url: string, options?: RequestInit): Promise<T | null> {
-  try {
-    const fetchOptions: RequestInit = {
-      credentials: 'include',
-      ...options,
-      headers: {
-        ...options?.headers
+async function safeFetchJson<T = any>(url: string, options?: RequestInit): Promise<T> {
+  const fetchOptions: RequestInit = {
+    credentials: 'include',
+    ...options,
+    headers: {
+      ...options?.headers
+    }
+  };
+  const response = await fetch(url, fetchOptions);
+  const contentType = response.headers.get('content-type') || '';
+
+  if (!response.ok) {
+    let errorText = '';
+    if (contentType.includes('application/json')) {
+      try {
+        const json = await response.json();
+        errorText = json.error || json.message || JSON.stringify(json);
+      } catch (e) {
+        errorText = await response.text();
       }
-    };
-    const response = await fetch(url, fetchOptions);
-    const contentType = response.headers.get('content-type') || '';
-
-    if (!response.ok) {
-      return null;
+    } else {
+      errorText = await response.text();
     }
-
-    if (!contentType.includes('application/json')) {
-      return null;
-    }
-
-    return await response.json() as T;
-  } catch (err: any) {
-    return null;
+    throw new Error(errorText || `API HTTP ${response.status} (${url})`);
   }
+
+  if (!contentType.includes('application/json')) {
+    const text = await response.text();
+    throw new Error(`Expected JSON from ${url} but received ${contentType}: ${text.slice(0, 300)}`);
+  }
+
+  return (await response.json()) as T;
 }
 
 // ==================== CMS SERVICE API (EXPRESS ROUTED TO SUPABASE) ====================
@@ -69,12 +78,12 @@ export const cmsService = {
 
   async saveGeneralSettings(settings: WebsiteGeneralSettings): Promise<boolean> {
     try {
-      const res = await safeFetchJson('/api/cms/settings/general', {
+      const res = await safeFetchJson<{ success?: boolean }>('/api/cms/settings/general', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(settings)
       });
-      return Boolean(res);
+      return Boolean(res && res.success !== false);
     } catch (e: any) {
       console.error('Failed to save general settings via Express API:', e?.message || e);
       return false;
@@ -96,12 +105,12 @@ export const cmsService = {
 
   async saveSeoSettings(seo: SeoSettings): Promise<boolean> {
     try {
-      const res = await safeFetchJson('/api/cms/settings/seo', {
+      const res = await safeFetchJson<{ success?: boolean }>('/api/cms/settings/seo', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(seo)
       });
-      return Boolean(res);
+      return Boolean(res && res.success !== false);
     } catch (e: any) {
       console.error('Failed to save SEO settings via Express API:', e?.message || e);
       return false;
@@ -119,12 +128,12 @@ export const cmsService = {
 
   async saveLegalSettings(legal: LegalSettings): Promise<boolean> {
     try {
-      const res = await safeFetchJson('/api/cms/settings/legal', {
+      const res = await safeFetchJson<{ success?: boolean }>('/api/cms/settings/legal', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(legal)
       });
-      return Boolean(res);
+      return Boolean(res && res.success !== false);
     } catch (e: any) {
       console.error('Failed to save legal settings via Express API:', e?.message || e);
       return false;
@@ -142,12 +151,12 @@ export const cmsService = {
 
   async saveHomePageConfig(config: HomePageConfig): Promise<boolean> {
     try {
-      await safeFetchJson('/api/cms/settings/home', {
+      const res = await safeFetchJson<{ success?: boolean }>('/api/cms/settings/home', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(config)
       });
-      return true;
+      return Boolean(res && res.success !== false);
     } catch (e: any) {
       console.error('Failed to save home config via Express API:', e?.message || e);
       return false;
@@ -183,12 +192,12 @@ export const cmsService = {
 
   async saveProject(project: ProjectItem): Promise<boolean> {
     try {
-      await safeFetchJson('/api/cms/projects', {
+      const res = await safeFetchJson<{ success?: boolean }>('/api/cms/projects', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(project)
       });
-      return true;
+      return Boolean(res && res.success !== false);
     } catch (e: any) {
       console.warn('[CMS Service] saveProject API warning:', e?.message || e);
       return false;
@@ -197,8 +206,8 @@ export const cmsService = {
 
   async deleteProject(id: string): Promise<boolean> {
     try {
-      await safeFetchJson(`/api/cms/projects/${id}`, { method: 'DELETE' });
-      return true;
+      const res = await safeFetchJson<{ success?: boolean }>(`/api/cms/projects/${id}`, { method: 'DELETE' });
+      return Boolean(res && res.success !== false);
     } catch (e: any) {
       console.warn('[CMS Service] deleteProject API warning:', e?.message || e);
       return false;
@@ -233,12 +242,12 @@ export const cmsService = {
 
   async saveBlog(blog: BlogArticle): Promise<boolean> {
     try {
-      await safeFetchJson('/api/cms/blogs', {
+      const res = await safeFetchJson<{ success?: boolean }>('/api/cms/blogs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(blog)
       });
-      return true;
+      return Boolean(res && res.success !== false);
     } catch (e: any) {
       console.warn('[CMS Service] saveBlog API warning:', e?.message || e);
       return false;
@@ -247,8 +256,8 @@ export const cmsService = {
 
   async deleteBlog(id: string): Promise<boolean> {
     try {
-      await safeFetchJson(`/api/cms/blogs/${id}`, { method: 'DELETE' });
-      return true;
+      const res = await safeFetchJson<{ success?: boolean }>(`/api/cms/blogs/${id}`, { method: 'DELETE' });
+      return Boolean(res && res.success !== false);
     } catch (e: any) {
       console.warn('[CMS Service] deleteBlog API warning:', e?.message || e);
       return false;
@@ -284,12 +293,12 @@ export const cmsService = {
 
   async saveCourse(course: LearnTopic): Promise<boolean> {
     try {
-      await safeFetchJson('/api/cms/courses', {
+      const res = await safeFetchJson<{ success?: boolean }>('/api/cms/courses', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(course)
       });
-      return true;
+      return Boolean(res && res.success !== false);
     } catch (e: any) {
       console.warn('[CMS Service] saveCourse API warning:', e?.message || e);
       return false;
@@ -298,8 +307,8 @@ export const cmsService = {
 
   async deleteCourse(id: string): Promise<boolean> {
     try {
-      await safeFetchJson(`/api/cms/courses/${id}`, { method: 'DELETE' });
-      return true;
+      const res = await safeFetchJson<{ success?: boolean }>(`/api/cms/courses/${id}`, { method: 'DELETE' });
+      return Boolean(res && res.success !== false);
     } catch (e: any) {
       console.warn('[CMS Service] deleteCourse API warning:', e?.message || e);
       return false;
@@ -330,12 +339,12 @@ export const cmsService = {
 
   async saveVideo(video: YouTubeVideo): Promise<boolean> {
     try {
-      await safeFetchJson('/api/cms/videos', {
+      const res = await safeFetchJson<{ success?: boolean }>('/api/cms/videos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(video)
       });
-      return true;
+      return Boolean(res && res.success !== false);
     } catch (e: any) {
       console.warn('[CMS Service] saveVideo API warning:', e?.message || e);
       return false;
@@ -344,8 +353,8 @@ export const cmsService = {
 
   async deleteVideo(id: string): Promise<boolean> {
     try {
-      await safeFetchJson(`/api/cms/videos/${id}`, { method: 'DELETE' });
-      return true;
+      const res = await safeFetchJson<{ success?: boolean }>(`/api/cms/videos/${id}`, { method: 'DELETE' });
+      return Boolean(res && res.success !== false);
     } catch (e: any) {
       console.warn('[CMS Service] deleteVideo API warning:', e?.message || e);
       return false;
@@ -385,12 +394,15 @@ export const cmsService = {
     message: string;
   }): Promise<{ success: boolean; error?: string }> {
     try {
-      await safeFetchJson<{ success?: boolean; message?: ContactMessage; error?: string }>('/api/cms/messages', {
+      const res = await safeFetchJson<{ success?: boolean; message?: ContactMessage; error?: string }>('/api/cms/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(msg)
       });
-      return { success: true };
+      if (res && res.success) {
+        return { success: true };
+      }
+      return { success: false, error: res?.error || 'Failed to submit contact message' };
     } catch (e: any) {
       console.error('Contact submission error:', e?.message || e);
       return { success: false, error: e?.message || 'Failed to submit contact message' };
@@ -410,7 +422,10 @@ export const cmsService = {
         },
         body: JSON.stringify({ replyText, replySubject }),
       });
-      return { success: true, message: data.message || 'Reply sent successfully.' };
+      if (data && data.success) {
+        return { success: true, message: data.message || 'Reply sent successfully.' };
+      }
+      return { success: false, message: data?.message || 'Failed to send reply via server endpoint.' };
     } catch (e: any) {
       console.error('API reply failed:', e?.message || e);
       return { success: false, message: e?.message || 'Failed to send reply via server endpoint.' };
@@ -419,12 +434,12 @@ export const cmsService = {
 
   async updateMessageStatus(id: string, status: ContactMessage['status'], adminNotes?: string): Promise<boolean> {
     try {
-      await safeFetchJson(`/api/cms/messages/${id}/status`, {
+      const res = await safeFetchJson<{ success?: boolean }>(`/api/cms/messages/${id}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status, adminNotes })
       });
-      return true;
+      return Boolean(res && res.success !== false);
     } catch (e: any) {
       console.warn('Failed to update message status via API:', e?.message || e);
       return false;
@@ -433,8 +448,8 @@ export const cmsService = {
 
   async deleteMessage(id: string): Promise<boolean> {
     try {
-      await safeFetchJson(`/api/cms/messages/${id}`, { method: 'DELETE' });
-      return true;
+      const res = await safeFetchJson<{ success?: boolean }>(`/api/cms/messages/${id}`, { method: 'DELETE' });
+      return Boolean(res && res.success !== false);
     } catch (e: any) {
       console.warn('Failed to delete message via API:', e?.message || e);
       return false;
@@ -451,18 +466,25 @@ export const cmsService = {
   },
 
   async subscribeNewsletter(email: string): Promise<{ success: boolean; message: string }> {
-    const data = await safeFetchJson<{ success?: boolean; message?: string }>('/api/newsletter', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email })
-    });
-    return { success: true, message: data.message || 'Successfully subscribed!' };
+    try {
+      const data = await safeFetchJson<{ success?: boolean; message?: string }>('/api/newsletter', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      });
+      if (data && data.success) {
+        return { success: true, message: data.message || 'Successfully subscribed!' };
+      }
+      return { success: false, message: data?.message || 'Failed to subscribe' };
+    } catch (e: any) {
+      return { success: false, message: e?.message || 'Failed to subscribe' };
+    }
   },
 
   async deleteSubscriber(id: string): Promise<boolean> {
     try {
-      await safeFetchJson(`/api/cms/subscribers/${id}`, { method: 'DELETE' });
-      return true;
+      const res = await safeFetchJson<{ success?: boolean }>(`/api/cms/subscribers/${id}`, { method: 'DELETE' });
+      return Boolean(res && res.success !== false);
     } catch (e: any) {
       console.warn('Failed to delete subscriber via API:', e?.message || e);
       return false;
@@ -516,8 +538,8 @@ export const cmsService = {
 
   async deleteCampaign(id: string): Promise<boolean> {
     try {
-      await safeFetchJson(`/api/admin/email-campaigns/${id}`, { method: 'DELETE' });
-      return true;
+      const res = await safeFetchJson<{ success?: boolean }>(`/api/admin/email-campaigns/${id}`, { method: 'DELETE' });
+      return Boolean(res && res.success !== false);
     } catch (e: any) {
       console.warn('Failed to delete campaign via API:', e?.message || e);
       return false;
@@ -531,7 +553,7 @@ export const cmsService = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ testEmail })
       });
-      return { success: Boolean(data.success), message: data.message || 'Test request processed.' };
+      return { success: Boolean(data && data.success), message: data?.message || 'Test request processed.' };
     } catch (e: any) {
       return { success: false, message: e?.message || 'Failed to trigger test email.' };
     }
@@ -543,7 +565,7 @@ export const cmsService = {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
       });
-      return { success: Boolean(data.success), message: data.message || 'Send request completed.', campaign: data.campaign };
+      return { success: Boolean(data && data.success), message: data?.message || 'Send request completed.', campaign: data?.campaign };
     } catch (e: any) {
       return { success: false, message: e?.message || 'Failed to dispatch bulk campaign.' };
     }
@@ -570,12 +592,12 @@ export const cmsService = {
       const list = await this.getSocialLinks();
       const idx = list.findIndex(s => s.id === item.id);
       const updated = idx >= 0 ? list.map(s => s.id === item.id ? item : s) : [...list, item];
-      await safeFetchJson('/api/cms/social', {
+      const res = await safeFetchJson<{ success?: boolean }>('/api/cms/social', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updated)
       });
-      return true;
+      return Boolean(res && res.success !== false);
     } catch (e: any) {
       console.warn('Failed to save social links via API:', e?.message || e);
       return false;
@@ -600,12 +622,12 @@ export const cmsService = {
 
   async saveNavigation(items: NavigationItem[]): Promise<boolean> {
     try {
-      await safeFetchJson('/api/cms/navigation', {
+      const res = await safeFetchJson<{ success?: boolean }>('/api/cms/navigation', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(items)
       });
-      return true;
+      return Boolean(res && res.success !== false);
     } catch (e: any) {
       console.warn('Failed to save navigation via API:', e?.message || e);
       return false;
@@ -638,10 +660,10 @@ export const cmsService = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(params)
       });
-      if (!data.success) {
+      if (!data || !data.success) {
         return {
           success: false,
-          error: data.error || 'Failed to upload asset to Supabase Storage.'
+          error: data?.error || 'Failed to upload asset to Supabase Storage.'
         };
       }
       return {
@@ -724,12 +746,12 @@ export const cmsService = {
 
   async saveCategory(cat: CategoryItem): Promise<boolean> {
     try {
-      await safeFetchJson('/api/cms/categories', {
+      const res = await safeFetchJson<{ success?: boolean }>('/api/cms/categories', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(cat)
       });
-      return true;
+      return Boolean(res && res.success !== false);
     } catch (e: any) {
       console.warn('Failed to save category via API:', e?.message || e);
       return false;
@@ -738,8 +760,8 @@ export const cmsService = {
 
   async deleteCategory(id: string): Promise<boolean> {
     try {
-      await safeFetchJson(`/api/cms/categories/${id}`, { method: 'DELETE' });
-      return true;
+      const res = await safeFetchJson<{ success?: boolean }>(`/api/cms/categories/${id}`, { method: 'DELETE' });
+      return Boolean(res && res.success !== false);
     } catch (e: any) {
       console.warn('Failed to delete category via API:', e?.message || e);
       return false;

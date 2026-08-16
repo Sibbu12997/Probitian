@@ -47,6 +47,16 @@ Official LinkedIn: [https://www.linkedin.com/company/probitian/](https://www.lin
 - 🔧 **[Operational Troubleshooting Manual](TROUBLESHOOTING.md)**  
   Resolution procedures for common issues, error codes, database permissions, email delivery, and media uploads.
 
+### 👥 Community & Governance
+- 📖 **[Contribution Guidelines](../CONTRIBUTING.md)**  
+  Comprehensive guidelines for contributing code, BI educational content, documentation, and bug fixes.
+- 🤝 **[Code of Conduct](../CODE_OF_CONDUCT.md)**  
+  Community pledge, behavioral standards, and enforcement policies.
+- 🛡️ **[Security Policy & Vulnerability Disclosure](../SECURITY.md)**  
+  Responsible disclosure procedures, reporting channels, and vulnerability scope.
+- ⚖️ **[License](../LICENSE)**  
+  MIT License for software source code with reservation of ProBitian trademarks and educational content.
+
 ---
 
 *Documentation maintained by Shivam Singh — ProBitian.*

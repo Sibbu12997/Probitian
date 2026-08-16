@@ -27,10 +27,19 @@ function isAllowedOrigin(origin: string | undefined, req: express.Request): bool
   try {
     const parsed = new URL(origin);
     const host = parsed.host.toLowerCase();
-    const reqHost = ((req.headers['x-forwarded-host'] as string) || req.headers.host || '').toLowerCase();
+    const serverHost = (req.get('host') || '').toLowerCase();
 
-    // Direct host match (same domain/port)
-    if (host === reqHost) return true;
+    // Direct host match against actual server host header
+    if (serverHost && host === serverHost) return true;
+
+    // Official ProBitian domains
+    if (
+      host === 'probitian.com' ||
+      host === 'www.probitian.com' ||
+      host.endsWith('.probitian.com')
+    ) {
+      return true;
+    }
 
     // Local development origins
     if (
@@ -574,16 +583,13 @@ function isValidId(id?: string): boolean {
   return /^[a-zA-Z0-9_.-]+$/.test(clean);
 }
 
-// Local storage files for offline / unconfigured dev environment ONLY (NODE_ENV !== 'production')
+// Local storage files for offline / unconfigured dev environment ONLY (NODE_ENV !== 'production' or AI Studio preview)
 const CMS_DATA_FILE = path.join(process.cwd(), 'data', 'cms_settings.json');
 
-function isDevEnvironment(): boolean {
-  return process.env.NODE_ENV !== 'production' || 
-    Boolean(process.env.DISABLE_HMR) || 
-    Boolean(process.env.AI_STUDIO_APPLET_ID);
-}
-
 function readCmsData() {
+  if (process.env.NODE_ENV === 'production' && !process.env.AI_STUDIO_APPLET_ID) {
+    throw new Error('Local JSON fallback is strictly disabled in production. Supabase PostgreSQL is the required source of truth.');
+  }
   try {
     if (fs.existsSync(CMS_DATA_FILE)) {
       const content = fs.readFileSync(CMS_DATA_FILE, 'utf-8');
@@ -596,6 +602,9 @@ function readCmsData() {
 }
 
 function writeCmsData(data: any) {
+  if (process.env.NODE_ENV === 'production' && !process.env.AI_STUDIO_APPLET_ID) {
+    throw new Error('Local JSON fallback is strictly disabled in production. Supabase PostgreSQL is the required source of truth.');
+  }
   try {
     const dir = path.dirname(CMS_DATA_FILE);
     if (!fs.existsSync(dir)) {
@@ -603,7 +612,7 @@ function writeCmsData(data: any) {
     }
     fs.writeFileSync(CMS_DATA_FILE, JSON.stringify(data, null, 2), 'utf-8');
   } catch (err) {
-    console.warn('Notice: Error writing CMS data cache:', err);
+    console.warn('Notice: Error writing CMS data cache in dev:', err);
   }
 }
 
@@ -1066,12 +1075,13 @@ app.get('/api/cms/settings/general', async (req, res) => {
     try {
       const { data, error } = await serverSupabase.from('settings').select('value').eq('key', 'general').maybeSingle();
       if (error) {
-        console.warn('[CMS Settings General Read Supabase Notice - Using local cache]:', error.message);
-      } else {
-        return res.json(data?.value || null);
+        console.error('[CMS Settings General Read Error]', error.message);
+        return res.status(503).json({ error: 'Database service unavailable' });
       }
+      return res.json(data?.value || null);
     } catch (err: any) {
-      console.warn('[CMS Settings General Read Supabase Exception - Using local cache]:', err?.message || err);
+      console.error('[CMS Settings General Read Exception]', err);
+      return res.status(503).json({ error: 'Database service unavailable' });
     }
   }
   const data = readCmsData();
@@ -1116,12 +1126,13 @@ app.get('/api/cms/settings/seo', async (req, res) => {
     try {
       const { data, error } = await serverSupabase.from('settings').select('value').eq('key', 'seo').maybeSingle();
       if (error) {
-        console.warn('[CMS SEO Read Supabase Notice - Using local cache]:', error.message);
-      } else {
-        return res.json(data?.value || null);
+        console.error('[CMS SEO Read Error]', error.message);
+        return res.status(503).json({ error: 'Database service unavailable' });
       }
+      return res.json(data?.value || null);
     } catch (err: any) {
-      console.warn('[CMS SEO Read Supabase Exception - Using local cache]:', err?.message || err);
+      console.error('[CMS SEO Read Exception]', err);
+      return res.status(503).json({ error: 'Database service unavailable' });
     }
   }
   const data = readCmsData();
@@ -1166,12 +1177,13 @@ app.get('/api/cms/settings/legal', async (req, res) => {
     try {
       const { data, error } = await serverSupabase.from('settings').select('value').eq('key', 'legal_policies').maybeSingle();
       if (error) {
-        console.warn('[CMS Legal Read Supabase Notice - Using local cache]:', error.message);
-      } else {
-        return res.json(data?.value || null);
+        console.error('[CMS Legal Read Error]', error.message);
+        return res.status(503).json({ error: 'Database service unavailable' });
       }
+      return res.json(data?.value || null);
     } catch (err: any) {
-      console.warn('[CMS Legal Read Supabase Exception - Using local cache]:', err?.message || err);
+      console.error('[CMS Legal Read Exception]', err);
+      return res.status(503).json({ error: 'Database service unavailable' });
     }
   }
   const data = readCmsData();
@@ -1216,8 +1228,10 @@ app.get('/api/cms/settings/home', async (req, res) => {
     try {
       const { data, error } = await serverSupabase.from('pages').select('*').eq('page_key', 'home').maybeSingle();
       if (error) {
-        console.warn('[CMS Home Config Read Supabase Notice - Using local cache]:', error.message);
-      } else if (data) {
+        console.error('[CMS Home Config Read Error]', error.message);
+        return res.status(503).json({ error: 'Database service unavailable' });
+      }
+      if (data) {
         return res.json({
           hero_heading: data.hero_heading,
           hero_description: data.hero_description,
@@ -1228,11 +1242,11 @@ app.get('/api/cms/settings/home', async (req, res) => {
           testimonials: data.testimonials,
           cta: data.cta
         });
-      } else {
-        return res.json(null);
       }
+      return res.json(null);
     } catch (err: any) {
-      console.warn('[CMS Home Config Read Supabase Exception - Using local cache]:', err?.message || err);
+      console.error('[CMS Home Config Read Exception]', err);
+      return res.status(503).json({ error: 'Database service unavailable' });
     }
   }
   const data = readCmsData();
@@ -1285,12 +1299,13 @@ app.get('/api/cms/projects', async (req, res) => {
     try {
       const { data, error } = await serverSupabase.from('projects').select('*').order('created_at', { ascending: false });
       if (error) {
-        console.warn('[CMS Projects Read Supabase Notice - Using local cache]:', error.message);
-      } else {
-        return res.json(Array.isArray(data) ? data : []);
+        console.error('[CMS Projects Read Error]', error.message);
+        return res.status(503).json({ error: 'Database service unavailable' });
       }
+      return res.json(Array.isArray(data) ? data : []);
     } catch (err: any) {
-      console.warn('[CMS Projects Read Supabase Exception - Using local cache]:', err?.message || err);
+      console.error('[CMS Projects Read Exception]', err);
+      return res.status(503).json({ error: 'Database service unavailable' });
     }
   }
   const data = readCmsData();
@@ -1395,12 +1410,13 @@ app.get('/api/cms/blogs', async (req, res) => {
     try {
       const { data, error } = await serverSupabase.from('blogs').select('*').order('created_at', { ascending: false });
       if (error) {
-        console.warn('[CMS Blogs Read Supabase Notice - Using local cache]:', error.message);
-      } else {
-        return res.json(Array.isArray(data) ? data : []);
+        console.error('[CMS Blogs Read Error]', error.message);
+        return res.status(503).json({ error: 'Database service unavailable' });
       }
+      return res.json(Array.isArray(data) ? data : []);
     } catch (err: any) {
-      console.warn('[CMS Blogs Read Supabase Exception - Using local cache]:', err?.message || err);
+      console.error('[CMS Blogs Read Exception]', err);
+      return res.status(503).json({ error: 'Database service unavailable' });
     }
   }
   const data = readCmsData();
@@ -1503,12 +1519,13 @@ app.get('/api/cms/courses', async (req, res) => {
     try {
       const { data, error } = await serverSupabase.from('courses').select('*').order('created_at', { ascending: false });
       if (error) {
-        console.warn('[CMS Courses Read Supabase Notice - Using local cache]:', error.message);
-      } else {
-        return res.json(Array.isArray(data) ? data : []);
+        console.error('[CMS Courses Read Error]', error.message);
+        return res.status(503).json({ error: 'Database service unavailable' });
       }
+      return res.json(Array.isArray(data) ? data : []);
     } catch (err: any) {
-      console.warn('[CMS Courses Read Supabase Exception - Using local cache]:', err?.message || err);
+      console.error('[CMS Courses Read Exception]', err);
+      return res.status(503).json({ error: 'Database service unavailable' });
     }
   }
   const data = readCmsData();
@@ -1615,12 +1632,13 @@ app.get('/api/cms/videos', async (req, res) => {
     try {
       const { data, error } = await serverSupabase.from('videos').select('*').order('created_at', { ascending: false });
       if (error) {
-        console.warn('[CMS Videos Read Supabase Notice - Using local cache]:', error.message);
-      } else {
-        return res.json(Array.isArray(data) ? data : []);
+        console.error('[CMS Videos Read Error]', error.message);
+        return res.status(503).json({ error: 'Database service unavailable' });
       }
+      return res.json(Array.isArray(data) ? data : []);
     } catch (err: any) {
-      console.warn('[CMS Videos Read Supabase Exception - Using local cache]:', err?.message || err);
+      console.error('[CMS Videos Read Exception]', err);
+      return res.status(503).json({ error: 'Database service unavailable' });
     }
   }
   const data = readCmsData();
@@ -2487,12 +2505,13 @@ app.get('/api/cms/social', async (req, res) => {
     try {
       const { data, error } = await serverSupabase.from('social_links').select('*').order('display_order', { ascending: true });
       if (error) {
-        console.warn('[Supabase GET Social Notice - Using local cache]:', error.message);
-      } else {
-        return res.json(data || []);
+        console.error('[Supabase GET Social Error]', error.message);
+        return res.status(503).json({ error: 'Database service unavailable' });
       }
+      return res.json(data || []);
     } catch (err) {
-      console.warn('[Supabase GET Social Exception - Using local cache]:', err);
+      console.error('[Supabase GET Social Exception]', err);
+      return res.status(503).json({ error: 'Database service unavailable' });
     }
   }
   const data = readCmsData();
@@ -2535,12 +2554,13 @@ app.get('/api/cms/navigation', async (req, res) => {
     try {
       const { data, error } = await serverSupabase.from('navigation').select('*').order('display_order', { ascending: true });
       if (error) {
-        console.warn('[Supabase GET Navigation Notice - Using local cache]:', error.message);
-      } else {
-        return res.json(data || []);
+        console.error('[Supabase GET Navigation Error]', error.message);
+        return res.status(503).json({ error: 'Database service unavailable' });
       }
+      return res.json(data || []);
     } catch (err) {
-      console.warn('[Supabase GET Navigation Exception - Using local cache]:', err);
+      console.error('[Supabase GET Navigation Exception]', err);
+      return res.status(503).json({ error: 'Database service unavailable' });
     }
   }
   const data = readCmsData();
@@ -2862,12 +2882,13 @@ app.get('/api/cms/categories', async (req, res) => {
     try {
       const { data, error } = await serverSupabase.from('categories').select('*');
       if (error) {
-        console.warn('[Supabase GET Categories Notice - Using local cache]:', error.message);
-      } else {
-        return res.json(data || []);
+        console.error('[Supabase GET Categories Error]', error.message);
+        return res.status(503).json({ error: 'Database service unavailable' });
       }
+      return res.json(data || []);
     } catch (err) {
-      console.warn('[Supabase GET Categories Exception - Using local cache]:', err);
+      console.error('[Supabase GET Categories Exception]', err);
+      return res.status(503).json({ error: 'Database service unavailable' });
     }
   }
   const data = readCmsData();

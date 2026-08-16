@@ -30,7 +30,9 @@ Project Owner: **Shivam Singh**
 18. [Project Structure](#18-project-structure)
 19. [Troubleshooting](#19-troubleshooting)
 20. [Production Checklist](#20-production-checklist)
-21. [Project Owner](#21-project-owner)
+21. [Community & Contributions](#21-community--contributions)
+22. [Project Owner](#22-project-owner)
+23. [License](#23-license)
 
 ---
 
@@ -349,13 +351,34 @@ npm start
 
 ---
 
-## 21. Project Owner
+## 21. Community & Contributions
+
+ProBitian is an open and collaborative learning ecosystem. We welcome thoughtful contributions from software developers, Business Intelligence professionals, data analysts, analytics engineers, educators, technical writers, and learners.
+
+Whether you are fixing a bug, adding a Power BI DAX tutorial, refining SQL examples, improving UI accessibility, optimizing database queries, or translating documentation, your contributions help data practitioners around the world!
+
+- 📖 **Contributing Guide**: Read [CONTRIBUTING.md](CONTRIBUTING.md) for local development setup, code standards, database migration rules, educational content guidelines, and pull request requirements.
+- 🤝 **Code of Conduct**: Review [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for our community standards, respectful collaboration guidelines, and pledge.
+- 🛡️ **Security Policy**: Read [SECURITY.md](SECURITY.md) for responsible disclosure guidelines and private vulnerability reporting.
+- ⚖️ **License Information**: Review [LICENSE](LICENSE) for software licensing terms and trademark/educational content scope.
+
+---
+
+## 22. Project Owner
 
 - **Name**: Shivam Singh
 - **Project**: ProBitian
 - **Website**: [https://probitian.ai.studio/](https://probitian.ai.studio/)
 - **Official Email**: [probitianofficial@gmail.com](mailto:probitianofficial@gmail.com)
 - **Official LinkedIn**: [https://www.linkedin.com/company/probitian/](https://www.linkedin.com/company/probitian/)
+
+---
+
+## 23. License
+
+The software source code of ProBitian is licensed under the [MIT License](LICENSE).
+
+*Note: The MIT License applies to the source code, build configuration, and developer tooling. ProBitian trademarks, brand logos (`public/logo.svg`, `public/banner.svg`), trade dress, and original educational curriculum materials are reserved by Shivam Singh and ProBitian. See [LICENSE](LICENSE) for full details.*
 
 ---
 
