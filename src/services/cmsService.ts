@@ -13,10 +13,10 @@ import {
   SocialLinkItem,
   NavigationItem,
   MediaItem,
-  CategoryItem
+  CategoryItem,
+  LegalSettings,
+  DEFAULT_LEGAL_SETTINGS
 } from '../types';
-import { LegalSettings, DEFAULT_LEGAL_SETTINGS } from '../data/defaultLegalData';
-import { PROJECTS, BLOG_ARTICLES, YOUTUBE_VIDEOS, LEARN_TOPICS } from '../data/mockData';
 
 /**
  * Safe fetch helper for Express API routes (Single source of truth: Supabase via Express)
@@ -224,9 +224,9 @@ export const cmsService = {
           created_at: p.created_at
         }));
       }
-      return PROJECTS;
+      return [];
     } catch {
-      return PROJECTS;
+      return [];
     }
   },
 
@@ -278,9 +278,9 @@ export const cmsService = {
           created_at: b.created_at
         }));
       }
-      return BLOG_ARTICLES;
+      return [];
     } catch {
-      return BLOG_ARTICLES;
+      return [];
     }
   },
 
@@ -333,9 +333,9 @@ export const cmsService = {
           created_at: c.created_at
         }));
       }
-      return LEARN_TOPICS;
+      return [];
     } catch {
-      return LEARN_TOPICS;
+      return [];
     }
   },
 
@@ -383,9 +383,9 @@ export const cmsService = {
           created_at: v.created_at
         }));
       }
-      return YOUTUBE_VIDEOS;
+      return [];
     } catch {
-      return YOUTUBE_VIDEOS;
+      return [];
     }
   },
 

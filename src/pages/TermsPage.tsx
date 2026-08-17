@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { NavPage } from '../types';
+import { NavPage, LegalSettings, DEFAULT_LEGAL_SETTINGS } from '../types';
 import { FileText, ArrowLeft, ShieldCheck, Mail, Calendar, Scale } from 'lucide-react';
 import { cmsService } from '../services/cmsService';
-import { LegalSettings, DEFAULT_LEGAL_SETTINGS } from '../data/defaultLegalData';
 
 interface TermsPageProps {
   onNavigate: (page: NavPage) => void;

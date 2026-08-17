@@ -17,7 +17,7 @@ import {
   Info
 } from 'lucide-react';
 import { cmsService } from '../../../services/cmsService';
-import { LegalSettings, LegalDocument, LegalSection, DEFAULT_LEGAL_SETTINGS } from '../../../data/defaultLegalData';
+import { LegalSettings, LegalDocument, LegalSection, DEFAULT_LEGAL_SETTINGS } from '../../../types';
 
 export const LegalManager: React.FC = () => {
   const [settings, setSettings] = useState<LegalSettings>(DEFAULT_LEGAL_SETTINGS);

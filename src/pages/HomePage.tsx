@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { NavPage, ProjectItem, BlogArticle, YouTubeVideo, HomePageConfig } from '../types';
-import { FEATURE_CARDS, PROJECTS, YOUTUBE_VIDEOS, BLOG_ARTICLES, WHY_PROBITIAN_CARDS } from '../data/mockData';
+import { NavPage, ProjectItem, BlogArticle, YouTubeVideo, HomePageConfig, FEATURE_CARDS, WHY_PROBITIAN_CARDS } from '../types';
 import { cmsService } from '../services/cmsService';
 import { BannerGraphic } from '../components/BannerGraphic';
 import { Youtube, Instagram, ArrowRight, Play, Sparkles, BarChart3, Database, Table, Filter, BrainCircuit, GraduationCap, Briefcase, HeartHandshake, TrendingUp, CheckCircle, ExternalLink } from 'lucide-react';
@@ -14,9 +13,9 @@ interface HomePageProps {
 
 export const HomePage: React.FC<HomePageProps> = ({ onNavigate, onSelectProject, onSelectBlog }) => {
   const [homeConfig, setHomeConfig] = useState<HomePageConfig | null>(null);
-  const [projects, setProjects] = useState<ProjectItem[]>(PROJECTS);
-  const [blogs, setBlogs] = useState<BlogArticle[]>(BLOG_ARTICLES);
-  const [videos, setVideos] = useState<YouTubeVideo[]>(YOUTUBE_VIDEOS);
+  const [projects, setProjects] = useState<ProjectItem[]>([]);
+  const [blogs, setBlogs] = useState<BlogArticle[]>([]);
+  const [videos, setVideos] = useState<YouTubeVideo[]>([]);
 
   useEffect(() => {
     loadCmsData();

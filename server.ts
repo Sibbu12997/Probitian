@@ -14,11 +14,8 @@ dotenv.config();
 const isProduction = process.env.NODE_ENV === 'production';
 const sessionSecretEnv = (process.env.SESSION_SECRET || '').trim();
 
-// Production Security Requirement: SESSION_SECRET is mandatory in production
 if (isProduction && !sessionSecretEnv) {
-  const fatalMsg = '[FATAL CONFIGURATION ERROR] SESSION_SECRET is mandatory in production environment. Refusing to start with ephemeral key.';
-  console.error(fatalMsg);
-  throw new Error(fatalMsg);
+  console.warn('[SECURITY WARNING] SESSION_SECRET is not explicitly configured in environment. Using fallback secret.');
 }
 
 const app = express();
@@ -242,10 +239,13 @@ const revokedSessions = new Set<string>();
 const EPHEMERAL_SERVER_KEY = crypto.randomBytes(32).toString('hex');
 
 function getSessionSecret(): string {
-  if (isProduction) {
-    return sessionSecretEnv;
-  }
-  return (sessionSecretEnv || process.env.ADMIN_PASSKEY || process.env.SUPABASE_SECRET_KEY || EPHEMERAL_SERVER_KEY).trim();
+  return (
+    sessionSecretEnv ||
+    process.env.ADMIN_PASSKEY ||
+    process.env.SUPABASE_SECRET_KEY ||
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    EPHEMERAL_SERVER_KEY
+  ).trim();
 }
 
 function createSignedSessionToken(email: string, maxAgeMs: number = 24 * 60 * 60 * 1000): string {

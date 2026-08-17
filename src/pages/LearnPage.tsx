@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { LearnTopic } from '../types';
-import { LEARN_TOPICS } from '../data/mockData';
+import { LearnTopic, DEFAULT_LEARN_TOPIC } from '../types';
 import { cmsService } from '../services/cmsService';
 import { BarChart3, Database, Table, Cpu, Play, CheckCircle2, BookOpen, Clock, Download, Sparkles, ExternalLink } from 'lucide-react';
 import { trackCourseClick, trackSocialClick, trackCtaClick, trackEvent } from '../lib/analytics';
 
 export const LearnPage: React.FC = () => {
-  const [topicsList, setTopicsList] = useState<LearnTopic[]>(LEARN_TOPICS);
-  const [selectedTopic, setSelectedTopic] = useState<LearnTopic>(LEARN_TOPICS[0]);
+  const [topicsList, setTopicsList] = useState<LearnTopic[]>([DEFAULT_LEARN_TOPIC]);
+  const [selectedTopic, setSelectedTopic] = useState<LearnTopic>(DEFAULT_LEARN_TOPIC);
 
   useEffect(() => {
     loadCourses();

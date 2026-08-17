@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { ProjectItem } from '../types';
-import { PROJECTS } from '../data/mockData';
 import { cmsService } from '../services/cmsService';
 import { ExternalLink, Filter, Search } from 'lucide-react';
 import { trackProjectClick } from '../lib/analytics';
@@ -10,7 +9,7 @@ interface ProjectsPageProps {
 }
 
 export const ProjectsPage: React.FC<ProjectsPageProps> = ({ onSelectProject }) => {
-  const [projectsList, setProjectsList] = useState<ProjectItem[]>(PROJECTS);
+  const [projectsList, setProjectsList] = useState<ProjectItem[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
@@ -21,9 +20,7 @@ export const ProjectsPage: React.FC<ProjectsPageProps> = ({ onSelectProject }) =
   const loadProjects = async () => {
     try {
       const data = await cmsService.getProjects();
-      if (data && data.length > 0) {
-        setProjectsList(data);
-      }
+      setProjectsList(data || []);
     } catch (err) {
       console.error('Error fetching projects from cmsService:', err);
     }
