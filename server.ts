@@ -15,7 +15,7 @@ const isProduction = process.env.NODE_ENV === 'production';
 const sessionSecretEnv = (process.env.SESSION_SECRET || '').trim();
 
 if (isProduction && !sessionSecretEnv) {
-  console.warn('[SECURITY WARNING] SESSION_SECRET is not explicitly configured in environment. Using fallback secret.');
+  throw new Error('Production configuration error: SESSION_SECRET is required.');
 }
 
 const app = express();
@@ -238,7 +238,13 @@ const revokedSessions = new Set<string>();
 // Ephemeral fallback key generated per server process instance if no explicit secret key is set in environment (Dev only)
 const EPHEMERAL_SERVER_KEY = crypto.randomBytes(32).toString('hex');
 
-function getSessionSecret(): string {
+export function getSessionSecret(): string {
+  if (isProduction) {
+    if (!sessionSecretEnv) {
+      throw new Error('Production configuration error: SESSION_SECRET is required.');
+    }
+    return sessionSecretEnv;
+  }
   return (
     sessionSecretEnv ||
     process.env.ADMIN_PASSKEY ||
@@ -411,8 +417,21 @@ const emailTestLimiter = createRateLimiter({ windowMs: 15 * 60 * 1000, max: 10, 
 const emailSendLimiter = createRateLimiter({ windowMs: 15 * 60 * 1000, max: 5, message: 'Too many campaign broadcasts requested. Please try again later.' });
 
 // ==================== SIGNED UNSUBSCRIBE TOKENS ====================
-function getUnsubscribeSecret(): string {
-  return (process.env.ADMIN_PASSKEY || process.env.SUPABASE_SECRET_KEY || process.env.UNSUBSCRIBE_SECRET || EPHEMERAL_SERVER_KEY).trim();
+export function getUnsubscribeSecret(): string {
+  if (isProduction) {
+    const unsubSecret = (process.env.UNSUBSCRIBE_SECRET || sessionSecretEnv).trim();
+    if (!unsubSecret) {
+      throw new Error('Production configuration error: UNSUBSCRIBE_SECRET or SESSION_SECRET is required.');
+    }
+    return unsubSecret;
+  }
+  return (
+    process.env.UNSUBSCRIBE_SECRET ||
+    sessionSecretEnv ||
+    process.env.ADMIN_PASSKEY ||
+    process.env.SUPABASE_SECRET_KEY ||
+    EPHEMERAL_SERVER_KEY
+  ).trim();
 }
 
 function generateUnsubscribeToken(email: string): string {
@@ -1217,16 +1236,17 @@ app.get('/api/cms/settings/general', async (req, res) => {
     try {
       const { data, error } = await serverSupabase.from('settings').select('value').eq('key', 'general').maybeSingle();
       if (error) {
-        console.warn('[CMS Settings General Read Notice - using fallback]', error.message);
-        const dataLocal = readCmsData();
-        return res.json(dataLocal.general || null);
+        console.error('[CMS Settings General Read Error]', error.message);
+        return res.status(500).json({ error: 'Database service error' });
       }
       return res.json(data?.value || null);
     } catch (err: any) {
-      console.warn('[CMS Settings General Read Exception - using fallback]', err?.message || err);
-      const dataLocal = readCmsData();
-      return res.json(dataLocal.general || null);
+      console.error('[CMS Settings General Read Exception]', err?.message || err);
+      return res.status(500).json({ error: 'Database service error' });
     }
+  }
+  if (isProduction) {
+    return res.status(503).json({ error: 'Database service unavailable' });
   }
   const data = readCmsData();
   return res.json(data.general || null);
@@ -1235,8 +1255,22 @@ app.get('/api/cms/settings/general', async (req, res) => {
 // GENERAL SETTINGS (PROTECTED WRITE)
 app.post('/api/cms/settings/general', requireAdmin, async (req, res) => {
   const settings = req.body;
-  if (!settings) {
+  if (!settings || typeof settings !== 'object') {
     return res.status(400).json({ error: 'Missing settings payload' });
+  }
+
+  // Validate URLs if provided
+  if (settings.logo_url && !validateUrl(settings.logo_url, { allowRelative: true }).valid) {
+    return res.status(400).json({ error: 'Invalid logo_url' });
+  }
+  if (settings.favicon_url && !validateUrl(settings.favicon_url, { allowRelative: true }).valid) {
+    return res.status(400).json({ error: 'Invalid favicon_url' });
+  }
+  if (settings.banner_url && !validateUrl(settings.banner_url, { allowRelative: true }).valid) {
+    return res.status(400).json({ error: 'Invalid banner_url' });
+  }
+  if (settings.community_hub_maps_url && !validateUrl(settings.community_hub_maps_url).valid) {
+    return res.status(400).json({ error: 'Invalid community_hub_maps_url' });
   }
 
   if (serverSupabase) {
@@ -1257,6 +1291,10 @@ app.post('/api/cms/settings/general', requireAdmin, async (req, res) => {
     }
   }
 
+  if (isProduction) {
+    return res.status(503).json({ error: 'Database service unavailable' });
+  }
+
   const data = readCmsData();
   data.general = settings;
   writeCmsData(data);
@@ -1270,16 +1308,17 @@ app.get('/api/cms/settings/seo', async (req, res) => {
     try {
       const { data, error } = await serverSupabase.from('settings').select('value').eq('key', 'seo').maybeSingle();
       if (error) {
-        console.warn('[CMS SEO Read Notice - using fallback]', error.message);
-        const dataLocal = readCmsData();
-        return res.json(dataLocal.seo || null);
+        console.error('[CMS SEO Read Error]', error.message);
+        return res.status(500).json({ error: 'Database service error' });
       }
       return res.json(data?.value || null);
     } catch (err: any) {
-      console.warn('[CMS SEO Read Exception - using fallback]', err?.message || err);
-      const dataLocal = readCmsData();
-      return res.json(dataLocal.seo || null);
+      console.error('[CMS SEO Read Exception]', err?.message || err);
+      return res.status(500).json({ error: 'Database service error' });
     }
+  }
+  if (isProduction) {
+    return res.status(503).json({ error: 'Database service unavailable' });
   }
   const data = readCmsData();
   return res.json(data.seo || null);
@@ -1288,8 +1327,12 @@ app.get('/api/cms/settings/seo', async (req, res) => {
 // SEO SETTINGS (PROTECTED WRITE)
 app.post('/api/cms/settings/seo', requireAdmin, async (req, res) => {
   const seo = req.body;
-  if (!seo) {
+  if (!seo || typeof seo !== 'object') {
     return res.status(400).json({ error: 'Missing SEO settings payload' });
+  }
+
+  if (seo.og_image && !validateUrl(seo.og_image, { allowRelative: true }).valid) {
+    return res.status(400).json({ error: 'Invalid og_image URL' });
   }
 
   if (serverSupabase) {
@@ -1310,6 +1353,10 @@ app.post('/api/cms/settings/seo', requireAdmin, async (req, res) => {
     }
   }
 
+  if (isProduction) {
+    return res.status(503).json({ error: 'Database service unavailable' });
+  }
+
   const data = readCmsData();
   data.seo = seo;
   writeCmsData(data);
@@ -1323,16 +1370,17 @@ app.get('/api/cms/settings/legal', async (req, res) => {
     try {
       const { data, error } = await serverSupabase.from('settings').select('value').eq('key', 'legal_policies').maybeSingle();
       if (error) {
-        console.warn('[CMS Legal Read Notice - using fallback]', error.message);
-        const dataLocal = readCmsData();
-        return res.json(dataLocal.legal_policies || null);
+        console.error('[CMS Legal Read Error]', error.message);
+        return res.status(500).json({ error: 'Database service error' });
       }
       return res.json(data?.value || null);
     } catch (err: any) {
-      console.warn('[CMS Legal Read Exception - using fallback]', err?.message || err);
-      const dataLocal = readCmsData();
-      return res.json(dataLocal.legal_policies || null);
+      console.error('[CMS Legal Read Exception]', err?.message || err);
+      return res.status(500).json({ error: 'Database service error' });
     }
+  }
+  if (isProduction) {
+    return res.status(503).json({ error: 'Database service unavailable' });
   }
   const data = readCmsData();
   return res.json(data.legal_policies || null);
@@ -1341,7 +1389,7 @@ app.get('/api/cms/settings/legal', async (req, res) => {
 // LEGAL SETTINGS (PROTECTED WRITE)
 app.post('/api/cms/settings/legal', requireAdmin, async (req, res) => {
   const legal = req.body;
-  if (!legal) {
+  if (!legal || typeof legal !== 'object') {
     return res.status(400).json({ error: 'Missing legal settings payload' });
   }
 
@@ -1363,6 +1411,10 @@ app.post('/api/cms/settings/legal', requireAdmin, async (req, res) => {
     }
   }
 
+  if (isProduction) {
+    return res.status(503).json({ error: 'Database service unavailable' });
+  }
+
   const data = readCmsData();
   data.legal_policies = legal;
   writeCmsData(data);
@@ -1376,9 +1428,8 @@ app.get('/api/cms/settings/home', async (req, res) => {
     try {
       const { data, error } = await serverSupabase.from('pages').select('*').eq('page_key', 'home').maybeSingle();
       if (error) {
-        console.warn('[CMS Home Config Read Notice - using fallback]', error.message);
-        const dataLocal = readCmsData();
-        return res.json(dataLocal.home || null);
+        console.error('[CMS Home Config Read Error]', error.message);
+        return res.status(500).json({ error: 'Database service error' });
       }
       if (data) {
         return res.json({
@@ -1392,13 +1443,14 @@ app.get('/api/cms/settings/home', async (req, res) => {
           cta: data.cta
         });
       }
-      const dataLocal = readCmsData();
-      return res.json(dataLocal.home || null);
+      return res.json(null);
     } catch (err: any) {
-      console.warn('[CMS Home Config Read Exception - using fallback]', err?.message || err);
-      const dataLocal = readCmsData();
-      return res.json(dataLocal.home || null);
+      console.error('[CMS Home Config Read Exception]', err?.message || err);
+      return res.status(500).json({ error: 'Database service error' });
     }
+  }
+  if (isProduction) {
+    return res.status(503).json({ error: 'Database service unavailable' });
   }
   const data = readCmsData();
   return res.json(data.home || null);
@@ -1407,8 +1459,12 @@ app.get('/api/cms/settings/home', async (req, res) => {
 // HOME PAGE CONFIG (PROTECTED WRITE)
 app.post('/api/cms/settings/home', requireAdmin, async (req, res) => {
   const homeConfig = req.body;
-  if (!homeConfig) {
+  if (!homeConfig || typeof homeConfig !== 'object') {
     return res.status(400).json({ error: 'Missing home config payload' });
+  }
+
+  if (homeConfig.banner_url && !validateUrl(homeConfig.banner_url, { allowRelative: true }).valid) {
+    return res.status(400).json({ error: 'Invalid banner_url' });
   }
 
   if (serverSupabase) {
@@ -1437,6 +1493,10 @@ app.post('/api/cms/settings/home', requireAdmin, async (req, res) => {
     }
   }
 
+  if (isProduction) {
+    return res.status(503).json({ error: 'Database service unavailable' });
+  }
+
   const data = readCmsData();
   data.home = homeConfig;
   writeCmsData(data);
@@ -1450,16 +1510,17 @@ app.get('/api/cms/projects', async (req, res) => {
     try {
       const { data, error } = await serverSupabase.from('projects').select('*').order('created_at', { ascending: false });
       if (error) {
-        console.warn('[CMS Projects Read Notice - using fallback]', error.message);
-        const local = readCmsData();
-        return res.json(local.projects || []);
+        console.error('[CMS Projects Read Error]', error.message);
+        return res.status(500).json({ error: 'Database service error' });
       }
       return res.json(Array.isArray(data) ? data : []);
     } catch (err: any) {
-      console.warn('[CMS Projects Read Exception - using fallback]', err?.message || err);
-      const local = readCmsData();
-      return res.json(local.projects || []);
+      console.error('[CMS Projects Read Exception]', err?.message || err);
+      return res.status(500).json({ error: 'Database service error' });
     }
+  }
+  if (isProduction) {
+    return res.status(503).json({ error: 'Database service unavailable' });
   }
   const data = readCmsData();
   return res.json(data.projects || []);
@@ -1899,16 +1960,17 @@ app.get('/api/cms/messages', requireAdmin, async (req, res) => {
     try {
       const { data, error } = await serverSupabase.from('messages').select('*').order('created_at', { ascending: false });
       if (error) {
-        console.warn('[CMS Messages Read Notice - using fallback]', error.message);
-        const local = readCmsData();
-        return res.json(local.messages || []);
+        console.error('[CMS Messages Read Error]', error.message);
+        return res.status(500).json({ error: 'Database service error' });
       }
       return res.json(Array.isArray(data) ? data : []);
     } catch (err: any) {
-      console.warn('[CMS Messages Read Exception - using fallback]', err?.message || err);
-      const local = readCmsData();
-      return res.json(local.messages || []);
+      console.error('[CMS Messages Read Exception]', err?.message || err);
+      return res.status(500).json({ error: 'Database service error' });
     }
+  }
+  if (isProduction) {
+    return res.status(503).json({ error: 'Database service unavailable' });
   }
   const data = readCmsData();
   return res.json(data.messages || []);
@@ -1944,6 +2006,9 @@ app.post('/api/cms/messages', contactLimiter, async (req, res) => {
       return res.status(503).json({ error: 'Database service unavailable. Unable to send message.' });
     }
   } else {
+    if (isProduction) {
+      return res.status(503).json({ error: 'Database service unavailable. Unable to send message.' });
+    }
     savedMsg = {
       id: 'msg-' + Date.now(),
       name,
@@ -2005,6 +2070,9 @@ app.post('/api/cms/messages/:id/reply', requireAdmin, async (req, res) => {
       return res.status(500).json({ success: false, message: 'Failed to process reply' });
     }
   } else {
+    if (isProduction) {
+      return res.status(503).json({ success: false, message: 'Database service unavailable' });
+    }
     const localData = readCmsData();
     const targetMsg = (localData.messages || []).find((m: any) => m.id === id);
     if (!targetMsg) {
@@ -2091,6 +2159,10 @@ app.patch('/api/cms/messages/:id/status', requireAdmin, async (req, res) => {
     }
   }
 
+  if (isProduction) {
+    return res.status(503).json({ error: 'Database service unavailable' });
+  }
+
   const data = readCmsData();
   data.messages = data.messages || [];
   const target = data.messages.find((m: any) => m.id === id);
@@ -2122,6 +2194,10 @@ app.delete('/api/cms/messages/:id', requireAdmin, async (req, res) => {
     }
   }
 
+  if (isProduction) {
+    return res.status(503).json({ error: 'Database service unavailable' });
+  }
+
   const data = readCmsData();
   if (data.messages) {
     data.messages = data.messages.filter((m: any) => m.id !== id);
@@ -2137,16 +2213,17 @@ app.get('/api/cms/subscribers', requireAdmin, async (req, res) => {
     try {
       const { data, error } = await serverSupabase.from('newsletter').select('*').order('created_at', { ascending: false });
       if (error) {
-        console.warn('[Subscribers Read Notice - using fallback]', error.message);
-        const local = readCmsData();
-        return res.json(local.subscribers || []);
+        console.error('[Subscribers Read Error]', error.message);
+        return res.status(500).json({ error: 'Database service error' });
       }
       return res.json(Array.isArray(data) ? data : []);
     } catch (err: any) {
-      console.warn('[Subscribers Read Exception - using fallback]', err?.message || err);
-      const local = readCmsData();
-      return res.json(local.subscribers || []);
+      console.error('[Subscribers Read Exception]', err?.message || err);
+      return res.status(500).json({ error: 'Database service error' });
     }
+  }
+  if (isProduction) {
+    return res.status(503).json({ error: 'Database service unavailable' });
   }
   const data = readCmsData();
   return res.json(data.subscribers || []);
@@ -2196,6 +2273,10 @@ app.post('/api/cms/subscribers', requireAdmin, async (req, res) => {
     }
   }
 
+  if (isProduction) {
+    return res.status(503).json({ error: 'Database service unavailable' });
+  }
+
   subscriberRecord = {
     id: 'sub-' + Date.now(),
     email: cleanEmail,
@@ -2233,6 +2314,10 @@ app.delete('/api/cms/subscribers/:id', requireAdmin, async (req, res) => {
     } catch (err: any) {
       return res.status(500).json({ error: 'Failed to delete subscriber' });
     }
+  }
+
+  if (isProduction) {
+    return res.status(503).json({ error: 'Database service unavailable' });
   }
 
   const data = readCmsData();
@@ -2727,16 +2812,17 @@ app.get('/api/cms/social', async (req, res) => {
     try {
       const { data, error } = await serverSupabase.from('social_links').select('*').order('display_order', { ascending: true });
       if (error) {
-        console.warn('[Supabase GET Social Notice - using fallback]', error.message);
-        const dataLocal = readCmsData();
-        return res.json(dataLocal.social_links || []);
+        console.error('[Supabase GET Social Error]', error.message);
+        return res.status(500).json({ error: 'Database service error' });
       }
       return res.json(data || []);
     } catch (err: any) {
-      console.warn('[Supabase GET Social Exception - using fallback]', err?.message || err);
-      const dataLocal = readCmsData();
-      return res.json(dataLocal.social_links || []);
+      console.error('[Supabase GET Social Exception]', err?.message || err);
+      return res.status(500).json({ error: 'Database service error' });
     }
+  }
+  if (isProduction) {
+    return res.status(503).json({ error: 'Database service unavailable' });
   }
   const data = readCmsData();
   return res.json(data.social_links || []);
@@ -2747,6 +2833,13 @@ app.post('/api/cms/social', requireAdmin, async (req, res) => {
   const links = req.body;
   if (!Array.isArray(links)) {
     return res.status(400).json({ error: 'Social links payload must be an array' });
+  }
+
+  // URL validate all links
+  for (const link of links) {
+    if (link.url && !validateUrl(link.url).valid) {
+      return res.status(400).json({ error: `Invalid URL format for platform ${link.platform || 'unknown'}` });
+    }
   }
 
   if (serverSupabase) {
@@ -2765,6 +2858,10 @@ app.post('/api/cms/social', requireAdmin, async (req, res) => {
     }
   }
 
+  if (isProduction) {
+    return res.status(503).json({ error: 'Database service unavailable' });
+  }
+
   const data = readCmsData();
   data.social_links = links;
   writeCmsData(data);
@@ -2778,16 +2875,17 @@ app.get('/api/cms/navigation', async (req, res) => {
     try {
       const { data, error } = await serverSupabase.from('navigation').select('*').order('display_order', { ascending: true });
       if (error) {
-        console.warn('[Supabase GET Navigation Notice - using fallback]', error.message);
-        const dataLocal = readCmsData();
-        return res.json(dataLocal.navigation || []);
+        console.error('[Supabase GET Navigation Error]', error.message);
+        return res.status(500).json({ error: 'Database service error' });
       }
       return res.json(data || []);
     } catch (err: any) {
-      console.warn('[Supabase GET Navigation Exception - using fallback]', err?.message || err);
-      const dataLocal = readCmsData();
-      return res.json(dataLocal.navigation || []);
+      console.error('[Supabase GET Navigation Exception]', err?.message || err);
+      return res.status(500).json({ error: 'Database service error' });
     }
+  }
+  if (isProduction) {
+    return res.status(503).json({ error: 'Database service unavailable' });
   }
   const data = readCmsData();
   return res.json(data.navigation || []);
@@ -2798,6 +2896,13 @@ app.post('/api/cms/navigation', requireAdmin, async (req, res) => {
   const navItems = req.body;
   if (!Array.isArray(navItems)) {
     return res.status(400).json({ error: 'Navigation payload must be an array' });
+  }
+
+  for (const item of navItems) {
+    const navPath = item.path || item.url;
+    if (navPath && !validateUrl(navPath, { allowRelative: true }).valid) {
+      return res.status(400).json({ error: `Invalid navigation path: ${navPath}` });
+    }
   }
 
   if (serverSupabase) {
@@ -2816,6 +2921,10 @@ app.post('/api/cms/navigation', requireAdmin, async (req, res) => {
     }
   }
 
+  if (isProduction) {
+    return res.status(503).json({ error: 'Database service unavailable' });
+  }
+
   const data = readCmsData();
   data.navigation = navItems;
   writeCmsData(data);
@@ -2829,16 +2938,17 @@ app.get('/api/cms/media', requireAdmin, async (req, res) => {
     try {
       const { data, error } = await serverSupabase.from('media').select('*').order('created_at', { ascending: false });
       if (error) {
-        console.warn('[Media Read Notice - using fallback]', error.message);
-        const dataLocal = readCmsData();
-        return res.json(dataLocal.media || []);
+        console.error('[Media Read Error]', error.message);
+        return res.status(500).json({ error: 'Database service error' });
       }
       return res.json(Array.isArray(data) ? data : []);
     } catch (err: any) {
-      console.warn('[Media Read Exception - using fallback]', err?.message || err);
-      const dataLocal = readCmsData();
-      return res.json(dataLocal.media || []);
+      console.error('[Media Read Exception]', err?.message || err);
+      return res.status(500).json({ error: 'Database service error' });
     }
+  }
+  if (isProduction) {
+    return res.status(503).json({ error: 'Database service unavailable' });
   }
   const data = readCmsData();
   return res.json(data.media || []);
@@ -2931,6 +3041,9 @@ app.post(
       const { data: publicUrlData } = serverSupabase.storage.from(PROBITIAN_MEDIA_BUCKET).getPublicUrl(storagePath);
       publicUrl = publicUrlData.publicUrl;
     } else {
+      if (isProduction) {
+        return res.status(503).json({ error: 'Database service unavailable' });
+      }
       publicUrl = `data:${mimeType};base64,${fileBuffer.toString('base64')}`;
     }
 
@@ -3025,6 +3138,10 @@ app.post('/api/cms/media', requireAdmin, uploadLimiter, async (req, res) => {
     }
   }
 
+  if (isProduction) {
+    return res.status(503).json({ error: 'Database service unavailable' });
+  }
+
   const cmsData = readCmsData();
   cmsData.media = cmsData.media || [];
   cmsData.media.unshift(itemWithId);
@@ -3094,6 +3211,10 @@ app.delete('/api/cms/media/:id', requireAdmin, async (req, res) => {
     }
   }
 
+  if (isProduction) {
+    return res.status(503).json({ error: 'Database service unavailable' });
+  }
+
   // Always keep local fallback in sync
   const cmsData = readCmsData();
   if (cmsData.media) {
@@ -3110,16 +3231,17 @@ app.get('/api/cms/categories', async (req, res) => {
     try {
       const { data, error } = await serverSupabase.from('categories').select('*');
       if (error) {
-        console.warn('[Supabase GET Categories Notice - using fallback]', error.message);
-        const dataLocal = readCmsData();
-        return res.json(dataLocal.categories || []);
+        console.error('[Supabase GET Categories Error]', error.message);
+        return res.status(500).json({ error: 'Database service error' });
       }
       return res.json(data || []);
     } catch (err: any) {
-      console.warn('[Supabase GET Categories Exception - using fallback]', err?.message || err);
-      const dataLocal = readCmsData();
-      return res.json(dataLocal.categories || []);
+      console.error('[Supabase GET Categories Exception]', err?.message || err);
+      return res.status(500).json({ error: 'Database service error' });
     }
+  }
+  if (isProduction) {
+    return res.status(503).json({ error: 'Database service unavailable' });
   }
   const data = readCmsData();
   return res.json(data.categories || []);
@@ -3144,6 +3266,10 @@ app.post('/api/cms/categories', requireAdmin, async (req, res) => {
       console.error('[Supabase POST Category Exception]', err);
       return res.status(500).json({ error: 'Failed to save category' });
     }
+  }
+
+  if (isProduction) {
+    return res.status(503).json({ error: 'Database service unavailable' });
   }
 
   const data = readCmsData();
