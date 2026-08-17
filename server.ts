@@ -7,8 +7,19 @@ import { createServer as createViteServer } from 'vite';
 import { createClient } from '@supabase/supabase-js';
 import { emailService } from './src/services/emailService';
 import { campaignEmailService } from './src/services/campaignEmailService';
+import { validateUrl } from './src/lib/urlValidator';
 
 dotenv.config();
+
+const isProduction = process.env.NODE_ENV === 'production';
+const sessionSecretEnv = (process.env.SESSION_SECRET || '').trim();
+
+// Production Security Requirement: SESSION_SECRET is mandatory in production
+if (isProduction && !sessionSecretEnv) {
+  const fatalMsg = '[FATAL CONFIGURATION ERROR] SESSION_SECRET is mandatory in production environment. Refusing to start with ephemeral key.';
+  console.error(fatalMsg);
+  throw new Error(fatalMsg);
+}
 
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
@@ -19,6 +30,19 @@ app.set('trust proxy', 1);
 // Safe baseline body limit for API routes (large uploads use route-specific parser)
 app.use(express.json({ limit: '500kb' }));
 app.use(express.urlencoded({ limit: '500kb', extended: true }));
+
+// ==================== AUTHORITATIVE ADMIN EMAILS ====================
+export function getAuthorizedAdminEmails(): string[] {
+  const configuredList = (process.env.ADMIN_EMAILS || 'probitianofficial@gmail.com')
+    .split(',')
+    .map(e => e.trim().toLowerCase())
+    .filter(Boolean);
+  
+  if (!configuredList.includes('probitianofficial@gmail.com')) {
+    configuredList.push('probitianofficial@gmail.com');
+  }
+  return Array.from(new Set(configuredList));
+}
 
 // ==================== ORIGIN ALLOWLIST & CORS VALIDATOR ====================
 function isAllowedOrigin(origin: string | undefined, req: express.Request): boolean {
@@ -174,6 +198,19 @@ app.use((req, res, next) => {
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
   }
+
+  // Sensitive API Cache Protection
+  if (
+    req.path.startsWith('/api/admin') ||
+    req.path.startsWith('/api/cms/messages') ||
+    req.path.startsWith('/api/cms/subscribers') ||
+    req.path.startsWith('/api/analytics')
+  ) {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+  }
+
   next();
 });
 
@@ -201,15 +238,18 @@ interface AdminSession {
 const adminSessions = new Map<string, AdminSession>();
 const revokedSessions = new Set<string>();
 
-// Ephemeral fallback key generated per server process instance if no explicit secret key is set in environment
+// Ephemeral fallback key generated per server process instance if no explicit secret key is set in environment (Dev only)
 const EPHEMERAL_SERVER_KEY = crypto.randomBytes(32).toString('hex');
 
 function getSessionSecret(): string {
-  return (process.env.ADMIN_PASSKEY || process.env.SUPABASE_SECRET_KEY || process.env.SESSION_SECRET || EPHEMERAL_SERVER_KEY).trim();
+  if (isProduction) {
+    return sessionSecretEnv;
+  }
+  return (sessionSecretEnv || process.env.ADMIN_PASSKEY || process.env.SUPABASE_SECRET_KEY || EPHEMERAL_SERVER_KEY).trim();
 }
 
 function createSignedSessionToken(email: string, maxAgeMs: number = 24 * 60 * 60 * 1000): string {
-  const cleanEmail = (email || 'admin@probitian.com').toLowerCase().trim();
+  const cleanEmail = (email || 'probitianofficial@gmail.com').toLowerCase().trim();
   const payload = {
     email: cleanEmail,
     createdAt: Date.now(),
@@ -587,6 +627,9 @@ function isValidId(id?: string): boolean {
 const CMS_DATA_FILE = path.join(process.cwd(), 'data', 'cms_settings.json');
 
 function readCmsData() {
+  if (isProduction) {
+    return {};
+  }
   try {
     if (fs.existsSync(CMS_DATA_FILE)) {
       const content = fs.readFileSync(CMS_DATA_FILE, 'utf-8');
@@ -599,6 +642,9 @@ function readCmsData() {
 }
 
 function writeCmsData(data: any) {
+  if (isProduction) {
+    return;
+  }
   try {
     const dir = path.dirname(CMS_DATA_FILE);
     if (!fs.existsSync(dir)) {
@@ -694,13 +740,16 @@ app.post('/api/admin/verify-passkey', loginLimiter, (req, res) => {
   const enteredPasskey = passkey.trim();
 
   if (constantTimeCompare(enteredPasskey, serverPasskey)) {
-    let adminEmail = 'admin@probitian.com';
+    const authorizedEmails = getAuthorizedAdminEmails();
+    let adminEmail = authorizedEmails[0] || 'probitianofficial@gmail.com';
+
     if (typeof email === 'string' && email.trim()) {
       const cleanEmail = email.trim().toLowerCase();
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (emailRegex.test(cleanEmail)) {
-        adminEmail = cleanEmail;
+      if (!authorizedEmails.includes(cleanEmail)) {
+        console.warn(`[SECURITY] Unauthorized email attempted passkey login: ${cleanEmail}`);
+        return res.status(403).json({ error: 'Forbidden: Email address is not authorized for administrator access' });
       }
+      adminEmail = cleanEmail;
     }
 
     const token = createSignedSessionToken(adminEmail);
@@ -754,18 +803,12 @@ app.post('/api/admin/verify-supabase-session', loginLimiter, async (req, res) =>
 
     const userEmail = verifiedUser.email.toLowerCase().trim();
 
-    // Explicit Admin Authorization Check
+    // Explicit Admin Authorization Check (Section 4)
     let isAuthorizedAdmin = false;
 
-    // 1. Check authorized administrator email allowlist
-    const configuredAdminEmails = [
-      'probitianofficial@gmail.com',
-      'shivam@probitian.com',
-      'shivambaghel79@gmail.com',
-      ...(process.env.ADMIN_EMAILS ? process.env.ADMIN_EMAILS.split(',').map(e => e.trim().toLowerCase()) : [])
-    ];
-
-    if (configuredAdminEmails.includes(userEmail)) {
+    // 1. Authoritative administrator email allowlist
+    const authorizedEmails = getAuthorizedAdminEmails();
+    if (authorizedEmails.includes(userEmail)) {
       isAuthorizedAdmin = true;
     }
 
@@ -827,12 +870,26 @@ app.get('/api/admin/session', (req, res) => {
 });
 
 // POST /api/admin/logout
-app.post('/api/admin/logout', (req, res) => {
+app.post('/api/admin/logout', async (req, res) => {
   const cookies = parseCookies(req);
   const token = cookies['admin_session'];
   if (token) {
     adminSessions.delete(token);
     revokedSessions.add(token);
+
+    if (serverSupabase) {
+      try {
+        const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+        await serverSupabase.from('revoked_sessions').upsert({
+          token_hash: tokenHash,
+          revoked_at: new Date().toISOString(),
+          expires_at: expiresAt
+        });
+      } catch (e) {
+        // Table might be optional or in development
+      }
+    }
   }
   res.setHeader('Set-Cookie', getAdminCookieHeader('', req, 0));
   return res.json({ success: true });
@@ -967,13 +1024,12 @@ app.post('/api/newsletter', newsletterLimiter, async (req, res) => {
   });
 });
 
-// Public Unsubscribe Endpoint
+// Public Unsubscribe Endpoint - GET (Verification & Confirmation Screen)
 app.get('/api/newsletter/unsubscribe', unsubscribeLimiter, async (req, res) => {
   const token = (req.query.token || '').toString().trim();
   const rawEmail = (req.query.email || '').toString().trim();
 
   let verifiedEmail: string | null = null;
-
   if (token) {
     verifiedEmail = verifyUnsubscribeToken(token);
   } else if (rawEmail) {
@@ -983,26 +1039,112 @@ app.get('/api/newsletter/unsubscribe', unsubscribeLimiter, async (req, res) => {
   if (!verifiedEmail) {
     return res.status(400).send(`
       <!DOCTYPE html>
-      <html>
-        <head><title>Unsubscribe - ProBitian</title><style>body{font-family:sans-serif;text-align:center;padding:50px;background:#f8fafc;color:#1e293b;}.card{max-width:480px;margin:auto;background:white;padding:32px;border-radius:12px;border:1px solid #e2e8f0;}</style></head>
+      <html lang="en">
+        <head>
+          <meta charset="UTF-8">
+          <title>Invalid Unsubscribe Link - ProBitian</title>
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #0f172a; color: #f8fafc; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; }
+            .card { background-color: #1e293b; border: 1px solid #334155; border-radius: 16px; max-width: 500px; width: 100%; padding: 40px; text-align: center; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5); }
+            h1 { color: #f87171; font-size: 22px; font-weight: 800; margin-bottom: 12px; }
+            p { color: #94a3b8; font-size: 15px; line-height: 1.6; margin-bottom: 24px; }
+            .btn { display: inline-block; background-color: #334155; color: #ffffff; font-weight: 700; padding: 12px 24px; border-radius: 8px; text-decoration: none; }
+          </style>
+        </head>
         <body>
           <div class="card">
-            <h2 style="color:#ef4444;">Invalid or Expired Request</h2>
-            <p>The unsubscribe request is invalid, tampered with, or expired. Please use the original unsubscribe link provided in your newsletter email.</p>
+            <h1>Invalid or Expired Link</h1>
+            <p>The unsubscribe token is invalid, expired, or tampered with. Please use the original link included at the bottom of your email newsletter.</p>
+            <a href="/" class="btn">Return to ProBitian</a>
           </div>
         </body>
       </html>
     `);
   }
 
-  // Update in Supabase
+  // Render confirmation form for GET
+  return res.status(200).send(`
+    <!DOCTYPE html>
+    <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <title>Confirm Unsubscribe - ProBitian</title>
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #0f172a; color: #f8fafc; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; }
+          .card { background-color: #1e293b; border: 1px solid #334155; border-radius: 16px; max-width: 500px; width: 100%; padding: 40px; text-align: center; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5); }
+          .badge { display: inline-block; background-color: #f59e0b; color: #0f172a; font-weight: 900; padding: 6px 12px; border-radius: 8px; font-size: 16px; margin-bottom: 16px; }
+          h1 { color: #ffffff; font-size: 24px; font-weight: 800; margin-bottom: 12px; }
+          p { color: #94a3b8; font-size: 15px; line-height: 1.6; margin-bottom: 24px; }
+          .email-highlight { color: #a78bfa; font-weight: 600; }
+          .btn-danger { display: inline-block; background-color: #ef4444; color: #ffffff; font-weight: 700; padding: 12px 28px; border-radius: 8px; border: none; font-size: 16px; cursor: pointer; transition: background-color 0.2s; }
+          .btn-danger:hover { background-color: #dc2626; }
+          .btn-cancel { display: inline-block; margin-top: 14px; color: #94a3b8; text-decoration: none; font-size: 14px; }
+          .btn-cancel:hover { color: #f8fafc; }
+        </style>
+      </head>
+      <body>
+        <div class="card">
+          <div class="badge">PB</div>
+          <h1>Confirm Unsubscribe</h1>
+          <p>Are you sure you want to unsubscribe <span class="email-highlight">${escapeHtml(verifiedEmail)}</span> from all ProBitian newsletters and updates?</p>
+          <form method="POST" action="/api/newsletter/unsubscribe">
+            <input type="hidden" name="token" value="${escapeHtml(token)}" />
+            <button type="submit" class="btn-danger">Yes, Unsubscribe Me</button>
+          </form>
+          <div>
+            <a href="/" class="btn-cancel">Cancel and return to ProBitian</a>
+          </div>
+        </div>
+      </body>
+    </html>
+  `);
+});
+
+// Public Unsubscribe Endpoint - POST (State Modification)
+app.post('/api/newsletter/unsubscribe', unsubscribeLimiter, async (req, res) => {
+  const token = (req.body?.token || req.query?.token || '').toString().trim();
+  const emailFromBody = (req.body?.email || req.query?.email || '').toString().trim();
+
+  let verifiedEmail: string | null = null;
+  if (token) {
+    verifiedEmail = verifyUnsubscribeToken(token);
+  } else if (emailFromBody) {
+    verifiedEmail = verifyUnsubscribeToken(emailFromBody);
+  }
+
+  if (!verifiedEmail) {
+    if (req.xhr || req.headers.accept?.includes('application/json')) {
+      return res.status(400).json({ error: 'Invalid or expired unsubscribe token' });
+    }
+    return res.status(400).send(`
+      <!DOCTYPE html>
+      <html lang="en">
+        <head><title>Error - ProBitian</title><style>body{font-family:sans-serif;text-align:center;padding:50px;background:#0f172a;color:#f8fafc;}</style></head>
+        <body><h2>Invalid or Expired Request</h2><p>Please use the link in your email.</p></body>
+      </html>
+    `);
+  }
+
   if (serverSupabase) {
     try {
-      await serverSupabase.from('newsletter').update({ status: 'unsubscribed' }).eq('email', verifiedEmail);
+      const { error } = await serverSupabase
+        .from('newsletter')
+        .update({ status: 'unsubscribed' })
+        .eq('email', verifiedEmail);
+
+      if (error) {
+        console.error('[Unsubscribe DB Error]', error.message);
+        if (isProduction) {
+          return res.status(503).json({ error: 'Database service unavailable' });
+        }
+      }
     } catch (e) {
-      console.error('[Unsubscribe DB Error]', e);
+      console.error('[Unsubscribe DB Exception]', e);
+      if (isProduction) {
+        return res.status(503).json({ error: 'Database service unavailable' });
+      }
     }
-  } else {
+  } else if (!isProduction) {
     const data = readCmsData();
     data.subscribers = data.subscribers || [];
     const target = data.subscribers.find((s: any) => s.email.toLowerCase() === verifiedEmail);
@@ -1010,6 +1152,12 @@ app.get('/api/newsletter/unsubscribe', unsubscribeLimiter, async (req, res) => {
       target.status = 'unsubscribed';
       writeCmsData(data);
     }
+  } else {
+    return res.status(503).json({ error: 'Database service unavailable' });
+  }
+
+  if (req.xhr || req.headers.accept?.includes('application/json')) {
+    return res.json({ success: true, message: `Successfully unsubscribed ${verifiedEmail}` });
   }
 
   return res.status(200).send(`
@@ -1025,7 +1173,7 @@ app.get('/api/newsletter/unsubscribe', unsubscribeLimiter, async (req, res) => {
           h1 { color: #ffffff; font-size: 24px; font-weight: 800; margin-bottom: 12px; }
           p { color: #94a3b8; font-size: 15px; line-height: 1.6; margin-bottom: 24px; }
           .email-highlight { color: #a78bfa; font-weight: 600; }
-          .btn { display: inline-block; background-color: #7c3aed; color: #ffffff; font-weight: 700; padding: 12px 24px; border-radius: 8px; text-decoration: none; transition: all 0.2s; }
+          .btn { display: inline-block; background-color: #7c3aed; color: #ffffff; font-weight: 700; padding: 12px 24px; border-radius: 8px; text-decoration: none; }
           .btn:hover { background-color: #6d28d9; }
         </style>
       </head>
@@ -2372,11 +2520,22 @@ app.post('/api/admin/email-campaigns/:id/test', requireAdmin, emailTestLimiter, 
   return res.json(result);
 });
 
+// In-memory active campaign lock to prevent duplicate concurrent broadcast execution
+const activeSendingCampaigns = new Set<string>();
+
 // POST Send Bulk Campaign to Active Subscribers
 app.post('/api/admin/email-campaigns/:id/send', requireAdmin, emailSendLimiter, async (req, res) => {
   const { id } = req.params;
   if (!isValidId(id)) {
     return res.status(400).json({ success: false, message: 'Invalid campaign ID format' });
+  }
+
+  // 1. Process-level concurrent broadcast lock
+  if (activeSendingCampaigns.has(id)) {
+    return res.status(409).json({
+      success: false,
+      message: 'Campaign broadcast is currently in progress. Please wait for the current broadcast to finish.'
+    });
   }
 
   let campaign: any = null;
@@ -2393,13 +2552,30 @@ app.post('/api/admin/email-campaigns/:id/send', requireAdmin, emailSendLimiter, 
       console.error('[Campaign Send Error] DB Exception:', e);
       return res.status(503).json({ success: false, message: 'Database service unavailable' });
     }
-  } else {
+  } else if (!isProduction) {
     const data = readCmsData();
     campaign = (data.campaigns || []).find((c: any) => c.id === id);
+  } else {
+    return res.status(503).json({ success: false, message: 'Database service unavailable' });
   }
 
   if (!campaign) {
     return res.status(404).json({ success: false, message: 'Campaign record not found' });
+  }
+
+  // 2. Database-level state machine validation
+  if (campaign.status === 'sending') {
+    return res.status(409).json({
+      success: false,
+      message: 'Campaign status is currently "sending". A broadcast is already actively running.'
+    });
+  }
+
+  if (campaign.status === 'sent') {
+    return res.status(409).json({
+      success: false,
+      message: 'Campaign has already been sent to all active subscribers. To prevent accidental duplicates, duplicate or create a new campaign to send again.'
+    });
   }
 
   if (!campaignEmailService.isConfigured()) {
@@ -2424,10 +2600,12 @@ app.post('/api/admin/email-campaigns/:id/send', requireAdmin, emailSendLimiter, 
       console.error('[Campaign Send Error] Subscribers Exception:', e);
       return res.status(503).json({ success: false, message: 'Database service unavailable' });
     }
-  } else {
+  } else if (!isProduction) {
     const data = readCmsData();
     const subs = data.subscribers || [];
     activeSubscribers = subs.filter((s: any) => s.status === 'active');
+  } else {
+    return res.status(503).json({ success: false, message: 'Database service unavailable' });
   }
 
   if (activeSubscribers.length === 0) {
@@ -2437,79 +2615,108 @@ app.post('/api/admin/email-campaigns/:id/send', requireAdmin, emailSendLimiter, 
     });
   }
 
-  const reqProtocol = req.headers['x-forwarded-proto'] || req.protocol;
-  const reqHost = req.headers['x-forwarded-host'] || req.headers.host;
-  const baseUrl = `${reqProtocol}://${reqHost}`;
+  // Lock campaign and transition state to 'sending'
+  activeSendingCampaigns.add(id);
 
-  let successfulCount = 0;
-  let failedCount = 0;
-  const recipientsLog: any[] = [];
+  try {
+    const startTimestamp = new Date().toISOString();
+    if (serverSupabase) {
+      await serverSupabase
+        .from('email_campaigns')
+        .update({ status: 'sending', updated_at: startTimestamp })
+        .eq('id', id);
+    } else if (!isProduction) {
+      const data = readCmsData();
+      const cIdx = (data.campaigns || []).findIndex((c: any) => c.id === id);
+      if (cIdx >= 0) {
+        data.campaigns[cIdx].status = 'sending';
+        data.campaigns[cIdx].updated_at = startTimestamp;
+        writeCmsData(data);
+      }
+    }
 
-  for (const subscriber of activeSubscribers) {
-    const subEmail = subscriber.email;
-    const unsubToken = generateUnsubscribeToken(subEmail);
-    const unsubUrl = `${baseUrl}/api/newsletter/unsubscribe?token=${unsubToken}`;
+    const reqProtocol = req.headers['x-forwarded-proto'] || req.protocol;
+    const reqHost = req.headers['x-forwarded-host'] || req.headers.host;
+    const baseUrl = `${reqProtocol}://${reqHost}`;
 
-    const sendRes = await campaignEmailService.sendSingleRecipient({
-      toEmail: subEmail,
-      subject: campaign.subject,
-      previewText: campaign.preview_text,
-      contentHtml: campaign.content,
-      unsubscribeUrl: unsubUrl
+    let successfulCount = 0;
+    let failedCount = 0;
+    const recipientsLog: any[] = [];
+
+    for (const subscriber of activeSubscribers) {
+      const subEmail = subscriber.email;
+      const unsubToken = generateUnsubscribeToken(subEmail);
+      const unsubUrl = `${baseUrl}/api/newsletter/unsubscribe?token=${unsubToken}`;
+
+      const sendRes = await campaignEmailService.sendSingleRecipient({
+        toEmail: subEmail,
+        subject: campaign.subject,
+        previewText: campaign.preview_text,
+        contentHtml: campaign.content,
+        unsubscribeUrl: unsubUrl
+      });
+
+      const recipientRecord = {
+        id: 'rec-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+        campaign_id: campaign.id,
+        subscriber_id: subscriber.id,
+        email: subEmail,
+        status: sendRes.success ? 'sent' : 'failed',
+        provider_message_id: sendRes.messageId || null,
+        error_message: sendRes.error || null,
+        sent_at: new Date().toISOString()
+      };
+
+      recipientsLog.push(recipientRecord);
+
+      if (sendRes.success) {
+        successfulCount++;
+      } else {
+        failedCount++;
+      }
+    }
+
+    const sentAt = new Date().toISOString();
+    const finalStatus = failedCount === 0 ? 'sent' : (successfulCount > 0 ? 'partially_sent' : 'failed');
+
+    campaign.status = finalStatus;
+    campaign.sent_at = sentAt;
+    campaign.total_recipients = activeSubscribers.length;
+    campaign.successful_count = successfulCount;
+    campaign.failed_count = failedCount;
+    campaign.updated_at = sentAt;
+
+    if (serverSupabase) {
+      try {
+        await serverSupabase.from('email_campaigns').upsert(campaign);
+        await serverSupabase.from('email_campaign_recipients').insert(recipientsLog);
+      } catch (e) {
+        console.warn('[Supabase Campaign Send Update Warning]', e);
+      }
+    } else if (!isProduction) {
+      const data = readCmsData();
+      data.campaigns = data.campaigns || [];
+      const cIdx = data.campaigns.findIndex((c: any) => c.id === campaign.id);
+      if (cIdx >= 0) data.campaigns[cIdx] = campaign;
+      data.campaign_recipients = data.campaign_recipients || [];
+      data.campaign_recipients.push(...recipientsLog);
+      writeCmsData(data);
+    }
+
+    return res.json({
+      success: true,
+      message: `Campaign broadcast completed! ${successfulCount} sent successfully, ${failedCount} failed out of ${activeSubscribers.length} active subscribers.`,
+      campaign
     });
-
-    const recipientRecord = {
-      id: 'rec-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
-      campaign_id: campaign.id,
-      subscriber_id: subscriber.id,
-      email: subEmail,
-      status: sendRes.success ? 'sent' : 'failed',
-      provider_message_id: sendRes.messageId || null,
-      error_message: sendRes.error || null,
-      sent_at: new Date().toISOString()
-    };
-
-    recipientsLog.push(recipientRecord);
-
-    if (sendRes.success) {
-      successfulCount++;
-    } else {
-      failedCount++;
+  } catch (broadcastErr: any) {
+    console.error('[Campaign Broadcast Uncaught Error]', broadcastErr);
+    if (serverSupabase) {
+      await serverSupabase.from('email_campaigns').update({ status: 'failed', updated_at: new Date().toISOString() }).eq('id', id);
     }
+    return res.status(500).json({ success: false, message: 'Broadcast execution encountered a server error' });
+  } finally {
+    activeSendingCampaigns.delete(id);
   }
-
-  const sentAt = new Date().toISOString();
-  const finalStatus = failedCount === 0 ? 'sent' : (successfulCount > 0 ? 'partially_sent' : 'failed');
-
-  campaign.status = finalStatus;
-  campaign.sent_at = sentAt;
-  campaign.total_recipients = activeSubscribers.length;
-  campaign.successful_count = successfulCount;
-  campaign.failed_count = failedCount;
-  campaign.updated_at = sentAt;
-
-  if (serverSupabase) {
-    try {
-      await serverSupabase.from('email_campaigns').upsert(campaign);
-      await serverSupabase.from('email_campaign_recipients').insert(recipientsLog);
-    } catch (e) {
-      console.warn('[Supabase Campaign Send Update Warning]', e);
-    }
-  } else {
-    const data = readCmsData();
-    data.campaigns = data.campaigns || [];
-    const cIdx = data.campaigns.findIndex((c: any) => c.id === campaign.id);
-    if (cIdx >= 0) data.campaigns[cIdx] = campaign;
-    data.campaign_recipients = data.campaign_recipients || [];
-    data.campaign_recipients.push(...recipientsLog);
-    writeCmsData(data);
-  }
-
-  return res.json({
-    success: true,
-    message: `Campaign broadcast completed! ${successfulCount} sent successfully, ${failedCount} failed out of ${activeSubscribers.length} active subscribers.`,
-    campaign
-  });
 });
 
 // ==================== SOCIAL, NAVIGATION, MEDIA, CATEGORIES ====================
@@ -2571,13 +2778,15 @@ app.get('/api/cms/navigation', async (req, res) => {
     try {
       const { data, error } = await serverSupabase.from('navigation').select('*').order('display_order', { ascending: true });
       if (error) {
-        console.error('[Supabase GET Navigation Error]', error.message);
-        return res.status(503).json({ error: 'Database service unavailable' });
+        console.warn('[Supabase GET Navigation Notice - using fallback]', error.message);
+        const dataLocal = readCmsData();
+        return res.json(dataLocal.navigation || []);
       }
       return res.json(data || []);
-    } catch (err) {
-      console.error('[Supabase GET Navigation Exception]', err);
-      return res.status(503).json({ error: 'Database service unavailable' });
+    } catch (err: any) {
+      console.warn('[Supabase GET Navigation Exception - using fallback]', err?.message || err);
+      const dataLocal = readCmsData();
+      return res.json(dataLocal.navigation || []);
     }
   }
   const data = readCmsData();
@@ -2620,13 +2829,15 @@ app.get('/api/cms/media', requireAdmin, async (req, res) => {
     try {
       const { data, error } = await serverSupabase.from('media').select('*').order('created_at', { ascending: false });
       if (error) {
-        console.error('[Media Read Error]', error.message);
-        return res.status(503).json({ error: 'Database service unavailable' });
+        console.warn('[Media Read Notice - using fallback]', error.message);
+        const dataLocal = readCmsData();
+        return res.json(dataLocal.media || []);
       }
       return res.json(Array.isArray(data) ? data : []);
     } catch (err: any) {
-      console.error('[Media Read Exception]', err);
-      return res.status(503).json({ error: 'Database service unavailable' });
+      console.warn('[Media Read Exception - using fallback]', err?.message || err);
+      const dataLocal = readCmsData();
+      return res.json(dataLocal.media || []);
     }
   }
   const data = readCmsData();
@@ -2899,13 +3110,15 @@ app.get('/api/cms/categories', async (req, res) => {
     try {
       const { data, error } = await serverSupabase.from('categories').select('*');
       if (error) {
-        console.error('[Supabase GET Categories Error]', error.message);
-        return res.status(503).json({ error: 'Database service unavailable' });
+        console.warn('[Supabase GET Categories Notice - using fallback]', error.message);
+        const dataLocal = readCmsData();
+        return res.json(dataLocal.categories || []);
       }
       return res.json(data || []);
-    } catch (err) {
-      console.error('[Supabase GET Categories Exception]', err);
-      return res.status(503).json({ error: 'Database service unavailable' });
+    } catch (err: any) {
+      console.warn('[Supabase GET Categories Exception - using fallback]', err?.message || err);
+      const dataLocal = readCmsData();
+      return res.json(dataLocal.categories || []);
     }
   }
   const data = readCmsData();

@@ -16,6 +16,7 @@ import {
   CategoryItem
 } from '../types';
 import { LegalSettings, DEFAULT_LEGAL_SETTINGS } from '../data/defaultLegalData';
+import { PROJECTS, BLOG_ARTICLES, YOUTUBE_VIDEOS, LEARN_TOPICS } from '../data/mockData';
 
 /**
  * Safe fetch helper for Express API routes (Single source of truth: Supabase via Express)
@@ -60,20 +61,36 @@ async function safeFetchJson<T = any>(url: string, options?: RequestInit): Promi
 export const cmsService = {
   // --- GENERAL SETTINGS ---
   async getGeneralSettings(): Promise<WebsiteGeneralSettings> {
-    const data = await safeFetchJson<WebsiteGeneralSettings | null>('/api/cms/settings/general');
-    return {
-      website_name: data?.website_name || 'ProBitian',
-      tagline: data?.tagline || 'Master Business Intelligence',
-      contact_email: data?.contact_email || 'probitianofficial@gmail.com',
-      logo_url: data?.logo_url || '/logo.svg',
-      favicon_url: data?.favicon_url || '/logo.svg',
-      banner_url: data?.banner_url || '/banner.svg',
-      theme_color: data?.theme_color || 'purple',
-      footer_copyright: data?.footer_copyright || '© 2026 ProBitian. All Rights Reserved.',
-      community_hub_name: data?.community_hub_name || 'ProBitian Community Hub',
-      community_hub_address: data?.community_hub_address || 'M93M+688, Salaiya, Madhya Pradesh 486440, India',
-      community_hub_maps_url: data?.community_hub_maps_url || 'https://maps.app.goo.gl/T4426JADcNHHFPqb7'
-    };
+    try {
+      const data = await safeFetchJson<WebsiteGeneralSettings | null>('/api/cms/settings/general');
+      return {
+        website_name: data?.website_name || 'ProBitian',
+        tagline: data?.tagline || 'Master Business Intelligence',
+        contact_email: data?.contact_email || 'probitianofficial@gmail.com',
+        logo_url: data?.logo_url || '/logo.svg',
+        favicon_url: data?.favicon_url || '/logo.svg',
+        banner_url: data?.banner_url || '/banner.svg',
+        theme_color: data?.theme_color || 'purple',
+        footer_copyright: data?.footer_copyright || '© 2026 ProBitian. All Rights Reserved.',
+        community_hub_name: data?.community_hub_name || 'ProBitian Community Hub',
+        community_hub_address: data?.community_hub_address || 'M93M+688, Salaiya, Madhya Pradesh 486440, India',
+        community_hub_maps_url: data?.community_hub_maps_url || 'https://maps.app.goo.gl/T4426JADcNHHFPqb7'
+      };
+    } catch {
+      return {
+        website_name: 'ProBitian',
+        tagline: 'Master Business Intelligence',
+        contact_email: 'probitianofficial@gmail.com',
+        logo_url: '/logo.svg',
+        favicon_url: '/logo.svg',
+        banner_url: '/banner.svg',
+        theme_color: 'purple',
+        footer_copyright: '© 2026 ProBitian. All Rights Reserved.',
+        community_hub_name: 'ProBitian Community Hub',
+        community_hub_address: 'M93M+688, Salaiya, Madhya Pradesh 486440, India',
+        community_hub_maps_url: 'https://maps.app.goo.gl/T4426JADcNHHFPqb7'
+      };
+    }
   },
 
   async saveGeneralSettings(settings: WebsiteGeneralSettings): Promise<boolean> {
@@ -92,15 +109,26 @@ export const cmsService = {
 
   // --- SEO SETTINGS ---
   async getSeoSettings(): Promise<SeoSettings> {
-    const data = await safeFetchJson<SeoSettings | null>('/api/cms/settings/seo');
-    return {
-      meta_title: data?.meta_title || 'ProBitian | Master Business Intelligence',
-      meta_description: data?.meta_description || 'Master Power BI, SQL, Excel, Power Query, AI Tools, and Dashboard Design through practical projects and industry-focused tutorials.',
-      keywords: data?.keywords || 'Power BI, SQL, DAX, Power Query, Data Analytics, Business Intelligence, Excel, AI, ProBitian',
-      og_image: data?.og_image || '/banner.svg',
-      twitter_handle: data?.twitter_handle || '@probitian',
-      robots_txt: data?.robots_txt || 'User-agent: *\nAllow: /'
-    };
+    try {
+      const data = await safeFetchJson<SeoSettings | null>('/api/cms/settings/seo');
+      return {
+        meta_title: data?.meta_title || 'ProBitian | Master Business Intelligence',
+        meta_description: data?.meta_description || 'Master Power BI, SQL, Excel, Power Query, AI Tools, and Dashboard Design through practical projects and industry-focused tutorials.',
+        keywords: data?.keywords || 'Power BI, SQL, DAX, Power Query, Data Analytics, Business Intelligence, Excel, AI, ProBitian',
+        og_image: data?.og_image || '/banner.svg',
+        twitter_handle: data?.twitter_handle || '@probitian',
+        robots_txt: data?.robots_txt || 'User-agent: *\nAllow: /'
+      };
+    } catch {
+      return {
+        meta_title: 'ProBitian | Master Business Intelligence',
+        meta_description: 'Master Power BI, SQL, Excel, Power Query, AI Tools, and Dashboard Design through practical projects and industry-focused tutorials.',
+        keywords: 'Power BI, SQL, DAX, Power Query, Data Analytics, Business Intelligence, Excel, AI, ProBitian',
+        og_image: '/banner.svg',
+        twitter_handle: '@probitian',
+        robots_txt: 'User-agent: *\nAllow: /'
+      };
+    }
   },
 
   async saveSeoSettings(seo: SeoSettings): Promise<boolean> {
@@ -119,11 +147,15 @@ export const cmsService = {
 
   // --- LEGAL & POLICIES SETTINGS ---
   async getLegalSettings(): Promise<LegalSettings> {
-    const data = await safeFetchJson<LegalSettings | null>('/api/cms/settings/legal');
-    if (data && typeof data === 'object' && (data.terms || data.privacy)) {
-      return data as LegalSettings;
+    try {
+      const data = await safeFetchJson<LegalSettings | null>('/api/cms/settings/legal');
+      if (data && typeof data === 'object' && (data.terms || data.privacy)) {
+        return data as LegalSettings;
+      }
+      return DEFAULT_LEGAL_SETTINGS;
+    } catch {
+      return DEFAULT_LEGAL_SETTINGS;
     }
-    return DEFAULT_LEGAL_SETTINGS;
   },
 
   async saveLegalSettings(legal: LegalSettings): Promise<boolean> {
@@ -142,11 +174,15 @@ export const cmsService = {
 
   // --- HOME PAGE CONFIG ---
   async getHomePageConfig(): Promise<HomePageConfig | null> {
-    const data = await safeFetchJson<HomePageConfig | null>('/api/cms/settings/home');
-    if (data && typeof data === 'object' && data.hero_heading) {
-      return data as HomePageConfig;
+    try {
+      const data = await safeFetchJson<HomePageConfig | null>('/api/cms/settings/home');
+      if (data && typeof data === 'object' && data.hero_heading) {
+        return data as HomePageConfig;
+      }
+      return null;
+    } catch {
+      return null;
     }
-    return null;
   },
 
   async saveHomePageConfig(config: HomePageConfig): Promise<boolean> {
@@ -165,29 +201,33 @@ export const cmsService = {
 
   // --- PROJECTS ---
   async getProjects(): Promise<ProjectItem[]> {
-    const data = await safeFetchJson<any[]>('/api/cms/projects');
-    if (Array.isArray(data)) {
-      return data.map((p: any) => ({
-        id: String(p.id),
-        title: p.title || 'Untitled Project',
-        category: p.category || 'General',
-        description: p.description || '',
-        fullDescription: p.full_description || p.fullDescription || p.description || '',
-        toolsUsed: p.tools_used || p.toolsUsed || [],
-        imagePlaceholder: p.image_url || p.imagePlaceholder || 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=1200&q=80',
-        galleryUrls: p.gallery_urls || p.galleryUrls || [],
-        kpis: Array.isArray(p.kpis) ? p.kpis : [],
-        featured: Boolean(p.featured),
-        published: p.published !== false,
-        githubUrl: p.github_url || p.githubUrl,
-        liveDemoUrl: p.live_demo_url || p.liveDemoUrl,
-        youtubeUrl: p.youtube_url || p.youtubeUrl,
-        tags: p.tags || [],
-        displayOrder: p.display_order ?? p.displayOrder,
-        created_at: p.created_at
-      }));
+    try {
+      const data = await safeFetchJson<any[]>('/api/cms/projects');
+      if (Array.isArray(data) && data.length > 0) {
+        return data.map((p: any) => ({
+          id: String(p.id),
+          title: p.title || 'Untitled Project',
+          category: p.category || 'General',
+          description: p.description || '',
+          fullDescription: p.full_description || p.fullDescription || p.description || '',
+          toolsUsed: p.tools_used || p.toolsUsed || [],
+          imagePlaceholder: p.image_url || p.imagePlaceholder || 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=1200&q=80',
+          galleryUrls: p.gallery_urls || p.galleryUrls || [],
+          kpis: Array.isArray(p.kpis) ? p.kpis : [],
+          featured: Boolean(p.featured),
+          published: p.published !== false,
+          githubUrl: p.github_url || p.githubUrl,
+          liveDemoUrl: p.live_demo_url || p.liveDemoUrl,
+          youtubeUrl: p.youtube_url || p.youtubeUrl,
+          tags: p.tags || [],
+          displayOrder: p.display_order ?? p.displayOrder,
+          created_at: p.created_at
+        }));
+      }
+      return PROJECTS;
+    } catch {
+      return PROJECTS;
     }
-    return [];
   },
 
   async saveProject(project: ProjectItem): Promise<boolean> {
@@ -216,28 +256,32 @@ export const cmsService = {
 
   // --- BLOGS ---
   async getBlogs(): Promise<BlogArticle[]> {
-    const data = await safeFetchJson<any[]>('/api/cms/blogs');
-    if (Array.isArray(data)) {
-      return data.map((b: any) => ({
-        id: String(b.id),
-        title: b.title || 'Untitled Article',
-        slug: b.slug || (b.title ? b.title.toLowerCase().replace(/[^a-z0-9]+/g, '-') : 'article'),
-        excerpt: b.excerpt || '',
-        content: b.content || '',
-        category: b.category || 'Data Analytics',
-        tags: b.tags || [],
-        date: b.date || (b.created_at ? new Date(b.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recent'),
-        readTime: b.read_time || b.readTime || '5 min read',
-        author: b.author || 'Shivam Singh',
-        imageUrl: b.featured_image || b.imageUrl || 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=800&q=80',
-        status: b.status || 'published',
-        scheduledAt: b.scheduled_at || b.scheduledAt,
-        metaTitle: b.meta_title || b.metaTitle,
-        metaDescription: b.meta_description || b.metaDescription,
-        created_at: b.created_at
-      }));
+    try {
+      const data = await safeFetchJson<any[]>('/api/cms/blogs');
+      if (Array.isArray(data) && data.length > 0) {
+        return data.map((b: any) => ({
+          id: String(b.id),
+          title: b.title || 'Untitled Article',
+          slug: b.slug || (b.title ? b.title.toLowerCase().replace(/[^a-z0-9]+/g, '-') : 'article'),
+          excerpt: b.excerpt || '',
+          content: b.content || '',
+          category: b.category || 'Data Analytics',
+          tags: b.tags || [],
+          date: b.date || (b.created_at ? new Date(b.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recent'),
+          readTime: b.read_time || b.readTime || '5 min read',
+          author: b.author || 'Shivam Singh',
+          imageUrl: b.featured_image || b.imageUrl || 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=800&q=80',
+          status: b.status || 'published',
+          scheduledAt: b.scheduled_at || b.scheduledAt,
+          metaTitle: b.meta_title || b.metaTitle,
+          metaDescription: b.meta_description || b.metaDescription,
+          created_at: b.created_at
+        }));
+      }
+      return BLOG_ARTICLES;
+    } catch {
+      return BLOG_ARTICLES;
     }
-    return [];
   },
 
   async saveBlog(blog: BlogArticle): Promise<boolean> {
@@ -266,29 +310,33 @@ export const cmsService = {
 
   // --- COURSES / LEARN TOPICS ---
   async getCourses(): Promise<LearnTopic[]> {
-    const data = await safeFetchJson<any[]>('/api/cms/courses');
-    if (Array.isArray(data)) {
-      return data.map((c: any) => ({
-        id: String(c.id),
-        title: c.title || 'Untitled Course',
-        slug: c.slug || (c.title ? c.title.toLowerCase().replace(/[^a-z0-9]+/g, '-') : 'course'),
-        icon: c.icon || 'BarChart3',
-        level: c.level || 'All Levels',
-        description: c.description || '',
-        modulesCount: c.modules_count ?? c.modulesCount ?? 5,
-        duration: c.duration || '5 Hours',
-        keyTakeaways: c.key_takeaways || c.keyTakeaways || [],
-        syllabus: Array.isArray(c.syllabus) ? c.syllabus : (Array.isArray(c.curriculum) ? c.curriculum : []),
-        thumbnail: c.thumbnail || c.thumbnail_url,
-        videoUrl: c.video_url || c.videoUrl,
-        pdfUrl: c.pdf_url || c.pdfUrl,
-        category: c.category || 'Data Analytics',
-        published: c.published !== false,
-        resources: c.resources || [],
-        created_at: c.created_at
-      }));
+    try {
+      const data = await safeFetchJson<any[]>('/api/cms/courses');
+      if (Array.isArray(data) && data.length > 0) {
+        return data.map((c: any) => ({
+          id: String(c.id),
+          title: c.title || 'Untitled Course',
+          slug: c.slug || (c.title ? c.title.toLowerCase().replace(/[^a-z0-9]+/g, '-') : 'course'),
+          icon: c.icon || 'BarChart3',
+          level: c.level || 'All Levels',
+          description: c.description || '',
+          modulesCount: c.modules_count ?? c.modulesCount ?? 5,
+          duration: c.duration || '5 Hours',
+          keyTakeaways: c.key_takeaways || c.keyTakeaways || [],
+          syllabus: Array.isArray(c.syllabus) ? c.syllabus : (Array.isArray(c.curriculum) ? c.curriculum : []),
+          thumbnail: c.thumbnail || c.thumbnail_url,
+          videoUrl: c.video_url || c.videoUrl,
+          pdfUrl: c.pdf_url || c.pdfUrl,
+          category: c.category || 'Data Analytics',
+          published: c.published !== false,
+          resources: c.resources || [],
+          created_at: c.created_at
+        }));
+      }
+      return LEARN_TOPICS;
+    } catch {
+      return LEARN_TOPICS;
     }
-    return [];
   },
 
   async saveCourse(course: LearnTopic): Promise<boolean> {
@@ -317,24 +365,28 @@ export const cmsService = {
 
   // --- YOUTUBE VIDEOS ---
   async getVideos(): Promise<YouTubeVideo[]> {
-    const data = await safeFetchJson<any[]>('/api/cms/videos');
-    if (Array.isArray(data)) {
-      return data.map((v: any) => ({
-        id: String(v.id),
-        title: v.title || 'Untitled Video',
-        description: v.description || '',
-        thumbnail: v.thumbnail || '',
-        duration: v.duration || '10:00',
-        views: v.views || (v.views_count ? `${v.views_count} views` : '1K views'),
-        url: v.youtube_url || v.url || '',
-        youtubeId: v.youtube_id || v.youtubeId || '',
-        category: v.category || 'Power BI',
-        playlist: v.playlist,
-        tags: v.tags || [],
-        created_at: v.created_at
-      }));
+    try {
+      const data = await safeFetchJson<any[]>('/api/cms/videos');
+      if (Array.isArray(data) && data.length > 0) {
+        return data.map((v: any) => ({
+          id: String(v.id),
+          title: v.title || 'Untitled Video',
+          description: v.description || '',
+          thumbnail: v.thumbnail || '',
+          duration: v.duration || '10:00',
+          views: v.views || (v.views_count ? `${v.views_count} views` : '1K views'),
+          url: v.youtube_url || v.url || '',
+          youtubeId: v.youtube_id || v.youtubeId || '',
+          category: v.category || 'Power BI',
+          playlist: v.playlist,
+          tags: v.tags || [],
+          created_at: v.created_at
+        }));
+      }
+      return YOUTUBE_VIDEOS;
+    } catch {
+      return YOUTUBE_VIDEOS;
     }
-    return [];
   },
 
   async saveVideo(video: YouTubeVideo): Promise<boolean> {
@@ -573,18 +625,28 @@ export const cmsService = {
 
   // --- SOCIAL LINKS ---
   async getSocialLinks(): Promise<SocialLinkItem[]> {
-    const data = await safeFetchJson<any[]>('/api/cms/social');
-    if (Array.isArray(data)) {
-      return data.map((s: any) => ({
-        id: String(s.id),
-        platform: s.platform || 'youtube',
-        url: s.url || '',
-        icon: s.icon || 'Youtube',
-        is_active: s.is_active !== false,
-        display_order: s.display_order ?? 0
-      }));
+    try {
+      const data = await safeFetchJson<any[]>('/api/cms/social');
+      if (Array.isArray(data) && data.length > 0) {
+        return data.map((s: any) => ({
+          id: String(s.id),
+          platform: s.platform || 'youtube',
+          url: s.url || '',
+          icon: s.icon || 'Youtube',
+          is_active: s.is_active !== false,
+          display_order: s.display_order ?? 0
+        }));
+      }
+    } catch {
+      // Fallback
     }
-    return [];
+    return [
+      { id: '1', platform: 'YouTube', url: 'https://youtube.com/@probitian', icon: 'Youtube', is_active: true, display_order: 1 },
+      { id: '2', platform: 'Instagram', url: 'https://instagram.com/probitian', icon: 'Instagram', is_active: true, display_order: 2 },
+      { id: '3', platform: 'Facebook', url: 'https://facebook.com/probitian', icon: 'Facebook', is_active: true, display_order: 3 },
+      { id: '4', platform: 'GitHub', url: 'https://github.com/probitian', icon: 'Github', is_active: true, display_order: 4 },
+      { id: '5', platform: 'LinkedIn', url: 'https://linkedin.com/company/probitian', icon: 'Linkedin', is_active: true, display_order: 5 }
+    ];
   },
 
   async saveSocialLink(item: SocialLinkItem): Promise<boolean> {
@@ -606,18 +668,28 @@ export const cmsService = {
 
   // --- NAVIGATION ---
   async getNavigation(): Promise<NavigationItem[]> {
-    const data = await safeFetchJson<any[]>('/api/cms/navigation');
-    if (Array.isArray(data)) {
-      return data.map((n: any) => ({
-        id: String(n.id),
-        label: n.label || '',
-        path: n.path || '',
-        icon: n.icon || 'Home',
-        display_order: n.display_order ?? 0,
-        is_visible: n.is_visible !== false
-      }));
+    try {
+      const data = await safeFetchJson<any[]>('/api/cms/navigation');
+      if (Array.isArray(data) && data.length > 0) {
+        return data.map((n: any) => ({
+          id: String(n.id),
+          label: n.label || '',
+          path: n.path || '',
+          icon: n.icon || 'Home',
+          display_order: n.display_order ?? 0,
+          is_visible: n.is_visible !== false
+        }));
+      }
+    } catch {
+      // Fallback
     }
-    return [];
+    return [
+      { id: '1', label: 'Home', path: '/', icon: 'Home', display_order: 1, is_visible: true },
+      { id: '2', label: 'Projects', path: '/#projects', icon: 'FolderGit2', display_order: 2, is_visible: true },
+      { id: '3', label: 'Blog', path: '/#blog', icon: 'BookOpen', display_order: 3, is_visible: true },
+      { id: '4', label: 'Learn', path: '/#learn', icon: 'GraduationCap', display_order: 4, is_visible: true },
+      { id: '5', label: 'Contact', path: '/#contact', icon: 'Mail', display_order: 5, is_visible: true }
+    ];
   },
 
   async saveNavigation(items: NavigationItem[]): Promise<boolean> {
@@ -679,24 +751,28 @@ export const cmsService = {
   },
 
   async getMediaItems(): Promise<MediaItem[]> {
-    const data = await safeFetchJson<any[]>('/api/cms/media');
-    if (Array.isArray(data)) {
-      return data.map((m: any) => ({
-        id: String(m.id),
-        filename: m.filename || 'asset',
-        original_filename: m.original_filename || m.filename,
-        storage_path: m.storage_path,
-        public_url: m.public_url || m.url || '',
-        url: m.url || m.public_url || '',
-        size_bytes: m.size_bytes || m.file_size || 0,
-        file_size: m.file_size || m.size_bytes || 0,
-        mime_type: m.mime_type || 'image/png',
-        alt_text: m.alt_text || m.filename,
-        category: m.category || m.folder || 'general',
-        folder: m.folder || m.category || 'general',
-        uploaded_at: m.uploaded_at || m.created_at || new Date().toISOString(),
-        created_at: m.created_at || new Date().toISOString()
-      }));
+    try {
+      const data = await safeFetchJson<any[]>('/api/cms/media');
+      if (Array.isArray(data)) {
+        return data.map((m: any) => ({
+          id: String(m.id),
+          filename: m.filename || 'asset',
+          original_filename: m.original_filename || m.filename,
+          storage_path: m.storage_path,
+          public_url: m.public_url || m.url || '',
+          url: m.url || m.public_url || '',
+          size_bytes: m.size_bytes || m.file_size || 0,
+          file_size: m.file_size || m.size_bytes || 0,
+          mime_type: m.mime_type || 'image/png',
+          alt_text: m.alt_text || m.filename,
+          category: m.category || m.folder || 'general',
+          folder: m.folder || m.category || 'general',
+          uploaded_at: m.uploaded_at || m.created_at || new Date().toISOString(),
+          created_at: m.created_at || new Date().toISOString()
+        }));
+      }
+    } catch {
+      // Fallback
     }
     return [];
   },
@@ -731,17 +807,27 @@ export const cmsService = {
 
   // --- CATEGORIES ---
   async getCategories(): Promise<CategoryItem[]> {
-    const data = await safeFetchJson<any[]>('/api/cms/categories');
-    if (Array.isArray(data)) {
-      return data.map((c: any) => ({
-        id: String(c.id),
-        name: c.name || '',
-        type: c.type || 'project',
-        slug: c.slug || (c.name ? c.name.toLowerCase().replace(/[^a-z0-9]+/g, '-') : 'category'),
-        description: c.description || ''
-      }));
+    try {
+      const data = await safeFetchJson<any[]>('/api/cms/categories');
+      if (Array.isArray(data) && data.length > 0) {
+        return data.map((c: any) => ({
+          id: String(c.id),
+          name: c.name || '',
+          type: c.type || 'project',
+          slug: c.slug || (c.name ? c.name.toLowerCase().replace(/[^a-z0-9]+/g, '-') : 'category'),
+          description: c.description || ''
+        }));
+      }
+    } catch {
+      // Fallback
     }
-    return [];
+    return [
+      { id: 'power-bi', name: 'Power BI', slug: 'power-bi', type: 'project', description: 'Dashboards, DAX, and Data Modeling' },
+      { id: 'sql', name: 'SQL', slug: 'sql', type: 'project', description: 'Database queries, joins, and optimization' },
+      { id: 'excel', name: 'Excel', slug: 'excel', type: 'project', description: 'Advanced formulas, financial models' },
+      { id: 'power-query', name: 'Power Query', slug: 'power-query', type: 'project', description: 'Data transformation and ETL automation' },
+      { id: 'ai-tools', name: 'AI Tools', slug: 'ai-tools', type: 'project', description: 'Copilot, ChatGPT, and automated analytics' }
+    ];
   },
 
   async saveCategory(cat: CategoryItem): Promise<boolean> {
