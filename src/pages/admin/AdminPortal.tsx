@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 
 import { Palette } from 'lucide-react';
+import { PROBITIAN_LOGO_URL } from '../../constants/branding';
 import { BrandingManager } from './modules/BrandingManager';
 import { DashboardOverview } from './modules/DashboardOverview';
 import { AnalyticsManager } from './modules/AnalyticsManager';
@@ -46,7 +47,9 @@ import { SettingsManager } from './modules/SettingsManager';
 import { LegalManager } from './modules/LegalManager';
 import { BackupManager } from './modules/BackupManager';
 import { CampaignsManager } from './modules/CampaignsManager';
-import { Send } from 'lucide-react';
+import { LeadsManager } from './modules/LeadsManager';
+import { LeadCampaignsManager } from './modules/LeadCampaignsManager';
+import { Send, Building2, SendHorizontal } from 'lucide-react';
 
 interface AdminPortalProps {
   userEmail: string;
@@ -65,6 +68,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 }) => {
   const [activeModule, setActiveModule] = useState<string>('overview');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [selectedLeadIdsForCampaign, setSelectedLeadIdsForCampaign] = useState<string[]>([]);
 
   const navGroups = [
     {
@@ -72,6 +76,13 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       items: [
         { id: 'overview', label: 'Dashboard', icon: LayoutDashboard },
         { id: 'analytics', label: 'GA4 Analytics', icon: BarChart3 }
+      ]
+    },
+    {
+      group: 'Lead Outreach & CRM',
+      items: [
+        { id: 'leads', label: 'B2B Leads CRM', icon: Building2 },
+        { id: 'lead_campaigns', label: 'Lead Outreach Campaigns', icon: SendHorizontal }
       ]
     },
     {
@@ -86,11 +97,11 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       ]
     },
     {
-      group: 'User Communication',
+      group: 'Subscriber & Messages',
       items: [
         { id: 'messages', label: 'Contact Messages', icon: Mail },
         { id: 'subscribers', label: 'Subscribers', icon: Users },
-        { id: 'campaigns', label: 'Email Campaigns', icon: Send }
+        { id: 'campaigns', label: 'Newsletter Campaigns', icon: Send }
       ]
     },
     {
@@ -111,6 +122,19 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     switch (activeModule) {
       case 'overview': return <DashboardOverview onNavigate={(m) => setActiveModule(m)} />;
       case 'analytics': return <AnalyticsManager />;
+      case 'leads': return (
+        <LeadsManager
+          onLaunchCampaign={(leadIds) => {
+            setSelectedLeadIdsForCampaign(leadIds);
+            setActiveModule('lead_campaigns');
+          }}
+        />
+      );
+      case 'lead_campaigns': return (
+        <LeadCampaignsManager
+          initialSelectedLeadIds={selectedLeadIdsForCampaign}
+        />
+      );
       case 'homepage': return <HomePageManager />;
       case 'projects': return <ProjectsManager />;
       case 'blog': return <BlogManager />;
@@ -143,9 +167,13 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
             <MenuIcon className="w-5 h-5" />
           </button>
 
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-amber-400 text-slate-950 font-black flex items-center justify-center text-sm shadow-md">
-              PB
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-full bg-white dark:bg-slate-800 p-0.5 border border-purple-200 dark:border-purple-800/40 shadow-sm flex items-center justify-center overflow-hidden shrink-0">
+              <img
+                src={PROBITIAN_LOGO_URL}
+                alt="ProBitian Official Logo"
+                className="w-full h-full object-contain"
+              />
             </div>
             <div className="hidden sm:block">
               <span className="font-black text-slate-900 dark:text-white text-base tracking-tight">Pro<span className="text-amber-500 dark:text-amber-400">BI</span>tian</span>

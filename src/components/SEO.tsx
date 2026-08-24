@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { cmsService } from '../services/cmsService';
 import { SeoSettings } from '../types';
+import { PROBITIAN_LOGO_URL } from '../constants/branding';
 
 interface SEOProps {
   title?: string;
@@ -78,7 +79,7 @@ export const SEO: React.FC<SEOProps> = ({
     '@type': 'EducationalOrganization',
     name: 'ProBItian',
     url: pageUrl,
-    logo: cmsSeo?.og_image || 'https://probitian.com/logo.svg',
+    logo: cmsSeo?.og_image || PROBITIAN_LOGO_URL,
     sameAs: [
       'https://youtube.com/@probitian',
       'https://instagram.com/probitian',

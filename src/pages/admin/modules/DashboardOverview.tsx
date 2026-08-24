@@ -10,7 +10,9 @@ import {
   TrendingUp,
   ArrowUpRight,
   Clock,
-  Sparkles
+  Sparkles,
+  Building2,
+  SendHorizontal
 } from 'lucide-react';
 import { cmsService } from '../../../services/cmsService';
 import { ProjectItem, BlogArticle, LearnTopic, YouTubeVideo, ContactMessage, NewsletterSubscriber, MediaItem } from '../../../types';
@@ -27,7 +29,9 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ onNavigate
     videosCount: 0,
     messagesCount: 0,
     subscribersCount: 0,
-    mediaCount: 0
+    mediaCount: 0,
+    leadsCount: 0,
+    leadCampaignsCount: 0
   });
   const [recentMessages, setRecentMessages] = useState<ContactMessage[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,14 +42,16 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ onNavigate
 
   const loadDashboardData = async () => {
     setLoading(true);
-    const [projects, blogs, courses, videos, messages, subscribers, media] = await Promise.all([
+    const [projects, blogs, courses, videos, messages, subscribers, media, leads, leadCampaigns] = await Promise.all([
       cmsService.getProjects(),
       cmsService.getBlogs(),
       cmsService.getCourses(),
       cmsService.getVideos(),
       cmsService.getMessages(),
       cmsService.getNewsletterSubscribers(),
-      cmsService.getMediaItems()
+      cmsService.getMediaItems(),
+      cmsService.getLeads().catch(() => []),
+      cmsService.getLeadCampaigns().catch(() => [])
     ]);
 
     setStats({
@@ -55,7 +61,9 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ onNavigate
       videosCount: videos.length,
       messagesCount: messages.length,
       subscribersCount: subscribers.length,
-      mediaCount: media.length
+      mediaCount: media.length,
+      leadsCount: leads.length,
+      leadCampaignsCount: leadCampaigns.length
     });
 
     setRecentMessages(messages.slice(0, 5));
@@ -63,6 +71,8 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ onNavigate
   };
 
   const statCards = [
+    { label: 'B2B Leads', count: stats.leadsCount, icon: Building2, color: 'text-purple-600 dark:text-purple-400', bg: 'bg-purple-500/10', module: 'leads' },
+    { label: 'Outreach Campaigns', count: stats.leadCampaignsCount, icon: SendHorizontal, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-500/10', module: 'lead_campaigns' },
     { label: 'Projects', count: stats.projectsCount, icon: FolderKanban, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-500/10', module: 'projects' },
     { label: 'Blog Articles', count: stats.blogsCount, icon: Newspaper, color: 'text-purple-600 dark:text-purple-400', bg: 'bg-purple-500/10', module: 'blog' },
     { label: 'Learn Courses', count: stats.coursesCount, icon: GraduationCap, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-500/10', module: 'learn' },

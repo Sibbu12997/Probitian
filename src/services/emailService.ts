@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer';
+import { PROBITIAN_LOGO_URL } from '../constants/branding';
 
 export function getGmailUser(): string {
   return (process.env.GMAIL_USER || 'probitianofficial@gmail.com').trim();
@@ -103,7 +104,8 @@ export const emailService = {
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #1e293b; line-height: 1.6;">
             <div style="text-align: center; margin-bottom: 24px;">
-              <h1 style="color: #7c3aed; font-size: 28px; margin: 0;">Welcome to ProBitian!</h1>
+              <img src="${PROBITIAN_LOGO_URL}" alt="ProBitian" width="48" height="48" style="display: block; margin: 0 auto 12px auto; width: 48px; height: 48px; object-fit: contain; border-radius: 50%;" />
+              <h1 style="color: #7c3aed; font-size: 26px; margin: 0;">Welcome to ProBitian!</h1>
               <p style="color: #64748b; font-size: 14px; margin-top: 4px;">Master Power BI, SQL, Excel & AI Tools</p>
             </div>
             <p>Hi there,</p>
@@ -142,7 +144,16 @@ export const emailService = {
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #1e293b; line-height: 1.6;">
             <div style="margin-bottom: 20px; padding-bottom: 12px; border-bottom: 2px solid #7c3aed;">
-              <h2 style="color: #7c3aed; font-size: 20px; margin: 0;">ProBitian Support Response</h2>
+              <table cellpadding="0" cellspacing="0" border="0" width="100%">
+                <tr>
+                  <td width="42" style="vertical-align: middle;">
+                    <img src="${PROBITIAN_LOGO_URL}" alt="ProBitian" width="36" height="36" style="display: block; width: 36px; height: 36px; object-fit: contain; border-radius: 50%;" />
+                  </td>
+                  <td style="vertical-align: middle; padding-left: 10px;">
+                    <h2 style="color: #7c3aed; font-size: 20px; margin: 0;">ProBitian Support Response</h2>
+                  </td>
+                </tr>
+              </table>
             </div>
             <div style="background-color: #f8fafc; padding: 16px; border-radius: 12px; border: 1px solid #e2e8f0; white-space: pre-line;">
               ${replyMessage.replace(/\n/g, '<br/>')}
@@ -190,7 +201,16 @@ export const emailService = {
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #1e293b; line-height: 1.6;">
             <div style="margin-bottom: 20px; padding-bottom: 12px; border-bottom: 2px solid #7c3aed;">
-              <h2 style="color: #7c3aed; font-size: 20px; margin: 0;">New Contact Enquiry Received</h2>
+              <table cellpadding="0" cellspacing="0" border="0" width="100%">
+                <tr>
+                  <td width="42" style="vertical-align: middle;">
+                    <img src="${PROBITIAN_LOGO_URL}" alt="ProBitian" width="36" height="36" style="display: block; width: 36px; height: 36px; object-fit: contain; border-radius: 50%;" />
+                  </td>
+                  <td style="vertical-align: middle; padding-left: 10px;">
+                    <h2 style="color: #7c3aed; font-size: 20px; margin: 0;">New Contact Enquiry Received</h2>
+                  </td>
+                </tr>
+              </table>
             </div>
             <table style="width: 100%; text-align: left; border-collapse: collapse; margin-bottom: 20px;">
               <tr><td style="padding: 8px 0; font-weight: bold; width: 140px;">Name:</td><td>${params.name}</td></tr>

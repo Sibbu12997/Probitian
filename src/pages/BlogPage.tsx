@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BlogArticle } from '../types';
+import { BLOG_ARTICLES } from '../data/mockData';
 import { cmsService } from '../services/cmsService';
 import { Search, Calendar, Clock, User, ChevronLeft, ChevronRight, ArrowRight } from 'lucide-react';
 import { trackBlogClick } from '../lib/analytics';
@@ -9,7 +10,7 @@ interface BlogPageProps {
 }
 
 export const BlogPage: React.FC<BlogPageProps> = ({ onSelectBlog }) => {
-  const [blogsList, setBlogsList] = useState<BlogArticle[]>([]);
+  const [blogsList, setBlogsList] = useState<BlogArticle[]>(BLOG_ARTICLES);
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -21,7 +22,9 @@ export const BlogPage: React.FC<BlogPageProps> = ({ onSelectBlog }) => {
   const loadBlogs = async () => {
     try {
       const data = await cmsService.getBlogs();
-      setBlogsList(data || []);
+      if (data && data.length > 0) {
+        setBlogsList(data);
+      }
     } catch (err) {
       console.error('Error fetching blogs from cmsService:', err);
     }

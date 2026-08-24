@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Lock, Mail, ShieldCheck, ArrowRight, ArrowLeft, Key, Eye, EyeOff, Sun, Moon, AlertCircle } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
+import { PROBITIAN_LOGO_URL } from '../../constants/branding';
 
 interface AdminLoginProps {
   onLoginSuccess: (userEmail: string) => void;
@@ -137,10 +138,12 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
         >
           {/* Brand & Title Header */}
           <div className="text-center space-y-2">
-            <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-600 to-amber-500 p-0.5 shadow-md shadow-purple-500/20 mb-1">
-              <div className="w-full h-full bg-white dark:bg-slate-900 rounded-[14px] flex items-center justify-center">
-                <ShieldCheck className="w-6 h-6 text-purple-600 dark:text-amber-400" />
-              </div>
+            <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-white dark:bg-slate-800 p-1 shadow-md shadow-purple-500/10 border border-slate-200 dark:border-slate-800 mb-1 overflow-hidden">
+              <img
+                src={PROBITIAN_LOGO_URL}
+                alt="ProBitian Official Logo"
+                className="w-full h-full object-contain"
+              />
             </div>
             <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
               Pro<span className="text-amber-500 dark:text-amber-400">BI</span>tian CMS

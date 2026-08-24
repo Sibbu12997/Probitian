@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BarChart3, Database, Table, Filter, BrainCircuit, Sparkles, TrendingUp, CheckCircle2, ArrowUpRight } from 'lucide-react';
 import { cmsService } from '../services/cmsService';
+import { PROBITIAN_LOGO_URL } from '../constants/branding';
 
 interface BannerGraphicProps {
   type?: 'hero' | 'about' | 'logo';
@@ -10,7 +11,7 @@ interface BannerGraphicProps {
 }
 
 export const BannerGraphic: React.FC<BannerGraphicProps> = ({ type = 'hero', className = '', bannerUrl, logoUrl }) => {
-  const [dynamicLogo, setDynamicLogo] = useState<string>('/logo.svg');
+  const [dynamicLogo, setDynamicLogo] = useState<string>(PROBITIAN_LOGO_URL);
   const [dynamicBanner, setDynamicBanner] = useState<string>('/banner.svg');
 
   const loadBranding = async () => {
@@ -37,7 +38,7 @@ export const BannerGraphic: React.FC<BannerGraphicProps> = ({ type = 'hero', cla
         <img 
           src={activeLogo} 
           alt="ProBItian Logo" 
-          onError={(e) => { e.currentTarget.src = '/logo.svg'; }}
+          onError={(e) => { e.currentTarget.src = PROBITIAN_LOGO_URL; }}
           className="w-full h-full object-contain filter drop-shadow-sm transition-transform duration-300 hover:scale-105"
         />
       </div>

@@ -19,6 +19,7 @@ import { cmsService } from '../../../services/cmsService';
 import { WebsiteGeneralSettings, HomePageConfig } from '../../../types';
 import { sanitizeSvgContent } from '../../../lib/svgSanitizer';
 import { MediaPicker } from '../../../components/admin/MediaPicker';
+import { PROBITIAN_LOGO_URL } from '../../../constants/branding';
 
 export const BrandingManager: React.FC = () => {
   const [settings, setSettings] = useState<WebsiteGeneralSettings | null>(null);
@@ -130,8 +131,8 @@ export const BrandingManager: React.FC = () => {
       setPendingLogoName(null);
       if (logoFileInputRef.current) logoFileInputRef.current.value = '';
     } else if (settings) {
-      setPendingLogo('/logo.svg');
-      setPendingLogoName('Reset to Default Logo');
+      setPendingLogo(PROBITIAN_LOGO_URL);
+      setPendingLogoName('Reset to Official Brand Logo');
     }
   };
 
@@ -255,7 +256,7 @@ export const BrandingManager: React.FC = () => {
     setMessage(null);
 
     try {
-      const defaultLogo = '/logo.svg';
+      const defaultLogo = PROBITIAN_LOGO_URL;
       const defaultBanner = '/banner.svg';
 
       if (settings) {
@@ -308,7 +309,7 @@ export const BrandingManager: React.FC = () => {
     );
   }
 
-  const activeLogo = pendingLogo || settings.logo_url || '/logo.svg';
+  const activeLogo = pendingLogo || settings.logo_url || PROBITIAN_LOGO_URL;
   const activeBanner = pendingBanner || settings.banner_url || '/banner.svg';
   const hasPendingChanges = pendingLogo !== null || pendingBanner !== null;
 

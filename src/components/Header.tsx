@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { NavPage } from '../types';
 import { Youtube, Sun, Moon, Menu, X, ArrowUpRight } from 'lucide-react';
 import { cmsService } from '../services/cmsService';
+import { PROBITIAN_LOGO_URL } from '../constants/branding';
 
 interface HeaderProps {
   currentPage: NavPage;
@@ -18,7 +19,7 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [logoUrl, setLogoUrl] = useState<string>('/logo.svg');
+  const [logoUrl, setLogoUrl] = useState<string>(PROBITIAN_LOGO_URL);
 
   const loadLogo = async () => {
     try {
@@ -76,12 +77,12 @@ export const Header: React.FC<HeaderProps> = ({
             className="flex items-center gap-3 group text-left focus:outline-none"
             aria-label="ProBItian Home"
           >
-            <div className="relative w-10 h-10 rounded-full bg-white dark:bg-slate-800 p-0.5 shadow-sm border border-purple-200 dark:border-purple-800/40 group-hover:scale-105 transition-transform duration-300 flex items-center justify-center overflow-hidden">
+            <div className="relative w-10 h-10 rounded-full bg-white dark:bg-slate-800 p-0.5 shadow-sm border border-purple-200 dark:border-purple-800/40 group-hover:scale-105 transition-transform duration-300 flex items-center justify-center overflow-hidden shrink-0">
               <img 
                 src={logoUrl} 
                 alt="ProBItian Official Logo" 
                 className="w-full h-full object-contain" 
-                onError={(e) => { e.currentTarget.src = '/logo.svg'; }}
+                onError={(e) => { e.currentTarget.src = PROBITIAN_LOGO_URL; }}
               />
             </div>
             <div>

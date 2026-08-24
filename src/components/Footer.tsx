@@ -3,13 +3,14 @@ import { NavPage } from '../types';
 import { Youtube, Instagram, Facebook, Github, Linkedin, Mail, ArrowUpRight, Send, CheckCircle2 } from 'lucide-react';
 import { trackSocialClick, trackContactClick, trackCtaClick, trackNewsletterSubscribe } from '../lib/analytics';
 import { cmsService } from '../services/cmsService';
+import { PROBITIAN_LOGO_URL } from '../constants/branding';
 
 interface FooterProps {
   onNavigate: (page: NavPage) => void;
 }
 
 export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
-  const [logoUrl, setLogoUrl] = useState<string>('/logo.svg');
+  const [logoUrl, setLogoUrl] = useState<string>(PROBITIAN_LOGO_URL);
   const [contactEmail, setContactEmail] = useState<string>('probitianofficial@gmail.com');
   const [newsletterEmail, setNewsletterEmail] = useState('');
   const [newsletterSubmitting, setNewsletterSubmitting] = useState(false);
@@ -66,12 +67,12 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
               onClick={() => onNavigate('home')}
               className="flex items-center gap-3 text-left focus:outline-none group"
             >
-              <div className="w-10 h-10 rounded-full bg-slate-800 p-0.5 border border-purple-500/40 group-hover:scale-105 transition-transform overflow-hidden flex items-center justify-center">
+              <div className="w-10 h-10 rounded-full bg-slate-800 p-0.5 border border-purple-500/40 group-hover:scale-105 transition-transform overflow-hidden flex items-center justify-center shrink-0">
                 <img 
                   src={logoUrl} 
                   alt="ProBItian Official Logo" 
                   className="w-full h-full object-contain" 
-                  onError={(e) => { e.currentTarget.src = '/logo.svg'; }}
+                  onError={(e) => { e.currentTarget.src = PROBITIAN_LOGO_URL; }}
                 />
               </div>
               <span className="text-2xl font-extrabold tracking-tight text-white">

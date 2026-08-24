@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { NavPage, LegalSettings, DEFAULT_LEGAL_SETTINGS } from '../types';
+import { NavPage } from '../types';
 import { ShieldCheck, ArrowLeft, FileText, Mail, Calendar, Lock } from 'lucide-react';
 import { cmsService } from '../services/cmsService';
+import { LegalSettings, DEFAULT_LEGAL_SETTINGS } from '../data/defaultLegalData';
 
 interface PrivacyPageProps {
   onNavigate: (page: NavPage) => void;
