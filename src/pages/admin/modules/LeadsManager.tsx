@@ -31,9 +31,10 @@ import {
   Layers,
   ArrowUpDown,
   History,
-  Info
+  Info,
+  Workflow
 } from 'lucide-react';
-import { Lead, LeadStatus, LeadPriority } from '../../../types';
+import { Lead, LeadStatus, LeadPriority, LeadSequence } from '../../../types';
 import { cmsService } from '../../../services/cmsService';
 
 const STATUS_OPTIONS: LeadStatus[] = [
@@ -75,9 +76,10 @@ const PRIORITY_COLORS: Record<LeadPriority, { bg: string; text: string; border: 
 interface LeadsManagerProps {
   onNavigateToOutreach?: (selectedLeadIds?: string[]) => void;
   onLaunchCampaign?: (selectedLeadIds?: string[]) => void;
+  onNavigateToSequences?: () => void;
 }
 
-export const LeadsManager: React.FC<LeadsManagerProps> = ({ onNavigateToOutreach, onLaunchCampaign }) => {
+export const LeadsManager: React.FC<LeadsManagerProps> = ({ onNavigateToOutreach, onLaunchCampaign, onNavigateToSequences }) => {
   const launchOutreachHandler = onNavigateToOutreach || onLaunchCampaign;
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
@@ -86,6 +88,13 @@ export const LeadsManager: React.FC<LeadsManagerProps> = ({ onNavigateToOutreach
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
   const [followUpFilter, setFollowUpFilter] = useState<string>('all');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  // Sequence Enrollment Modal State
+  const [isEnrollSequenceModalOpen, setIsEnrollSequenceModalOpen] = useState(false);
+  const [availableSequences, setAvailableSequences] = useState<LeadSequence[]>([]);
+  const [selectedSequenceId, setSelectedSequenceId] = useState<string>('');
+  const [isEnrollingInSequence, setIsEnrollingInSequence] = useState(false);
+  const [leadSequencesForDrawer, setLeadSequencesForDrawer] = useState<any[]>([]);
 
   // Notifications
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -273,19 +282,75 @@ export const LeadsManager: React.FC<LeadsManagerProps> = ({ onNavigateToOutreach
     }
   };
 
+  // Open Sequence Enrollment Modal
+  const handleOpenSequenceEnrollModal = async () => {
+    if (selectedIds.size === 0) return;
+    try {
+      const seqs = await cmsService.getLeadSequences();
+      setAvailableSequences(seqs || []);
+      if (seqs && seqs.length > 0) {
+        const activeOne = seqs.find(s => s.status === 'Active') || seqs[0];
+        setSelectedSequenceId(activeOne.id);
+      }
+      setIsEnrollSequenceModalOpen(true);
+    } catch (e: any) {
+      showFeedback('error', 'Failed to load email sequences');
+    }
+  };
+
+  // Execute Enrollment of Selected Leads
+  const handleExecuteSequenceEnrollment = async () => {
+    if (!selectedSequenceId || selectedIds.size === 0) return;
+    setIsEnrollingInSequence(true);
+    try {
+      const res = await cmsService.enrollLeadsInSequence(selectedSequenceId, Array.from(selectedIds));
+      if (res.success) {
+        showFeedback('success', res.message || `Enrolled ${res.enrolledCount} leads into sequence.`);
+        setIsEnrollSequenceModalOpen(false);
+        setSelectedIds(new Set());
+      } else {
+        showFeedback('error', res.message || 'Failed to enroll leads in sequence.');
+      }
+    } catch (err: any) {
+      showFeedback('error', err?.message || 'Failed to enroll leads in sequence');
+    } finally {
+      setIsEnrollingInSequence(false);
+    }
+  };
+
   // View Details Modal
   const handleViewLeadDetails = async (lead: Lead) => {
     setViewingLead(lead);
     setLoadingDetails(true);
+    setLeadSequencesForDrawer([]);
     try {
-      const full = await cmsService.getLeadById(lead.id);
+      const [full, seqs] = await Promise.all([
+        cmsService.getLeadById(lead.id),
+        cmsService.getLeadSequencesForLead(lead.id)
+      ]);
       if (full) {
         setViewingLead(full);
       }
+      if (seqs) {
+        setLeadSequencesForDrawer(seqs);
+      }
     } catch (e) {
-      console.warn('Failed to load lead outreach history:', e);
+      console.warn('Failed to load lead outreach history or sequences:', e);
     } finally {
       setLoadingDetails(false);
+    }
+  };
+
+  // Stop sequence for lead in drawer
+  const handleStopLeadSequenceFromDrawer = async (sequenceId: string, leadId: string) => {
+    try {
+      const res = await cmsService.stopLeadInSequence(sequenceId, leadId, 'Manual Stop from Lead Drawer');
+      showFeedback('success', res.message || 'Sequence stopped for lead.');
+      // Refresh sequences for this lead
+      const updated = await cmsService.getLeadSequencesForLead(leadId);
+      setLeadSequencesForDrawer(updated || []);
+    } catch (e: any) {
+      showFeedback('error', 'Failed to stop lead sequence.');
     }
   };
 
@@ -571,6 +636,17 @@ export const LeadsManager: React.FC<LeadsManagerProps> = ({ onNavigateToOutreach
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {onNavigateToSequences && (
+            <button
+              onClick={onNavigateToSequences}
+              className="px-3.5 py-2 rounded-xl bg-purple-50 dark:bg-purple-950/50 hover:bg-purple-100 text-purple-700 dark:text-purple-300 font-bold text-xs border border-purple-200 dark:border-purple-800 flex items-center gap-1.5 cursor-pointer transition-all shadow-sm"
+              title="Manage Automated Email Sequences"
+            >
+              <Workflow className="w-4 h-4 text-purple-600" />
+              <span>Email Sequences</span>
+            </button>
+          )}
+
           {selectedIds.size > 0 && launchOutreachHandler && (
             <button
               onClick={() => launchOutreachHandler(Array.from(selectedIds))}
@@ -746,17 +822,46 @@ export const LeadsManager: React.FC<LeadsManagerProps> = ({ onNavigateToOutreach
 
           {/* Batch Actions Toolbar when leads selected */}
           {selectedIds.size > 0 && (
-            <div className="ml-auto flex items-center gap-2 bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800/60 px-3 py-1 rounded-xl">
+            <div className="ml-auto flex flex-wrap items-center gap-2 bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800/60 px-3 py-1.5 rounded-2xl">
               <span className="text-[11px] font-bold text-purple-700 dark:text-purple-300">
                 {selectedIds.size} selected
               </span>
+
+              {launchOutreachHandler && (
+                <button
+                  onClick={() => launchOutreachHandler(Array.from(selectedIds))}
+                  className="px-2.5 py-1 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-bold text-[10px] transition-all flex items-center gap-1 cursor-pointer shadow-sm"
+                  title="Launch Outreach Campaign with selected leads"
+                >
+                  <Send className="w-3 h-3 text-amber-300" />
+                  <span>Launch Campaign</span>
+                </button>
+              )}
+
+              <button
+                onClick={handleOpenSequenceEnrollModal}
+                className="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[10px] transition-all flex items-center gap-1 cursor-pointer shadow-sm"
+                title="Enroll selected leads into an automated multi-step email sequence"
+              >
+                <Workflow className="w-3 h-3 text-white" />
+                <span>Start Email Sequence</span>
+              </button>
+
               <button
                 onClick={handleBatchDelete}
                 className="px-2 py-1 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 font-bold text-[10px] transition-colors flex items-center gap-1 cursor-pointer"
-                title="Delete Selected"
+                title="Delete Selected Leads"
               >
                 <Trash2 className="w-3 h-3" />
                 <span>Delete</span>
+              </button>
+
+              <button
+                onClick={() => setSelectedIds(new Set())}
+                className="px-2 py-1 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 text-[10px] font-bold"
+                title="Clear Selection"
+              >
+                Clear
               </button>
             </div>
           )}
@@ -1478,6 +1583,89 @@ export const LeadsManager: React.FC<LeadsManagerProps> = ({ onNavigateToOutreach
                 </div>
               )}
 
+              {/* Active Email Sequences for this lead */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                    <Workflow className="w-4 h-4 text-purple-600" />
+                    <span>Automated Email Sequences</span>
+                  </p>
+                  {onNavigateToSequences && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setViewingLead(null);
+                        onNavigateToSequences();
+                      }}
+                      className="text-purple-600 hover:text-purple-700 text-[11px] font-bold inline-flex items-center gap-1"
+                    >
+                      <span>Manage Sequences</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+
+                {loadingDetails ? (
+                  <div className="py-3 text-center text-slate-400">
+                    <RefreshCw className="w-4 h-4 animate-spin mx-auto" />
+                  </div>
+                ) : leadSequencesForDrawer.length === 0 ? (
+                  <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 text-center text-slate-400 text-[11px]">
+                    This lead is not currently enrolled in any active sequences.
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {leadSequencesForDrawer.map((seqRec: any, idx: number) => {
+                      const seq = seqRec.lead_sequences || {};
+                      return (
+                        <div
+                          key={seqRec.id || idx}
+                          className="p-3 rounded-xl bg-purple-50/50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800/40 flex items-center justify-between text-[11px]"
+                        >
+                          <div>
+                            <p className="font-bold text-slate-900 dark:text-white">
+                              {seq.name || 'Outreach Sequence'}
+                            </p>
+                            <p className="text-slate-500">
+                              Current Progress: <strong>Step {seqRec.current_step || 0}</strong>
+                              {seqRec.next_send_at && (
+                                <span className="ml-2 text-indigo-600 dark:text-indigo-400 font-mono">
+                                  &bull; Next Send: {new Date(seqRec.next_send_at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                              )}
+                            </p>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                                seqRec.status === 'Active' || seqRec.status === 'Pending'
+                                  ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'
+                                  : seqRec.status === 'Completed'
+                                  ? 'bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300'
+                                  : 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300'
+                              }`}
+                            >
+                              {seqRec.status}
+                            </span>
+
+                            {(seqRec.status === 'Active' || seqRec.status === 'Pending') && (
+                              <button
+                                type="button"
+                                onClick={() => handleStopLeadSequenceFromDrawer(seqRec.sequence_id, viewingLead.id)}
+                                className="px-2 py-0.5 rounded bg-red-50 hover:bg-red-100 text-red-600 text-[10px] font-bold border border-red-200"
+                              >
+                                Stop
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
               {/* Outreach Campaign History */}
               <div className="space-y-2">
                 <p className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
@@ -1546,6 +1734,108 @@ export const LeadsManager: React.FC<LeadsManagerProps> = ({ onNavigateToOutreach
                   className="px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold"
                 >
                   Done
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: ENROLL SELECTED LEADS IN SEQUENCE */}
+      {isEnrollSequenceModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl p-6 space-y-5 animate-fade-in my-8">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-purple-100 dark:bg-purple-950 text-purple-600 flex items-center justify-center">
+                  <Workflow className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-slate-900 dark:text-white">
+                    Start Email Sequence
+                  </h3>
+                  <p className="text-[11px] text-slate-500">
+                    Enroll {selectedIds.size} explicitly selected lead(s)
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsEnrollSequenceModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-slate-400 uppercase">
+                  Select Target Email Sequence *
+                </label>
+                {availableSequences.length === 0 ? (
+                  <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 text-xs">
+                    No sequences found. Please create a sequence first in the Email Sequences module.
+                  </div>
+                ) : (
+                  <select
+                    value={selectedSequenceId}
+                    onChange={(e) => setSelectedSequenceId(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-900 dark:text-white"
+                  >
+                    {availableSequences.map((seq) => (
+                      <option key={seq.id} value={seq.id}>
+                        {seq.name} ({seq.steps?.length || 0} steps &bull; {seq.status})
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              {/* Selected Leads Preview */}
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-slate-400 uppercase">
+                  Selected Leads to Enroll ({selectedIds.size})
+                </label>
+                <div className="max-h-40 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-2 bg-slate-50 dark:bg-slate-800/40 text-xs">
+                  {leads
+                    .filter((l) => selectedIds.has(l.id))
+                    .map((l) => (
+                      <div key={l.id} className="py-1.5 px-1 flex items-center justify-between">
+                        <div>
+                          <span className="font-bold text-slate-900 dark:text-white block">{l.company_name}</span>
+                          <span className="text-[11px] text-slate-500 font-mono">{l.email}</span>
+                        </div>
+                        <span className="text-[10px] px-2 py-0.5 rounded bg-purple-100 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 font-bold">
+                          {l.lead_priority}
+                        </span>
+                      </div>
+                    ))}
+                </div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-slate-100 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 text-[11px] space-y-1">
+                <p className="font-bold text-slate-800 dark:text-slate-200">Safety & Duplicate Protection:</p>
+                <p>&bull; Step 1 will be scheduled immediately.</p>
+                <p>&bull; Duplicate leads already active in this sequence will be automatically skipped.</p>
+                <p>&bull; Leads with "Do Not Contact" / "Bounced" status are excluded.</p>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setIsEnrollSequenceModalOpen(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExecuteSequenceEnrollment}
+                  disabled={!selectedSequenceId || selectedIds.size === 0 || isEnrollingInSequence}
+                  className="px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-purple-600/20 disabled:opacity-50"
+                >
+                  {isEnrollingInSequence ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                  <span>Enroll {selectedIds.size} Leads</span>
                 </button>
               </div>
             </div>

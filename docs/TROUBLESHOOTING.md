@@ -160,4 +160,54 @@ Official LinkedIn: [https://www.linkedin.com/company/probitian/](https://www.lin
 
 ---
 
+### 15. CSV Import Fails or Appears Empty
+
+- **Problem**: Uploading a CSV in B2B Leads CRM displays zero leads or shows "No valid leads found".
+- **Cause**: Header row is missing or contains unsupported column names.
+- **How to Verify**: Check the first row of your CSV. Ensure headers include at least `company_name` (or `company`) and `email` (or `work_email`).
+- **Solution**: Normalize headers to standard format: `company_name,contact_person,email,phone,industry,location,powerbi_use_case,lead_priority,status`. Re-upload the file.
+- **Prevention**: Use the standard CSV template provided in the documentation.
+
+---
+
+### 16. Automated Sequence Step Not Sending
+
+- **Problem**: Lead is enrolled in an Active sequence, but no email is delivered when expected.
+- **Cause**: The lead is in a terminal status (`Replied`, `Interested`, `Converted`, `Do Not Contact`, `Bounced`), the sequence is paused, or `next_send_at` time is in the future.
+- **How to Verify**: Open the Lead Details Drawer in CRM and inspect the sequence enrollment state and `next_send_at` timestamp.
+- **Solution**: Verify sequence status is `Active`. If you want to force immediate evaluation, click **Process Due Steps Now** in the Email Sequences module.
+- **Prevention**: Verify step delay days (`delay_days`) when creating or editing sequences.
+
+---
+
+### 17. Sequence Still Sending After Prospect Responded
+
+- **Problem**: Automated emails continue to send to a prospect who already replied by email.
+- **Cause**: Lead status in CRM was not updated from `Contacted` to a terminal status (`Replied`, `Interested`, `Demo Requested`).
+- **How to Verify**: Look up the lead in B2B Leads CRM and check their current status column.
+- **Solution**: Change the lead's status to `Replied` or `Interested`, or open the Lead Drawer and click **Stop** on the active sequence.
+- **Prevention**: Establish a daily habit of updating lead status when reviewing replies in your Gmail inbox.
+
+---
+
+### 18. Personalization Variable Tags Appear Raw in Email
+
+- **Problem**: Delivered email contains literal `{{company_name}}` or `{{contact_person}}` text instead of lead details.
+- **Cause**: Typos in tag syntax (e.g., single braces `{company}` or mismatched spaces) or the lead record has blank values for that field.
+- **How to Verify**: Check the step template in Email Sequences and verify the lead record in B2B Leads CRM.
+- **Solution**: Use standard supported tags: `{{company_name}}`, `{{contact_person}}`, `{{first_name}}`, `{{industry}}`, `{{location}}`, `{{powerbi_use_case}}`. Ensure lead records have values populated.
+- **Prevention**: Always use the **Send Test Email** feature to preview rendered output before launching broad sequences.
+
+---
+
+### 19. Duplicate Sequence Enrollment
+
+- **Problem**: An administrator attempts to enroll the same lead into the same sequence twice.
+- **Cause**: Multiple selection without checking existing enrollments.
+- **How to Verify**: Server enrollment logic checks `crm_sequence_leads` for active enrollment.
+- **Solution**: The system automatically detects and prevents active duplicate enrollments, updating status safely.
+- **Prevention**: Review the enrollment summary modal before confirming batch sequence launches.
+
+---
+
 *Documentation maintained by Shivam Singh — ProBitian.*

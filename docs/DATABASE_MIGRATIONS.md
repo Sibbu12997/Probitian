@@ -36,12 +36,16 @@ All database schema definitions and incremental changes are maintained as sequen
 ```
 supabase/
 └── migrations/
-    ├── 0001_initial_schema.sql          # Baseline CMS schema & initial RLS policies
-    ├── 0002_add_message_fields.sql      # Contact enquiry reply, phone, & status fields
-    ├── 0003_add_campaign_tables.sql     # Email campaign & recipient tracking tables
-    ├── 0004_grant_table_permissions.sql # Table grants and permissions for service_role
-    ├── 0005_upgrade_media_storage.sql    # Upgrade media metadata schema & storage bucket
-    └── 0006_fix_newsletter_permissions.sql # Harden newsletter RLS and service_role grants
+    ├── 0001_initial_schema.sql                 # Baseline CMS schema & initial RLS policies
+    ├── 0002_add_message_fields.sql             # Contact enquiry reply, phone, & status fields
+    ├── 0003_add_campaign_tables.sql            # Email campaign & recipient tracking tables
+    ├── 0004_grant_table_permissions.sql        # Table grants and permissions for service_role
+    ├── 0005_upgrade_media_storage.sql           # Upgrade media metadata schema & storage bucket
+    ├── 0006_fix_newsletter_permissions.sql      # Harden newsletter RLS and service_role grants
+    ├── 0007_harden_security_and_least_privilege.sql # RLS hardening & least privilege security
+    ├── 0008_add_linkedin_social_link.sql       # Official LinkedIn social channel configuration
+    ├── 0009_add_lead_outreach_tables.sql       # B2B CRM leads, lead_campaigns, campaign_leads tables
+    └── 0010_grant_crm_table_permissions.sql    # service_role grants for leads & campaign_leads
 ```
 
 ---

@@ -49,7 +49,8 @@ import { BackupManager } from './modules/BackupManager';
 import { CampaignsManager } from './modules/CampaignsManager';
 import { LeadsManager } from './modules/LeadsManager';
 import { LeadCampaignsManager } from './modules/LeadCampaignsManager';
-import { Send, Building2, SendHorizontal } from 'lucide-react';
+import { LeadSequencesManager } from './modules/LeadSequencesManager';
+import { Send, Building2, SendHorizontal, Workflow } from 'lucide-react';
 
 interface AdminPortalProps {
   userEmail: string;
@@ -82,6 +83,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       group: 'Lead Outreach & CRM',
       items: [
         { id: 'leads', label: 'B2B Leads CRM', icon: Building2 },
+        { id: 'lead_sequences', label: 'Email Sequences', icon: Workflow },
         { id: 'lead_campaigns', label: 'Lead Outreach Campaigns', icon: SendHorizontal }
       ]
     },
@@ -128,6 +130,12 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
             setSelectedLeadIdsForCampaign(leadIds);
             setActiveModule('lead_campaigns');
           }}
+          onNavigateToSequences={() => setActiveModule('lead_sequences')}
+        />
+      );
+      case 'lead_sequences': return (
+        <LeadSequencesManager
+          onNavigateToLeads={() => setActiveModule('leads')}
         />
       );
       case 'lead_campaigns': return (

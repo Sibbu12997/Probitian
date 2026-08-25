@@ -15,21 +15,25 @@ Official LinkedIn: [https://www.linkedin.com/company/probitian/](https://www.lin
 - 👤 **[ProBitian Website User Guide](PROBITIAN_USER_GUIDE.md)**  
   Comprehensive user guide for public learners navigating courses, portfolio projects, technical articles, and enquiry forms.
 - 🛠 **[Admin Control Center User Guide](PROBITIAN_ADMIN_CONTROL_CENTER_USER_GUIDE.md)**  
-  Administrator manual covering all 17 CMS modules, home page editing, message handling, branding, and GA4 analytics.
+  Administrator manual covering all 20 CMS & CRM modules, B2B Lead CRM, Email Sequences, Lead Outreach Campaigns, home page editing, message handling, branding, and GA4 analytics.
+- 🎯 **[B2B Lead CRM & Automated Email Sequences Workflow](LEAD_OUTREACH_AND_SEQUENCES_WORKFLOW.md)**  
+  Complete operational specification for B2B Lead CRM, CSV Import pipeline, Outreach Campaigns, Multi-step Email Sequences, Selective Lead Enrollment, and Background Worker.
 
 ### 🗄 Database & Storage Architecture
 - 🏛 **[Database Architecture Specification](DATABASE_ARCHITECTURE.md)**  
-  Detailed specification of Supabase PostgreSQL as the single authoritative production database and table schema references.
+  Detailed specification of Supabase PostgreSQL as the single authoritative production database, table schema references (`leads`, `lead_campaigns`, `campaign_leads`), and RLS policies.
 - 🔄 **[Database Migrations & Schema Management](DATABASE_MIGRATIONS.md)**  
-  Sequential migration log (`0001` to `0006`), non-destructive schema rules, and migration execution procedures.
+  Sequential migration log (`0001` to `0010`), non-destructive schema rules, and migration execution procedures.
 - 🖼 **[Media Library & Supabase Storage Specification](MEDIA_LIBRARY.md)**  
   Supabase Storage (`probitian-media` bucket) architecture, folder organization, upload API, and SVG DOMPurify sanitization.
 
-### ✉️ Email & Newsletter Workflows
+### ✉️ Email, Outreach & Automated Sequences
 - 📬 **[Newsletter Subscription Workflow](NEWSLETTER_WORKFLOW.md)**  
   Step-by-step pipeline for newsletter subscriptions, database persistence gating, and welcome email delivery.
 - 📢 **[Email Campaign Broadcast Engine Workflow](EMAIL_CAMPAIGN_WORKFLOW.md)**  
-  Campaign creation, draft saving, test emails, bulk subscriber dispatches, and recipient delivery tracking.
+  Newsletter broadcast engine, draft saving, test emails, bulk subscriber dispatches, and recipient delivery tracking.
+- 🎯 **[Lead Outreach Campaigns & Automated Sequences](LEAD_OUTREACH_AND_SEQUENCES_WORKFLOW.md)**  
+  B2B targeted outreach broadcasts, multi-step drip email sequences, dynamic variable tags, and automated stop triggers.
 - 🔐 **[Email Configuration & Gmail SMTP Security](EMAIL_CONFIGURATION.md)**  
   Nodemailer over Gmail SMTP setup, sender configuration, and credential isolation standards.
 

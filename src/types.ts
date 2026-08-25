@@ -298,3 +298,86 @@ export interface CampaignLead {
   lead?: Lead;
 }
 
+// ==================== B2B LEAD EMAIL SEQUENCES ====================
+
+export type SequenceStatus = 'Draft' | 'Active' | 'Paused' | 'Completed' | 'Cancelled';
+
+export type SequenceLeadStatus = 'Pending' | 'Active' | 'Completed' | 'Paused' | 'Stopped' | 'Failed';
+
+export type SequenceStopReason =
+  | 'Replied'
+  | 'Interested'
+  | 'Demo Requested'
+  | 'Converted'
+  | 'Not Interested'
+  | 'Do Not Contact'
+  | 'Bounced'
+  | 'Manual Stop'
+  | 'Failed';
+
+export interface LeadSequence {
+  id: string;
+  name: string;
+  description?: string;
+  status: SequenceStatus;
+  created_at: string;
+  updated_at: string;
+  steps?: SequenceStep[];
+  leads?: SequenceLead[];
+  // Aggregated analytics
+  total_leads?: number;
+  active_leads?: number;
+  completed_leads?: number;
+  stopped_leads?: number;
+  emails_sent?: number;
+  emails_failed?: number;
+}
+
+export interface SequenceStep {
+  id: string;
+  sequence_id: string;
+  step_number: number;
+  delay_days: number;
+  subject: string;
+  preheader?: string;
+  html_content: string;
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
+  // Computed stats for step
+  sent_count?: number;
+  pending_count?: number;
+  failed_count?: number;
+}
+
+export interface SequenceLead {
+  id: string;
+  sequence_id: string;
+  lead_id: string;
+  current_step: number;
+  status: SequenceLeadStatus;
+  next_send_at?: string | null;
+  last_sent_at?: string | null;
+  completed_at?: string | null;
+  stopped_at?: string | null;
+  stop_reason?: SequenceStopReason | string | null;
+  created_at: string;
+  updated_at: string;
+  lead?: Lead;
+  sequence?: LeadSequence;
+}
+
+export interface SequenceDeliveryLog {
+  id: string;
+  sequence_id: string;
+  sequence_lead_id?: string;
+  lead_id: string;
+  step_number: number;
+  step_id?: string;
+  email: string;
+  status: 'sent' | 'failed';
+  error_message?: string;
+  sent_at: string;
+}
+
+

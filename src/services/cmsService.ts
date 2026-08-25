@@ -18,7 +18,11 @@ import {
   LeadCampaign,
   CampaignLead,
   LeadStatus,
-  LeadPriority
+  LeadPriority,
+  LeadSequence,
+  SequenceStep,
+  SequenceLead,
+  SequenceDeliveryLog
 } from '../types';
 import { LegalSettings, DEFAULT_LEGAL_SETTINGS } from '../data/defaultLegalData';
 import { PROBITIAN_LOGO_URL } from '../constants/branding';
@@ -808,6 +812,217 @@ export const cmsService = {
       };
     } catch (e: any) {
       return { success: false, message: e?.message || 'Failed to dispatch lead outreach campaign.' };
+    }
+  },
+
+  // --- B2B LEAD EMAIL SEQUENCES ---
+  async getLeadSequences(): Promise<LeadSequence[]> {
+    try {
+      const data = await safeFetchJson<LeadSequence[]>('/api/admin/lead-sequences');
+      if (Array.isArray(data)) {
+        return data as LeadSequence[];
+      }
+      return [];
+    } catch (e: any) {
+      console.warn('Failed to fetch lead sequences:', e?.message || e);
+      return [];
+    }
+  },
+
+  async getLeadSequenceById(id: string): Promise<LeadSequence | null> {
+    try {
+      return await safeFetchJson<LeadSequence>(`/api/admin/lead-sequences/${id}`);
+    } catch (e: any) {
+      console.warn(`Failed to fetch lead sequence ${id}:`, e?.message || e);
+      return null;
+    }
+  },
+
+  async createLeadSequence(data: { name: string; description?: string; steps?: Partial<SequenceStep>[] }): Promise<{ success: boolean; sequence?: LeadSequence; error?: string }> {
+    try {
+      const res = await safeFetchJson<{ success?: boolean; sequence?: LeadSequence; error?: string }>('/api/admin/lead-sequences', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      return {
+        success: Boolean(res && res.success !== false),
+        sequence: res?.sequence,
+        error: res?.error
+      };
+    } catch (e: any) {
+      console.warn('Failed to create lead sequence:', e?.message || e);
+      return { success: false, error: e?.message || 'Failed to create lead sequence' };
+    }
+  },
+
+  async updateLeadSequence(id: string, updates: Partial<LeadSequence>): Promise<{ success: boolean; sequence?: LeadSequence }> {
+    try {
+      const res = await safeFetchJson<{ success?: boolean; sequence?: LeadSequence }>(`/api/admin/lead-sequences/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates)
+      });
+      return {
+        success: Boolean(res && res.success !== false),
+        sequence: res?.sequence
+      };
+    } catch (e: any) {
+      console.warn(`Failed to update lead sequence ${id}:`, e?.message || e);
+      return { success: false };
+    }
+  },
+
+  async deleteLeadSequence(id: string): Promise<boolean> {
+    try {
+      const res = await safeFetchJson<{ success?: boolean }>(`/api/admin/lead-sequences/${id}`, {
+        method: 'DELETE'
+      });
+      return Boolean(res && res.success !== false);
+    } catch (e: any) {
+      console.warn(`Failed to delete lead sequence ${id}:`, e?.message || e);
+      return false;
+    }
+  },
+
+  async saveSequenceSteps(sequenceId: string, steps: Partial<SequenceStep>[]): Promise<{ success: boolean; steps?: SequenceStep[] }> {
+    try {
+      const res = await safeFetchJson<{ success?: boolean; steps?: SequenceStep[] }>(`/api/admin/lead-sequences/${sequenceId}/steps`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ steps })
+      });
+      return {
+        success: Boolean(res && res.success !== false),
+        steps: res?.steps
+      };
+    } catch (e: any) {
+      console.warn(`Failed to save steps for sequence ${sequenceId}:`, e?.message || e);
+      return { success: false };
+    }
+  },
+
+  async enrollLeadsInSequence(sequenceId: string, leadIds: string[]): Promise<{
+    success: boolean;
+    message: string;
+    enrolledCount: number;
+    skippedCount: number;
+    totalSelected: number;
+  }> {
+    try {
+      const res = await safeFetchJson<{
+        success?: boolean;
+        message?: string;
+        enrolledCount?: number;
+        skippedCount?: number;
+        totalSelected?: number;
+      }>(`/api/admin/lead-sequences/${sequenceId}/enroll`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ leadIds })
+      });
+      return {
+        success: Boolean(res && res.success !== false),
+        message: res?.message || 'Enrollment processed',
+        enrolledCount: res?.enrolledCount || 0,
+        skippedCount: res?.skippedCount || 0,
+        totalSelected: res?.totalSelected || leadIds.length
+      };
+    } catch (e: any) {
+      return {
+        success: false,
+        message: e?.message || 'Failed to enroll leads in sequence',
+        enrolledCount: 0,
+        skippedCount: 0,
+        totalSelected: leadIds.length
+      };
+    }
+  },
+
+  async pauseLeadSequence(sequenceId: string): Promise<{ success: boolean; message: string }> {
+    try {
+      const res = await safeFetchJson<{ success?: boolean; message?: string }>(`/api/admin/lead-sequences/${sequenceId}/pause`, {
+        method: 'POST'
+      });
+      return {
+        success: Boolean(res && res.success !== false),
+        message: res?.message || 'Sequence paused.'
+      };
+    } catch (e: any) {
+      return { success: false, message: e?.message || 'Failed to pause sequence' };
+    }
+  },
+
+  async resumeLeadSequence(sequenceId: string): Promise<{ success: boolean; message: string }> {
+    try {
+      const res = await safeFetchJson<{ success?: boolean; message?: string }>(`/api/admin/lead-sequences/${sequenceId}/resume`, {
+        method: 'POST'
+      });
+      return {
+        success: Boolean(res && res.success !== false),
+        message: res?.message || 'Sequence resumed.'
+      };
+    } catch (e: any) {
+      return { success: false, message: e?.message || 'Failed to resume sequence' };
+    }
+  },
+
+  async stopLeadInSequence(sequenceId: string, leadId: string, reason?: string): Promise<{ success: boolean; message: string }> {
+    try {
+      const res = await safeFetchJson<{ success?: boolean; message?: string }>(`/api/admin/lead-sequences/${sequenceId}/stop-lead`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ leadId, reason })
+      });
+      return {
+        success: Boolean(res && res.success !== false),
+        message: res?.message || 'Lead sequence status updated.'
+      };
+    } catch (e: any) {
+      return { success: false, message: e?.message || 'Failed to stop lead in sequence' };
+    }
+  },
+
+  async sendSequenceTestEmail(sequenceId: string, stepNumber: number, testEmail: string, sampleLeadId?: string): Promise<{ success: boolean; message: string }> {
+    try {
+      const res = await safeFetchJson<{ success?: boolean; message?: string }>(`/api/admin/lead-sequences/${sequenceId}/test`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stepNumber, testEmail, sampleLeadId })
+      });
+      return {
+        success: Boolean(res && res.success !== false),
+        message: res?.message || 'Sequence test email dispatched.'
+      };
+    } catch (e: any) {
+      return { success: false, message: e?.message || 'Failed to dispatch sequence test email.' };
+    }
+  },
+
+  async triggerSequenceProcessing(): Promise<{ success: boolean; stats?: any }> {
+    try {
+      const res = await safeFetchJson<{ success?: boolean; stats?: any }>('/api/admin/lead-sequences/process', {
+        method: 'POST'
+      });
+      return {
+        success: Boolean(res && res.success !== false),
+        stats: res?.stats
+      };
+    } catch (e: any) {
+      return { success: false };
+    }
+  },
+
+  async getLeadSequencesForLead(leadId: string): Promise<any[]> {
+    try {
+      const data = await safeFetchJson<any[]>(`/api/admin/leads/${leadId}/sequences`);
+      if (Array.isArray(data)) {
+        return data;
+      }
+      return [];
+    } catch (e: any) {
+      console.warn(`Failed to fetch sequences for lead ${leadId}:`, e?.message || e);
+      return [];
     }
   },
 

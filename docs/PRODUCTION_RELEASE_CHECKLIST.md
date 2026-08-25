@@ -22,7 +22,7 @@ Prior to releasing a new deployment or major update, ensure every item below is 
 - [x] **Firebase Absent**: Zero active code, imports, or dependencies on Firebase in production.
 - [x] **Cloud SQL Disabled**: Zero active code, imports, or dependencies on Cloud SQL in production.
 
-### 2. Email & Communications
+### 2. Email, Lead Outreach & Automated Sequences
 - [x] **Newsletter Subscriptions Tested**: `POST /api/newsletter` saves subscribers to Supabase.
 - [x] **Welcome Email Tested**: Welcome email dispatched via Gmail SMTP (`probitianofficial@gmail.com`) only after DB persistence.
 - [x] **Contact Form Tested**: Visitor enquiries saved to Supabase `messages` table and alert emails sent.
@@ -30,6 +30,13 @@ Prior to releasing a new deployment or major update, ensure every item below is 
 - [x] **Campaign Save Tested**: `POST /api/admin/email-campaigns` upserts drafts to Supabase `email_campaigns`.
 - [x] **Campaign Test Email Tested**: Test emails dispatched successfully.
 - [x] **Campaign Status Tracking Tested**: Campaign status lifecycle (`draft` → `sending` → `sent`) and recipient delivery logs (`email_campaign_recipients`) functioning.
+- [x] **B2B Lead CRM Tested**: Manual lead creation, editing, status filtering, and search verified in `public.leads`.
+- [x] **CSV Lead Import Tested**: Header aliases, quote handling, and duplicate modes (Skip/Update) verified with Supabase persistence.
+- [x] **Selective Lead Enrollment Tested**: Multi-select CRM checkboxes enroll only targeted leads into sequences.
+- [x] **Multi-Step Sequences Tested**: Multi-step delay scheduling (`delay_days`), subjects, and dynamic personalization tags (`{{company_name}}`, `{{contact_person}}`, etc.) verified.
+- [x] **Background Worker Tested**: 60-second automated interval worker and "Process Due Steps Now" trigger evaluated successfully.
+- [x] **Automatic Safety Stop Tested**: Sequence halts immediately when a lead transitions to terminal status (`Replied`, `Interested`, `Converted`, `Do Not Contact`, `Bounced`).
+- [x] **Lead Drawer Inspection Tested**: Real-time sequence progress and manual single-lead Stop button tested.
 
 ### 3. Media & Storage
 - [x] **Media Upload Tested**: Files uploaded to Supabase Storage `probitian-media` bucket and metadata written to `public.media`.

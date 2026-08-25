@@ -73,7 +73,7 @@ The public website caters to learners and site visitors with seamless hash routi
 
 ## 4. Admin Portal
 
-Accessible at `#/admin`, the Admin Control Center provides 17 administrative modules:
+Accessible at `#/admin`, the Admin Control Center provides 20 comprehensive administrative modules:
 1. **Dashboard Overview**: KPI cards, recent activity, and quick CMS shortcuts.
 2. **GA4 Analytics**: Real-time traffic, page views, duration, country map, and conversion events.
 3. **Home Page Editor**: Headlines, value proposition cards, and platform statistics.
@@ -85,19 +85,27 @@ Accessible at `#/admin`, the Admin Control Center provides 17 administrative mod
 9. **Contact Messages & Inbox**: Visitor inquiry table with status badges, notes, and direct Gmail SMTP email reply modals.
 10. **Subscribers Manager**: Active subscriber roster and CSV export capabilities.
 11. **Email Campaign Manager**: Create, test, schedule, and broadcast bulk newsletter emails.
-12. **Branding Manager**: Logo, banner, and theme color controls with factory reset support.
-13. **Social Links Manager**: Social media URL controls.
-14. **Navigation Menu Manager**: Menu visibility and link order controls.
-15. **SEO & Meta Tags Manager**: Meta titles, descriptions, keywords, OG tags, and canonical URLs.
-16. **Website Settings**: Site parameters and Community Hub physical address settings.
-17. **Legal & Policies Manager**: Edit Terms of Service and Privacy Policy texts.
+12. **B2B Leads CRM**: Manage enterprise prospects, search/filter leads, import/export CSVs, inspect lead drawer, and track sales stages.
+13. **Email Sequences**: Orchestrate multi-step automated drip sequences with customizable intervals, subjects, dynamic variables, and automated stop conditions.
+14. **Lead Outreach Campaigns**: Launch targeted broadcast outreach emails to CRM lead segments with safety exclusions and delivery tracking.
+15. **Website Branding**: Logo, banner, and theme color controls with factory reset support.
+16. **Social Links Manager**: Social media URL controls.
+17. **Navigation Menu Manager**: Menu visibility and link order controls.
+18. **SEO & Meta Tags Manager**: Meta titles, descriptions, keywords, OG tags, and canonical URLs.
+19. **Website Settings**: Site parameters and Community Hub physical address settings.
+20. **Legal & Policies Manager**: Edit Terms of Service and Privacy Policy texts.
 
 ---
 
-## 5. Email & Newsletter System
+## 5. Email, Outreach & Automated Sequence System
 
 Email services run server-side using **Nodemailer** over **Gmail SMTP**:
 - **Official Sender**: `probitianofficial@gmail.com`
+- **Transactional Notifications**: Instant welcome emails to new subscribers and inbound inquiry notifications to administrators.
+- **Admin Direct Replies**: Send direct email responses to contact form inquiries right from the admin dashboard.
+- **Newsletter Broadcasts**: Bulk email broadcasting to active subscribers with preheader support, test email dispatch, and delivery tracking.
+- **B2B Lead Outreach**: Targeted campaigns to prospect lists with automatic suppression of bounced or opted-out contacts.
+- **Automated Drip Sequences**: Multi-step automated sequences running on a 60-second background worker with dynamic tag interpolation (`{{company_name}}`, `{{contact_person}}`, etc.) and automated safety stopping when prospects reply or convert.
 - **Transactional Emails**:
   - Immediate inquiry confirmation emails sent to visitors.
   - New message notification alerts.

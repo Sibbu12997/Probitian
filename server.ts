@@ -2769,6 +2769,374 @@ async function appendSupabaseCrmRecipients(newRecipients: any[]): Promise<void> 
   });
 }
 
+// ==================== B2B LEAD SEQUENCES PERSISTENCE HELPERS ====================
+
+async function getSupabaseLeadSequences(): Promise<any[]> {
+  if (!serverSupabase) {
+    if (process.env.NODE_ENV === 'production') {
+      return [];
+    }
+    const data = readCmsData();
+    return data.lead_sequences || [];
+  }
+
+  try {
+    const { data: dbSeqs, error: tblErr } = await serverSupabase.from('lead_sequences').select('*').order('created_at', { ascending: false });
+    if (!tblErr && Array.isArray(dbSeqs) && dbSeqs.length > 0) {
+      return dbSeqs;
+    }
+
+    const { data: row, error: rowErr } = await serverSupabase.from('settings').select('value').eq('key', 'crm_lead_sequences').maybeSingle();
+    if (!rowErr && row && Array.isArray(row.value?.sequences)) {
+      return row.value.sequences;
+    }
+    return [];
+  } catch (err: any) {
+    console.error('[Supabase Lead Sequences Read Exception]', err);
+    return [];
+  }
+}
+
+async function saveSupabaseLeadSequences(sequences: any[]): Promise<void> {
+  if (!serverSupabase) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('Supabase database client is required in production environment.');
+    }
+    const data = readCmsData();
+    data.lead_sequences = sequences;
+    writeCmsData(data);
+    return;
+  }
+
+  const normalizedSequences = sequences.map(s => ({
+    ...s,
+    id: isValidUuid(s.id) ? s.id : crypto.randomUUID()
+  }));
+
+  try {
+    const { error: tblErr } = await serverSupabase.from('lead_sequences').upsert(normalizedSequences);
+    if (!tblErr) {
+      const now = new Date().toISOString();
+      await serverSupabase.from('settings').upsert({
+        key: 'crm_lead_sequences',
+        value: { sequences: normalizedSequences, updated_at: now },
+        updated_at: now
+      });
+      return;
+    }
+  } catch (e) {
+    // Fall back to settings
+  }
+
+  const now = new Date().toISOString();
+  const { error } = await serverSupabase.from('settings').upsert({
+    key: 'crm_lead_sequences',
+    value: { sequences: normalizedSequences, updated_at: now },
+    updated_at: now
+  });
+  if (error) {
+    console.error('[Supabase Save CRM Sequences to Settings Error]', error.message);
+    throw new Error(`Failed to persist sequences to Supabase: ${error.message}`);
+  }
+}
+
+async function getSupabaseSequenceSteps(): Promise<any[]> {
+  if (!serverSupabase) {
+    if (process.env.NODE_ENV === 'production') {
+      return [];
+    }
+    const data = readCmsData();
+    return data.sequence_steps || [];
+  }
+
+  try {
+    const { data: dbSteps, error: tblErr } = await serverSupabase.from('sequence_steps').select('*').order('step_number', { ascending: true });
+    if (!tblErr && Array.isArray(dbSteps) && dbSteps.length > 0) {
+      return dbSteps;
+    }
+
+    const { data: row, error: rowErr } = await serverSupabase.from('settings').select('value').eq('key', 'crm_sequence_steps').maybeSingle();
+    if (!rowErr && row && Array.isArray(row.value?.steps)) {
+      return row.value.steps;
+    }
+    return [];
+  } catch (err: any) {
+    console.error('[Supabase Sequence Steps Read Exception]', err);
+    return [];
+  }
+}
+
+async function saveSupabaseSequenceSteps(steps: any[]): Promise<void> {
+  if (!serverSupabase) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('Supabase database client is required in production environment.');
+    }
+    const data = readCmsData();
+    data.sequence_steps = steps;
+    writeCmsData(data);
+    return;
+  }
+
+  const normalizedSteps = steps.map(s => ({
+    ...s,
+    id: isValidUuid(s.id) ? s.id : crypto.randomUUID(),
+    sequence_id: isValidUuid(s.sequence_id) ? s.sequence_id : s.sequence_id
+  }));
+
+  try {
+    const { error: tblErr } = await serverSupabase.from('sequence_steps').upsert(normalizedSteps);
+    if (!tblErr) {
+      const now = new Date().toISOString();
+      await serverSupabase.from('settings').upsert({
+        key: 'crm_sequence_steps',
+        value: { steps: normalizedSteps, updated_at: now },
+        updated_at: now
+      });
+      return;
+    }
+  } catch (e) {
+    // Fall back to settings
+  }
+
+  const now = new Date().toISOString();
+  const { error } = await serverSupabase.from('settings').upsert({
+    key: 'crm_sequence_steps',
+    value: { steps: normalizedSteps, updated_at: now },
+    updated_at: now
+  });
+  if (error) {
+    console.error('[Supabase Save CRM Sequence Steps Error]', error.message);
+    throw new Error(`Failed to persist sequence steps to Supabase: ${error.message}`);
+  }
+}
+
+async function getSupabaseSequenceLeads(): Promise<any[]> {
+  if (!serverSupabase) {
+    if (process.env.NODE_ENV === 'production') {
+      return [];
+    }
+    const data = readCmsData();
+    return data.sequence_leads || [];
+  }
+
+  try {
+    const { data: dbLeads, error: tblErr } = await serverSupabase.from('sequence_leads').select('*').order('created_at', { ascending: false });
+    if (!tblErr && Array.isArray(dbLeads) && dbLeads.length > 0) {
+      return dbLeads;
+    }
+
+    const { data: row, error: rowErr } = await serverSupabase.from('settings').select('value').eq('key', 'crm_sequence_leads').maybeSingle();
+    if (!rowErr && row && Array.isArray(row.value?.sequence_leads)) {
+      return row.value.sequence_leads;
+    }
+    return [];
+  } catch (err: any) {
+    console.error('[Supabase Sequence Leads Read Exception]', err);
+    return [];
+  }
+}
+
+async function saveSupabaseSequenceLeads(sequenceLeads: any[]): Promise<void> {
+  if (!serverSupabase) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('Supabase database client is required in production environment.');
+    }
+    const data = readCmsData();
+    data.sequence_leads = sequenceLeads;
+    writeCmsData(data);
+    return;
+  }
+
+  const normalizedSeqLeads = sequenceLeads.map(sl => ({
+    ...sl,
+    id: isValidUuid(sl.id) ? sl.id : crypto.randomUUID(),
+    sequence_id: isValidUuid(sl.sequence_id) ? sl.sequence_id : sl.sequence_id,
+    lead_id: isValidUuid(sl.lead_id) ? sl.lead_id : sl.lead_id
+  }));
+
+  try {
+    const { error: tblErr } = await serverSupabase.from('sequence_leads').upsert(normalizedSeqLeads);
+    if (!tblErr) {
+      const now = new Date().toISOString();
+      await serverSupabase.from('settings').upsert({
+        key: 'crm_sequence_leads',
+        value: { sequence_leads: normalizedSeqLeads, updated_at: now },
+        updated_at: now
+      });
+      return;
+    }
+  } catch (e) {
+    // Fall back to settings
+  }
+
+  const now = new Date().toISOString();
+  const { error } = await serverSupabase.from('settings').upsert({
+    key: 'crm_sequence_leads',
+    value: { sequence_leads: normalizedSeqLeads, updated_at: now },
+    updated_at: now
+  });
+  if (error) {
+    console.error('[Supabase Save CRM Sequence Leads Error]', error.message);
+    throw new Error(`Failed to persist sequence leads to Supabase: ${error.message}`);
+  }
+}
+
+async function getSupabaseSequenceDeliveries(): Promise<any[]> {
+  if (!serverSupabase) {
+    if (process.env.NODE_ENV === 'production') {
+      return [];
+    }
+    const data = readCmsData();
+    return data.sequence_deliveries || [];
+  }
+
+  try {
+    const { data: dbDelivs, error: tblErr } = await serverSupabase.from('sequence_deliveries').select('*').order('sent_at', { ascending: false });
+    if (!tblErr && Array.isArray(dbDelivs)) {
+      return dbDelivs;
+    }
+
+    const { data: row, error: rowErr } = await serverSupabase.from('settings').select('value').eq('key', 'crm_sequence_deliveries').maybeSingle();
+    if (!rowErr && row && Array.isArray(row.value?.deliveries)) {
+      return row.value.deliveries;
+    }
+    return [];
+  } catch (err: any) {
+    console.error('[Supabase Sequence Deliveries Read Exception]', err);
+    return [];
+  }
+}
+
+async function appendSupabaseSequenceDeliveries(newDeliveries: any[]): Promise<void> {
+  if (!newDeliveries || newDeliveries.length === 0) return;
+
+  const normalized = newDeliveries.map(d => ({
+    ...d,
+    id: isValidUuid(d.id) ? d.id : crypto.randomUUID()
+  }));
+
+  if (!serverSupabase) {
+    if (process.env.NODE_ENV !== 'production') {
+      const data = readCmsData();
+      data.sequence_deliveries = data.sequence_deliveries || [];
+      data.sequence_deliveries.push(...normalized);
+      writeCmsData(data);
+    }
+    return;
+  }
+
+  try {
+    const { error: tblErr } = await serverSupabase.from('sequence_deliveries').insert(normalized);
+    if (!tblErr) return;
+  } catch (e) {
+    // Continue to settings
+  }
+
+  const existing = await getSupabaseSequenceDeliveries();
+  const combined = [...existing, ...normalized];
+  const now = new Date().toISOString();
+  await serverSupabase.from('settings').upsert({
+    key: 'crm_sequence_deliveries',
+    value: { deliveries: combined, updated_at: now },
+    updated_at: now
+  });
+}
+
+// Ensure default sequence exists on initialization
+async function ensureDefaultLeadSequence(): Promise<void> {
+  try {
+    const sequences = await getSupabaseLeadSequences();
+    if (sequences.length === 0) {
+      const defaultSequenceId = 'c0000000-0000-0000-0000-000000000001';
+      const now = new Date().toISOString();
+      const defaultSeq = {
+        id: defaultSequenceId,
+        name: 'Power BI Outreach — 14 Day',
+        description: 'Multi-stage enterprise outreach sequence designed for manufacturing and distribution leaders.',
+        status: 'Active',
+        created_at: now,
+        updated_at: now
+      };
+
+      const defaultSteps = [
+        {
+          id: 'c0000000-0001-0000-0000-000000000001',
+          sequence_id: defaultSequenceId,
+          step_number: 1,
+          delay_days: 0,
+          subject: 'Power BI Analytics for {{company_name}}',
+          preheader: 'Automate your operational MIS & reporting with Power BI',
+          html_content: `<h2>Hello {{contact_person}},</h2>
+<p>I noticed <strong>{{company_name}}</strong> operates in the {{industry}} space.</p>
+<p>Based on your business scale in {{location}}, a dedicated Power BI dashboard tailored for <strong>{{powerbi_use_case}}</strong> can eliminate manual Excel consolidation and deliver executive clarity in real time.</p>
+<p><a href="https://probitian.ai.studio/#/contact" class="btn-cta">Schedule Power BI Consultation</a></p>
+<p>Best regards,<br/><strong>Shivam Baghel</strong><br/>ProBitian Analytics</p>`,
+          enabled: true,
+          created_at: now,
+          updated_at: now
+        },
+        {
+          id: 'c0000000-0001-0000-0000-000000000002',
+          sequence_id: defaultSequenceId,
+          step_number: 2,
+          delay_days: 3,
+          subject: 'Following up — Power BI for {{company_name}}',
+          preheader: 'Quick follow-up regarding automated analytics for {{company_name}}',
+          html_content: `<h2>Hi {{contact_person}},</h2>
+<p>Following up on my previous note regarding <strong>{{company_name}}</strong>'s analytics workflow in {{location}}.</p>
+<p>We specialize in turning complex multi-source data into real-time Power BI executive dashboards for {{industry}} organizations — specifically around <strong>{{powerbi_use_case}}</strong>.</p>
+<p>Would you have 10 minutes this week for a brief walkthrough of live enterprise dashboards?</p>
+<p><a href="https://probitian.ai.studio/#/projects" class="btn-cta">Explore Live Portfolio</a> &nbsp; <a href="https://probitian.ai.studio/#/contact" class="btn-cta" style="background-color: #0f172a !important;">Book Meeting</a></p>
+<p>Regards,<br/><strong>Shivam Baghel</strong><br/>ProBitian Analytics</p>`,
+          enabled: true,
+          created_at: now,
+          updated_at: now
+        },
+        {
+          id: 'c0000000-0001-0000-0000-000000000003',
+          sequence_id: defaultSequenceId,
+          step_number: 3,
+          delay_days: 7,
+          subject: 'A quick Power BI idea for {{company_name}}',
+          preheader: 'Practical architecture for {{powerbi_use_case}}',
+          html_content: `<h2>Hello {{contact_person}},</h2>
+<p>I wanted to share a practical insight regarding <strong>{{powerbi_use_case}}</strong> for companies in {{industry}}.</p>
+<p>Most leadership teams spend 15+ hours weekly consolidating departmental sheets. Our automated Power BI pipeline connects directly to your databases, ERP, and operations data to deliver instant KPI tracking without manual overhead.</p>
+<p><a href="https://probitian.ai.studio/#/contact" class="btn-cta">Request Custom Demo</a></p>
+<p>Best,<br/><strong>Shivam Baghel</strong><br/>ProBitian Analytics</p>`,
+          enabled: true,
+          created_at: now,
+          updated_at: now
+        },
+        {
+          id: 'c0000000-0001-0000-0000-000000000004',
+          sequence_id: defaultSequenceId,
+          step_number: 4,
+          delay_days: 14,
+          subject: 'Closing the loop — {{company_name}}',
+          preheader: 'Final follow-up regarding Power BI initiatives for {{company_name}}',
+          html_content: `<h2>Hi {{contact_person}},</h2>
+<p>I understand timing is everything and you are likely focused on other high priorities at <strong>{{company_name}}</strong>.</p>
+<p>I will pause outreach for now. Whenever you are ready to explore Power BI solutions or automate <strong>{{powerbi_use_case}}</strong>, feel free to reach out directly.</p>
+<p><a href="https://probitian.ai.studio/" style="color:#7c3aed;font-weight:bold;">Visit ProBitian</a> &bull; <a href="https://probitian.ai.studio/#/contact" style="color:#7c3aed;font-weight:bold;">Contact Shivam</a></p>
+<p>Wishing you and the team at {{company_name}} continued success!</p>
+<p>Warm regards,<br/><strong>Shivam Baghel</strong><br/>ProBitian Analytics</p>`,
+          enabled: true,
+          created_at: now,
+          updated_at: now
+        }
+      ];
+
+      await saveSupabaseLeadSequences([defaultSeq]);
+      await saveSupabaseSequenceSteps(defaultSteps);
+      console.log('[Lead Sequences] Initialized default Power BI Outreach Sequence');
+    }
+  } catch (err: any) {
+    console.warn('[ensureDefaultLeadSequence Warning]', err?.message || err);
+  }
+}
+
+
 // GET All Leads with optional search and filters
 app.get('/api/admin/leads', requireAdmin, async (req, res) => {
   const { search, status, lead_priority, industry, follow_up } = req.query;
@@ -3587,6 +3955,784 @@ app.post('/api/admin/lead-campaigns/:id/send', requireAdmin, emailSendLimiter, a
     return res.status(500).json({ error: 'Failed to complete outreach dispatch in database' });
   }
 });
+
+// ==================== B2B LEAD SEQUENCES ENGINE & BACKGROUND WORKER ====================
+
+let isProcessingSequences = false;
+
+async function processActiveSequences(): Promise<{ processed: number; sent: number; stopped: number; completed: number; failed: number }> {
+  if (isProcessingSequences) {
+    return { processed: 0, sent: 0, stopped: 0, completed: 0, failed: 0 };
+  }
+
+  isProcessingSequences = true;
+  const stats = { processed: 0, sent: 0, stopped: 0, completed: 0, failed: 0 };
+
+  try {
+    const sequences = await getSupabaseLeadSequences();
+    const activeSequences = sequences.filter((s: any) => s.status === 'Active');
+    if (activeSequences.length === 0) {
+      return stats;
+    }
+
+    const activeSeqIdSet = new Set(activeSequences.map((s: any) => s.id));
+    const allSteps = await getSupabaseSequenceSteps();
+    const allSeqLeads = await getSupabaseSequenceLeads();
+    const allLeads = await getSupabaseCrmLeads();
+    const allDeliveries = await getSupabaseSequenceDeliveries();
+
+    const leadsMap = new Map<string, any>();
+    allLeads.forEach((l: any) => leadsMap.set(l.id, l));
+
+    const now = new Date();
+    const nowIso = now.toISOString();
+    const nowTime = now.getTime();
+
+    let seqLeadsUpdated = false;
+    let leadsUpdated = false;
+    const newDeliveries: any[] = [];
+    const newRecipientsLogs: any[] = [];
+
+    for (const seqLead of allSeqLeads) {
+      // Must belong to an active sequence
+      if (!activeSeqIdSet.has(seqLead.sequence_id)) continue;
+
+      // Must be Active or Pending
+      if (seqLead.status !== 'Active' && seqLead.status !== 'Pending') continue;
+
+      // Must be due for sending
+      if (seqLead.next_send_at && new Date(seqLead.next_send_at).getTime() > nowTime) {
+        continue;
+      }
+
+      stats.processed++;
+
+      // Check lead record in CRM
+      const lead = leadsMap.get(seqLead.lead_id);
+      if (!lead) {
+        seqLead.status = 'Stopped';
+        seqLead.stop_reason = 'Lead not found in CRM';
+        seqLead.stopped_at = nowIso;
+        seqLeadsUpdated = true;
+        stats.stopped++;
+        continue;
+      }
+
+      // Safety & Stop Conditions Check
+      // Stop sequence immediately if lead has replied, expressed interest, converted, or requested Do Not Contact / Bounced
+      const terminalStatuses = ['Replied', 'Interested', 'Demo Requested', 'Converted', 'Do Not Contact', 'Bounced', 'Not Interested'];
+      if (terminalStatuses.includes(lead.status)) {
+        seqLead.status = 'Stopped';
+        seqLead.stop_reason = lead.status;
+        seqLead.stopped_at = nowIso;
+        seqLeadsUpdated = true;
+        stats.stopped++;
+        continue;
+      }
+
+      // Determine next step
+      const currentStepNum = Number(seqLead.current_step) || 0;
+      const targetStepNum = currentStepNum + 1;
+
+      // Find target step
+      const stepsForSeq = allSteps
+        .filter((st: any) => st.sequence_id === seqLead.sequence_id && st.enabled !== false)
+        .sort((a: any, b: any) => (a.step_number || 0) - (b.step_number || 0));
+
+      const targetStep = stepsForSeq.find((st: any) => st.step_number === targetStepNum);
+
+      // If no more steps exist, sequence is completed!
+      if (!targetStep) {
+        seqLead.status = 'Completed';
+        seqLead.completed_at = nowIso;
+        seqLead.next_send_at = null;
+        seqLeadsUpdated = true;
+        stats.completed++;
+        continue;
+      }
+
+      // Idempotency check: verify if step was already sent
+      const alreadySent = allDeliveries.some((d: any) =>
+        d.sequence_id === seqLead.sequence_id &&
+        d.lead_id === lead.id &&
+        d.step_number === targetStepNum &&
+        d.status === 'sent'
+      );
+
+      if (alreadySent) {
+        // Step already delivered; advance to next step without re-dispatching
+        seqLead.current_step = targetStepNum;
+        const nextStepAfter = stepsForSeq.find((st: any) => st.step_number === targetStepNum + 1);
+        if (nextStepAfter) {
+          const delayDays = Math.max(0, Number(nextStepAfter.delay_days) || 1);
+          seqLead.next_send_at = new Date(nowTime + delayDays * 86400000).toISOString();
+        } else {
+          seqLead.status = 'Completed';
+          seqLead.completed_at = nowIso;
+          seqLead.next_send_at = null;
+        }
+        seqLeadsUpdated = true;
+        continue;
+      }
+
+      // Dispatch Email via campaignEmailService
+      try {
+        const sendResult = await campaignEmailService.sendLeadSingleRecipient({
+          toEmail: lead.email,
+          subject: targetStep.subject,
+          preheader: targetStep.preheader,
+          contentHtml: targetStep.html_content,
+          lead
+        });
+
+        if (sendResult.success) {
+          stats.sent++;
+          const deliveryId = crypto.randomUUID();
+          newDeliveries.push({
+            id: deliveryId,
+            sequence_id: seqLead.sequence_id,
+            sequence_lead_id: seqLead.id,
+            lead_id: lead.id,
+            step_number: targetStepNum,
+            step_id: targetStep.id,
+            email: lead.email,
+            status: 'sent',
+            sent_at: nowIso
+          });
+
+          // Log in campaign_leads for unified CRM history
+          newRecipientsLogs.push({
+            id: deliveryId,
+            campaign_id: seqLead.sequence_id,
+            lead_id: isValidUuid(lead.id) ? lead.id : null,
+            lead_email: lead.email,
+            lead_company: lead.company_name,
+            status: 'sent',
+            provider_message_id: sendResult.messageId,
+            sent_at: nowIso,
+            created_at: nowIso
+          });
+
+          // Advance step progress
+          seqLead.current_step = targetStepNum;
+          seqLead.last_sent_at = nowIso;
+          seqLead.status = 'Active';
+
+          // Schedule next step or complete sequence
+          const nextStepAfter = stepsForSeq.find((st: any) => st.step_number === targetStepNum + 1);
+          if (nextStepAfter) {
+            const delayDays = Math.max(0, Number(nextStepAfter.delay_days) || 1);
+            seqLead.next_send_at = new Date(nowTime + delayDays * 86400000).toISOString();
+          } else {
+            seqLead.status = 'Completed';
+            seqLead.completed_at = nowIso;
+            seqLead.next_send_at = null;
+          }
+          seqLeadsUpdated = true;
+
+          // Update lead status in CRM if it was 'Not Contacted'
+          if (lead.status === 'Not Contacted') {
+            lead.status = 'Contacted';
+            lead.updated_at = nowIso;
+            leadsUpdated = true;
+          }
+        } else {
+          stats.failed++;
+          newDeliveries.push({
+            id: crypto.randomUUID(),
+            sequence_id: seqLead.sequence_id,
+            sequence_lead_id: seqLead.id,
+            lead_id: lead.id,
+            step_number: targetStepNum,
+            step_id: targetStep.id,
+            email: lead.email,
+            status: 'failed',
+            error_message: sendResult.error || 'SMTP delivery failed',
+            sent_at: nowIso
+          });
+        }
+      } catch (err: any) {
+        stats.failed++;
+        console.error(`[Sequence Send Exception for ${lead.email}]`, err?.message || err);
+        newDeliveries.push({
+          id: crypto.randomUUID(),
+          sequence_id: seqLead.sequence_id,
+          sequence_lead_id: seqLead.id,
+          lead_id: lead.id,
+          step_number: targetStepNum,
+          step_id: targetStep.id,
+          email: lead.email,
+          status: 'failed',
+          error_message: err?.message || 'Unexpected worker error',
+          sent_at: nowIso
+        });
+      }
+    }
+
+    // Persist all state changes to Supabase
+    if (seqLeadsUpdated) {
+      await saveSupabaseSequenceLeads(allSeqLeads);
+    }
+    if (newDeliveries.length > 0) {
+      await appendSupabaseSequenceDeliveries(newDeliveries);
+    }
+    if (newRecipientsLogs.length > 0) {
+      await appendSupabaseCrmRecipients(newRecipientsLogs);
+    }
+    if (leadsUpdated) {
+      await saveSupabaseCrmLeads(allLeads);
+    }
+
+    return stats;
+  } catch (err: any) {
+    console.error('[processActiveSequences Error]', err);
+    return stats;
+  } finally {
+    isProcessingSequences = false;
+  }
+}
+
+// GET All Lead Sequences with summary metrics
+app.get('/api/admin/lead-sequences', requireAdmin, async (req, res) => {
+  try {
+    await ensureDefaultLeadSequence();
+    const sequences = await getSupabaseLeadSequences();
+    const steps = await getSupabaseSequenceSteps();
+    const sequenceLeads = await getSupabaseSequenceLeads();
+    const deliveries = await getSupabaseSequenceDeliveries();
+
+    const sequencesWithStats = sequences.map((seq: any) => {
+      const seqSteps = steps.filter((st: any) => st.sequence_id === seq.id);
+      const enrolled = sequenceLeads.filter((sl: any) => sl.sequence_id === seq.id);
+      const seqDeliveries = deliveries.filter((d: any) => d.sequence_id === seq.id);
+
+      const active_leads = enrolled.filter((sl: any) => sl.status === 'Active' || sl.status === 'Pending').length;
+      const completed_leads = enrolled.filter((sl: any) => sl.status === 'Completed').length;
+      const stopped_leads = enrolled.filter((sl: any) => sl.status === 'Stopped').length;
+      const emails_sent = seqDeliveries.filter((d: any) => d.status === 'sent').length;
+      const emails_failed = seqDeliveries.filter((d: any) => d.status === 'failed').length;
+
+      return {
+        ...seq,
+        steps: seqSteps.sort((a: any, b: any) => (a.step_number || 0) - (b.step_number || 0)),
+        total_leads: enrolled.length,
+        active_leads,
+        completed_leads,
+        stopped_leads,
+        emails_sent,
+        emails_failed
+      };
+    });
+
+    return res.json(sequencesWithStats);
+  } catch (err: any) {
+    console.error('[GET /api/admin/lead-sequences Error]', err);
+    return res.status(500).json({ error: 'Failed to retrieve sequences from database' });
+  }
+});
+
+// GET Single Lead Sequence Details by ID
+app.get('/api/admin/lead-sequences/:id', requireAdmin, async (req, res) => {
+  const { id } = req.params;
+  if (!isValidId(id)) {
+    return res.status(400).json({ error: 'Invalid sequence ID format' });
+  }
+
+  try {
+    await ensureDefaultLeadSequence();
+    const sequences = await getSupabaseLeadSequences();
+    const sequence = sequences.find((s: any) => s.id === id);
+    if (!sequence) {
+      return res.status(404).json({ error: 'Lead sequence not found' });
+    }
+
+    const allSteps = await getSupabaseSequenceSteps();
+    const allSeqLeads = await getSupabaseSequenceLeads();
+    const allLeads = await getSupabaseCrmLeads();
+    const allDeliveries = await getSupabaseSequenceDeliveries();
+
+    const seqSteps = allSteps
+      .filter((st: any) => st.sequence_id === id)
+      .sort((a: any, b: any) => (a.step_number || 0) - (b.step_number || 0));
+
+    const leadsMap = new Map<string, any>();
+    allLeads.forEach((l: any) => leadsMap.set(l.id, l));
+
+    const seqLeads = allSeqLeads
+      .filter((sl: any) => sl.sequence_id === id)
+      .map((sl: any) => ({
+        ...sl,
+        lead: leadsMap.get(sl.lead_id) || null
+      }));
+
+    const seqDeliveries = allDeliveries.filter((d: any) => d.sequence_id === id);
+
+    // Compute step-level delivery stats
+    const stepsWithStats = seqSteps.map((st: any) => {
+      const stepDeliveries = seqDeliveries.filter((d: any) => d.step_number === st.step_number);
+      const sent_count = stepDeliveries.filter((d: any) => d.status === 'sent').length;
+      const failed_count = stepDeliveries.filter((d: any) => d.status === 'failed').length;
+      const pending_count = seqLeads.filter((sl: any) => (sl.status === 'Active' || sl.status === 'Pending') && (sl.current_step || 0) < st.step_number).length;
+      return {
+        ...st,
+        sent_count,
+        failed_count,
+        pending_count
+      };
+    });
+
+    const active_leads = seqLeads.filter((sl: any) => sl.status === 'Active' || sl.status === 'Pending').length;
+    const completed_leads = seqLeads.filter((sl: any) => sl.status === 'Completed').length;
+    const stopped_leads = seqLeads.filter((sl: any) => sl.status === 'Stopped').length;
+    const emails_sent = seqDeliveries.filter((d: any) => d.status === 'sent').length;
+    const emails_failed = seqDeliveries.filter((d: any) => d.status === 'failed').length;
+
+    return res.json({
+      ...sequence,
+      steps: stepsWithStats,
+      leads: seqLeads,
+      deliveries: seqDeliveries,
+      total_leads: seqLeads.length,
+      active_leads,
+      completed_leads,
+      stopped_leads,
+      emails_sent,
+      emails_failed
+    });
+  } catch (err: any) {
+    console.error('[GET /api/admin/lead-sequences/:id Error]', err);
+    return res.status(500).json({ error: 'Failed to retrieve sequence details' });
+  }
+});
+
+// POST Create New Lead Sequence
+app.post('/api/admin/lead-sequences', requireAdmin, async (req, res) => {
+  const { name, description, steps } = req.body || {};
+  if (!name || typeof name !== 'string' || !name.trim()) {
+    return res.status(400).json({ error: 'Sequence name is required' });
+  }
+
+  try {
+    const sequenceId = crypto.randomUUID();
+    const now = new Date().toISOString();
+
+    const newSequence = {
+      id: sequenceId,
+      name: name.trim(),
+      description: description ? description.trim() : '',
+      status: 'Active',
+      created_at: now,
+      updated_at: now
+    };
+
+    const sequences = await getSupabaseLeadSequences();
+    sequences.unshift(newSequence);
+    await saveSupabaseLeadSequences(sequences);
+
+    // Save initial steps if provided
+    let createdSteps: any[] = [];
+    if (Array.isArray(steps) && steps.length > 0) {
+      createdSteps = steps.map((st: any, idx: number) => ({
+        id: isValidUuid(st.id) ? st.id : crypto.randomUUID(),
+        sequence_id: sequenceId,
+        step_number: idx + 1,
+        delay_days: Math.max(0, Number(st.delay_days) || (idx === 0 ? 0 : 3)),
+        subject: st.subject || `Follow-up #${idx + 1}`,
+        preheader: st.preheader || '',
+        html_content: st.html_content || '<p>Hello {{contact_person}},</p>',
+        enabled: st.enabled !== false,
+        created_at: now,
+        updated_at: now
+      }));
+      const allSteps = await getSupabaseSequenceSteps();
+      allSteps.push(...createdSteps);
+      await saveSupabaseSequenceSteps(allSteps);
+    }
+
+    return res.json({
+      success: true,
+      sequence: {
+        ...newSequence,
+        steps: createdSteps,
+        total_leads: 0,
+        active_leads: 0,
+        completed_leads: 0,
+        stopped_leads: 0,
+        emails_sent: 0,
+        emails_failed: 0
+      }
+    });
+  } catch (err: any) {
+    console.error('[POST /api/admin/lead-sequences Error]', err);
+    return res.status(500).json({ error: 'Failed to create lead sequence in database' });
+  }
+});
+
+// PATCH Update Lead Sequence Details (Name, Description, Status)
+app.patch('/api/admin/lead-sequences/:id', requireAdmin, async (req, res) => {
+  const { id } = req.params;
+  if (!isValidId(id)) {
+    return res.status(400).json({ error: 'Invalid sequence ID format' });
+  }
+
+  const { name, description, status } = req.body || {};
+  try {
+    const sequences = await getSupabaseLeadSequences();
+    const idx = sequences.findIndex((s: any) => s.id === id);
+    if (idx === 0 && sequences.length === 0) {
+      return res.status(404).json({ error: 'Sequence not found' });
+    }
+    if (idx < 0) {
+      return res.status(404).json({ error: 'Sequence not found' });
+    }
+
+    const now = new Date().toISOString();
+    const updated = {
+      ...sequences[idx],
+      name: name !== undefined ? String(name).trim() : sequences[idx].name,
+      description: description !== undefined ? String(description).trim() : sequences[idx].description,
+      status: status !== undefined ? status : sequences[idx].status,
+      updated_at: now
+    };
+    sequences[idx] = updated;
+    await saveSupabaseLeadSequences(sequences);
+
+    // If resumed, trigger background worker
+    if (status === 'Active') {
+      setTimeout(() => { processActiveSequences().catch(console.error); }, 100);
+    }
+
+    return res.json({ success: true, sequence: updated });
+  } catch (err: any) {
+    console.error('[PATCH /api/admin/lead-sequences/:id Error]', err);
+    return res.status(500).json({ error: 'Failed to update sequence in database' });
+  }
+});
+
+// DELETE Lead Sequence
+app.delete('/api/admin/lead-sequences/:id', requireAdmin, async (req, res) => {
+  const { id } = req.params;
+  if (!isValidId(id)) {
+    return res.status(400).json({ error: 'Invalid sequence ID format' });
+  }
+
+  try {
+    const sequences = await getSupabaseLeadSequences();
+    const filteredSeqs = sequences.filter((s: any) => s.id !== id);
+    await saveSupabaseLeadSequences(filteredSeqs);
+
+    const steps = await getSupabaseSequenceSteps();
+    const filteredSteps = steps.filter((st: any) => st.sequence_id !== id);
+    await saveSupabaseSequenceSteps(filteredSteps);
+
+    const seqLeads = await getSupabaseSequenceLeads();
+    const filteredLeads = seqLeads.filter((sl: any) => sl.sequence_id !== id);
+    await saveSupabaseSequenceLeads(filteredLeads);
+
+    return res.json({ success: true });
+  } catch (err: any) {
+    console.error('[DELETE /api/admin/lead-sequences/:id Error]', err);
+    return res.status(500).json({ error: 'Failed to delete sequence' });
+  }
+});
+
+// POST Save/Update Steps for a Sequence
+app.post('/api/admin/lead-sequences/:id/steps', requireAdmin, async (req, res) => {
+  const { id } = req.params;
+  if (!isValidId(id)) {
+    return res.status(400).json({ error: 'Invalid sequence ID format' });
+  }
+
+  const { steps } = req.body || {};
+  if (!Array.isArray(steps)) {
+    return res.status(400).json({ error: 'Steps must be an array' });
+  }
+
+  try {
+    const allSteps = await getSupabaseSequenceSteps();
+    const otherSteps = allSteps.filter((st: any) => st.sequence_id !== id);
+
+    const now = new Date().toISOString();
+    const updatedSeqSteps = steps.map((st: any, idx: number) => ({
+      id: isValidUuid(st.id) ? st.id : crypto.randomUUID(),
+      sequence_id: id,
+      step_number: idx + 1,
+      delay_days: Math.max(0, Number(st.delay_days) || (idx === 0 ? 0 : 3)),
+      subject: st.subject ? st.subject.trim() : `Step #${idx + 1}`,
+      preheader: st.preheader ? st.preheader.trim() : '',
+      html_content: st.html_content || '<p>Hello {{contact_person}},</p>',
+      enabled: st.enabled !== false,
+      created_at: st.created_at || now,
+      updated_at: now
+    }));
+
+    const combined = [...otherSteps, ...updatedSeqSteps];
+    await saveSupabaseSequenceSteps(combined);
+
+    return res.json({ success: true, steps: updatedSeqSteps });
+  } catch (err: any) {
+    console.error('[POST /api/admin/lead-sequences/:id/steps Error]', err);
+    return res.status(500).json({ error: 'Failed to save sequence steps' });
+  }
+});
+
+// POST Enroll Selected Leads into Sequence with Explicit Targeting & Duplicate Prevention
+app.post('/api/admin/lead-sequences/:id/enroll', requireAdmin, async (req, res) => {
+  const { id } = req.params;
+  if (!isValidId(id)) {
+    return res.status(400).json({ error: 'Invalid sequence ID format' });
+  }
+
+  const { leadIds } = req.body || {};
+  if (!Array.isArray(leadIds) || leadIds.length === 0) {
+    return res.status(400).json({
+      success: false,
+      message: 'Please select at least one lead from the CRM table to enroll in this sequence.'
+    });
+  }
+
+  try {
+    const sequences = await getSupabaseLeadSequences();
+    const sequence = sequences.find((s: any) => s.id === id);
+    if (!sequence) {
+      return res.status(404).json({ success: false, message: 'Sequence not found' });
+    }
+
+    const allLeads = await getSupabaseCrmLeads();
+    const idSet = new Set(leadIds);
+    const selectedLeads = allLeads.filter((l: any) => idSet.has(l.id));
+
+    if (selectedLeads.length === 0) {
+      return res.status(400).json({ success: false, message: 'No matching leads found for provided IDs.' });
+    }
+
+    // Filter out Do Not Contact and Bounced
+    const eligibleLeads = selectedLeads.filter((l: any) => l.status !== 'Do Not Contact' && l.status !== 'Bounced');
+    if (eligibleLeads.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'All selected leads have "Do Not Contact" or "Bounced" status and cannot be enrolled.'
+      });
+    }
+
+    // Check existing enrollments to prevent duplicates
+    const allSeqLeads = await getSupabaseSequenceLeads();
+    const existingForSeq = allSeqLeads.filter((sl: any) => sl.sequence_id === id);
+    const enrolledLeadIdSet = new Set(existingForSeq.map((sl: any) => sl.lead_id));
+
+    const now = new Date().toISOString();
+    const newEnrollments: any[] = [];
+    let skippedCount = 0;
+
+    for (const lead of eligibleLeads) {
+      if (enrolledLeadIdSet.has(lead.id)) {
+        skippedCount++;
+        continue;
+      }
+
+      newEnrollments.push({
+        id: crypto.randomUUID(),
+        sequence_id: id,
+        lead_id: lead.id,
+        current_step: 0,
+        status: 'Active',
+        next_send_at: now, // Ready for Step 1 (which has delay 0)
+        created_at: now,
+        updated_at: now
+      });
+    }
+
+    if (newEnrollments.length > 0) {
+      allSeqLeads.push(...newEnrollments);
+      await saveSupabaseSequenceLeads(allSeqLeads);
+
+      // Trigger automatic background worker immediately
+      setTimeout(() => {
+        processActiveSequences().catch(err => console.error('[Sequence Immediate Worker Error]', err));
+      }, 500);
+    }
+
+    return res.json({
+      success: true,
+      message: `Enrolled ${newEnrollments.length} leads into sequence "${sequence.name}". ${skippedCount > 0 ? `(${skippedCount} duplicate leads already enrolled were skipped)` : ''}`,
+      enrolledCount: newEnrollments.length,
+      skippedCount,
+      totalSelected: leadIds.length
+    });
+  } catch (err: any) {
+    console.error('[POST /api/admin/lead-sequences/:id/enroll Error]', err);
+    return res.status(500).json({ error: 'Failed to enroll leads in sequence' });
+  }
+});
+
+// POST Pause Lead Sequence
+app.post('/api/admin/lead-sequences/:id/pause', requireAdmin, async (req, res) => {
+  const { id } = req.params;
+  try {
+    const sequences = await getSupabaseLeadSequences();
+    const seq = sequences.find((s: any) => s.id === id);
+    if (!seq) {
+      return res.status(404).json({ error: 'Sequence not found' });
+    }
+
+    seq.status = 'Paused';
+    seq.updated_at = new Date().toISOString();
+    await saveSupabaseLeadSequences(sequences);
+
+    return res.json({ success: true, message: `Sequence "${seq.name}" paused. All active step dispatches are held.` });
+  } catch (err: any) {
+    console.error('[POST /api/admin/lead-sequences/:id/pause Error]', err);
+    return res.status(500).json({ error: 'Failed to pause sequence' });
+  }
+});
+
+// POST Resume Lead Sequence
+app.post('/api/admin/lead-sequences/:id/resume', requireAdmin, async (req, res) => {
+  const { id } = req.params;
+  try {
+    const sequences = await getSupabaseLeadSequences();
+    const seq = sequences.find((s: any) => s.id === id);
+    if (!seq) {
+      return res.status(404).json({ error: 'Sequence not found' });
+    }
+
+    seq.status = 'Active';
+    seq.updated_at = new Date().toISOString();
+    await saveSupabaseLeadSequences(sequences);
+
+    // Trigger worker
+    setTimeout(() => {
+      processActiveSequences().catch(err => console.error('[Sequence Worker Resume Trigger Error]', err));
+    }, 200);
+
+    return res.json({ success: true, message: `Sequence "${seq.name}" resumed.` });
+  } catch (err: any) {
+    console.error('[POST /api/admin/lead-sequences/:id/resume Error]', err);
+    return res.status(500).json({ error: 'Failed to resume sequence' });
+  }
+});
+
+// POST Stop Single Lead in Sequence
+app.post('/api/admin/lead-sequences/:id/stop-lead', requireAdmin, async (req, res) => {
+  const { id } = req.params;
+  const { leadId, reason } = req.body || {};
+
+  if (!leadId) {
+    return res.status(400).json({ error: 'leadId is required' });
+  }
+
+  try {
+    const allSeqLeads = await getSupabaseSequenceLeads();
+    const target = allSeqLeads.find((sl: any) => sl.sequence_id === id && sl.lead_id === leadId);
+
+    if (!target) {
+      return res.status(404).json({ error: 'Lead is not enrolled in this sequence' });
+    }
+
+    const now = new Date().toISOString();
+    target.status = 'Stopped';
+    target.stop_reason = reason || 'Manual Stop';
+    target.stopped_at = now;
+    target.updated_at = now;
+
+    await saveSupabaseSequenceLeads(allSeqLeads);
+    return res.json({ success: true, message: 'Lead sequence stopped successfully' });
+  } catch (err: any) {
+    console.error('[POST /api/admin/lead-sequences/:id/stop-lead Error]', err);
+    return res.status(500).json({ error: 'Failed to stop lead sequence' });
+  }
+});
+
+// POST Send Test Email for a Specific Sequence Step
+app.post('/api/admin/lead-sequences/:id/test', requireAdmin, emailTestLimiter, async (req, res) => {
+  const { id } = req.params;
+  const { stepNumber = 1, testEmail, sampleLeadId, customLeadData } = req.body || {};
+
+  if (!testEmail || !testEmail.includes('@')) {
+    return res.status(400).json({ success: false, message: 'Valid test recipient email address is required.' });
+  }
+
+  try {
+    const steps = await getSupabaseSequenceSteps();
+    const step = steps.find((st: any) => st.sequence_id === id && st.step_number === Number(stepNumber));
+
+    if (!step) {
+      return res.status(404).json({ success: false, message: `Sequence step #${stepNumber} not found.` });
+    }
+
+    let leadData = customLeadData || null;
+    if (!leadData && sampleLeadId) {
+      const allLeads = await getSupabaseCrmLeads();
+      leadData = allLeads.find((l: any) => l.id === sampleLeadId);
+    }
+
+    if (!leadData) {
+      leadData = {
+        company_name: 'Udaan Manufacturing Ltd',
+        industry: 'Automotive & Industrial Parts',
+        location: 'Pithampur Industrial Zone, MP',
+        contact_person: 'Rajesh Sharma',
+        email: testEmail,
+        phone: '+91 98260 12345',
+        linkedin: 'https://linkedin.com/company/udaan-mfg',
+        powerbi_use_case: 'Plant Production MIS & Scrap Costing Dashboard',
+        lead_priority: 'High'
+      };
+    }
+
+    const result = await campaignEmailService.sendLeadTestEmail({
+      testEmail,
+      subject: step.subject,
+      preheader: step.preheader,
+      contentHtml: step.html_content,
+      lead: leadData
+    });
+
+    return res.json(result);
+  } catch (err: any) {
+    console.error('[POST /api/admin/lead-sequences/:id/test Error]', err);
+    return res.status(500).json({ success: false, message: 'Failed to dispatch test sequence email' });
+  }
+});
+
+// POST Manual Trigger for Sequence Processing
+app.post('/api/admin/lead-sequences/process', requireAdmin, async (req, res) => {
+  try {
+    const stats = await processActiveSequences();
+    return res.json({ success: true, stats });
+  } catch (err: any) {
+    console.error('[POST /api/admin/lead-sequences/process Error]', err);
+    return res.status(500).json({ error: 'Sequence processing cycle failed' });
+  }
+});
+
+// GET Sequences for a specific Lead (for Lead Details Drawer)
+app.get('/api/admin/leads/:id/sequences', requireAdmin, async (req, res) => {
+  const { id } = req.params;
+  try {
+    const allSeqLeads = await getSupabaseSequenceLeads();
+    const sequences = await getSupabaseLeadSequences();
+    const allSteps = await getSupabaseSequenceSteps();
+
+    const enrolledSeqLeads = allSeqLeads.filter((sl: any) => sl.lead_id === id);
+    const result = enrolledSeqLeads.map((sl: any) => {
+      const seq = sequences.find((s: any) => s.id === sl.sequence_id);
+      const steps = allSteps.filter((st: any) => st.sequence_id === sl.sequence_id);
+      return {
+        ...sl,
+        sequence_name: seq?.name || 'Unknown Sequence',
+        sequence_status: seq?.status || 'Unknown',
+        total_steps: steps.length
+      };
+    });
+
+    return res.json(result);
+  } catch (err: any) {
+    console.error('[GET /api/admin/leads/:id/sequences Error]', err);
+    return res.status(500).json({ error: 'Failed to fetch lead sequence memberships' });
+  }
+});
+
 
 // ==================== SOCIAL, NAVIGATION, MEDIA, CATEGORIES ====================
 
@@ -4504,8 +5650,21 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
+  app.listen(PORT, '0.0.0.0', async () => {
     console.log(`Server running on http://0.0.0.0:${PORT}`);
+    // Initialize default Lead CRM Sequences
+    try {
+      await ensureDefaultLeadSequence();
+    } catch (e) {
+      console.warn('[Server Init] Default sequence check:', e);
+    }
+
+    // Schedule automated email sequence background worker every 60 seconds
+    setInterval(() => {
+      processActiveSequences().catch(err => {
+        console.error('[Automated Sequence Worker Error]', err);
+      });
+    }, 60000);
   });
 }
 
