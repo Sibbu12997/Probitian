@@ -214,7 +214,7 @@ export const campaignEmailService = {
     <div class="footer">
       <p style="margin: 0; font-weight: 600; color: #475569;">Shivam Baghel &bull; ProBitian Analytics</p>
       <p style="margin: 4px 0;">Salaiya, Madhya Pradesh, India &bull; Direct: <a href="mailto:${gmailUser}" style="color: #7c3aed;">${gmailUser}</a></p>
-      <p style="margin: 4px 0;"><a href="https://probitian.com" style="color: #7c3aed; text-decoration: none;">www.probitian.com</a> &bull; Power BI &amp; Data Engineering Solutions</p>
+      <p style="margin: 4px 0;"><a href="https://probitian.ai.studio/" style="color: #7c3aed; text-decoration: none;">probitian.ai.studio</a> &bull; <a href="https://probitian.ai.studio/#/contact" style="color: #7c3aed; text-decoration: none;">Contact Us</a> &bull; Power BI &amp; Data Engineering Solutions</p>
       <p style="margin-top: 12px; font-size: 11px; color: #94a3b8;">If you prefer not to receive business intelligence insights from us, simply reply with "Unsubscribe".</p>
     </div>
   </div>

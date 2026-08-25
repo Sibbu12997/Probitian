@@ -2499,97 +2499,354 @@ app.post('/api/admin/email-campaigns/:id/send', requireAdmin, emailSendLimiter, 
 
 // ==================== BUSINESS LEADS & LEAD OUTREACH CAMPAIGNS ====================
 
+// --- Supabase-Backed Production CRM Persistence Engine ---
+// Primary storage: Supabase PostgreSQL dedicated tables ('leads', 'lead_campaigns', 'campaign_leads')
+// Fallback when tables await migration: Supabase PostgreSQL cloud settings table ('crm_leads', 'crm_lead_campaigns', 'crm_campaign_leads')
+
+let crmLeadsTableMigrated = false;
+let crmCampaignsTableMigrated = false;
+
+async function getSupabaseCrmLeads(): Promise<any[]> {
+  if (!serverSupabase) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('Supabase database client is required in production environment.');
+    }
+    const data = readCmsData();
+    return data.leads || [];
+  }
+
+  try {
+    const { data: dbLeads, error: tblErr } = await serverSupabase.from('leads').select('*').order('created_at', { ascending: false });
+    if (!tblErr && Array.isArray(dbLeads)) {
+      // If dedicated table is empty and we haven't checked settings migration yet, check settings
+      if (dbLeads.length === 0 && !crmLeadsTableMigrated) {
+        crmLeadsTableMigrated = true;
+        const { data: row } = await serverSupabase.from('settings').select('value').eq('key', 'crm_leads').maybeSingle();
+        const settingsLeads = row?.value?.leads;
+        if (Array.isArray(settingsLeads) && settingsLeads.length > 0) {
+          console.log(`[CRM Auto-Migrate] Found ${settingsLeads.length} leads in settings table. Migrating to dedicated 'leads' table...`);
+          const formatted = settingsLeads.map((l: any) => ({
+            id: isValidUuid(l.id) ? l.id : crypto.randomUUID(),
+            company_name: l.company_name || 'Unknown Company',
+            industry: l.industry || '',
+            location: l.location || '',
+            contact_person: l.contact_person || '',
+            email: (l.email || '').trim().toLowerCase(),
+            phone: l.phone || '',
+            linkedin: l.linkedin || '',
+            powerbi_use_case: l.powerbi_use_case || '',
+            lead_priority: ['High', 'Medium', 'Low'].includes(l.lead_priority) ? l.lead_priority : 'Medium',
+            status: l.status || 'Not Contacted',
+            follow_up_date: l.follow_up_date || null,
+            notes: l.notes || '',
+            created_at: l.created_at || new Date().toISOString(),
+            updated_at: l.updated_at || new Date().toISOString()
+          }));
+          const { error: insErr } = await serverSupabase.from('leads').insert(formatted);
+          if (!insErr) {
+            console.log(`[CRM Auto-Migrate] Successfully migrated ${formatted.length} leads to dedicated 'leads' table.`);
+            return formatted;
+          }
+        }
+      }
+      return dbLeads;
+    }
+
+    // Dedicated table not yet created/exposed -> read from Supabase settings cloud table
+    const { data: row, error: rowErr } = await serverSupabase.from('settings').select('value').eq('key', 'crm_leads').maybeSingle();
+    if (!rowErr && row && Array.isArray(row.value?.leads)) {
+      return row.value.leads;
+    }
+    return [];
+  } catch (err: any) {
+    console.error('[Supabase CRM Leads Read Exception]', err);
+    throw new Error('Supabase CRM database unavailable');
+  }
+}
+
+async function saveSupabaseCrmLeads(leads: any[]): Promise<void> {
+  if (!serverSupabase) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('Supabase database client is required in production environment.');
+    }
+    const data = readCmsData();
+    data.leads = leads;
+    writeCmsData(data);
+    return;
+  }
+
+  // Ensure all leads have valid UUIDs
+  const normalizedLeads = leads.map(l => ({
+    ...l,
+    id: isValidUuid(l.id) ? l.id : crypto.randomUUID()
+  }));
+
+  // 1. Try upserting to dedicated leads table
+  try {
+    const { error: tblErr } = await serverSupabase.from('leads').upsert(normalizedLeads);
+    if (!tblErr) {
+      // Also update settings table as backup
+      const now = new Date().toISOString();
+      await serverSupabase.from('settings').upsert({
+        key: 'crm_leads',
+        value: { leads: normalizedLeads, updated_at: now },
+        updated_at: now
+      });
+      return;
+    }
+  } catch (e) {
+    // Fall back to settings table
+  }
+
+  // 2. Fallback to Supabase settings cloud table
+  const now = new Date().toISOString();
+  const { error } = await serverSupabase.from('settings').upsert({
+    key: 'crm_leads',
+    value: { leads: normalizedLeads, updated_at: now },
+    updated_at: now
+  });
+  if (error) {
+    console.error('[Supabase Save CRM Leads to Settings Error]', error.message);
+    throw new Error(`Failed to persist leads to Supabase: ${error.message}`);
+  }
+}
+
+async function getSupabaseCrmCampaigns(): Promise<any[]> {
+  if (!serverSupabase) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('Supabase database client is required in production environment.');
+    }
+    const data = readCmsData();
+    return data.lead_campaigns || [];
+  }
+
+  try {
+    const { data: dbCamps, error: tblErr } = await serverSupabase.from('lead_campaigns').select('*').order('created_at', { ascending: false });
+    if (!tblErr && Array.isArray(dbCamps)) {
+      if (dbCamps.length === 0 && !crmCampaignsTableMigrated) {
+        crmCampaignsTableMigrated = true;
+        const { data: row } = await serverSupabase.from('settings').select('value').eq('key', 'crm_lead_campaigns').maybeSingle();
+        const settingsCamps = row?.value?.campaigns;
+        if (Array.isArray(settingsCamps) && settingsCamps.length > 0) {
+          console.log(`[CRM Auto-Migrate] Found ${settingsCamps.length} campaigns in settings table. Migrating to dedicated 'lead_campaigns' table...`);
+          const formatted = settingsCamps.map((c: any) => ({
+            id: isValidUuid(c.id) ? c.id : crypto.randomUUID(),
+            name: c.name || 'Untitled Campaign',
+            campaign_type: 'lead_outreach',
+            subject: c.subject || 'Outreach Subject',
+            preheader: c.preheader || '',
+            html_content: c.html_content || '',
+            status: c.status || 'draft',
+            total_recipients: c.total_recipients || 0,
+            successful_count: c.successful_count || 0,
+            failed_count: c.failed_count || 0,
+            sent_at: c.sent_at || null,
+            created_at: c.created_at || new Date().toISOString(),
+            updated_at: c.updated_at || new Date().toISOString()
+          }));
+          const { error: insErr } = await serverSupabase.from('lead_campaigns').insert(formatted);
+          if (!insErr) {
+            console.log(`[CRM Auto-Migrate] Successfully migrated ${formatted.length} campaigns to dedicated table.`);
+            return formatted;
+          }
+        }
+      }
+      return dbCamps;
+    }
+
+    const { data: row, error: rowErr } = await serverSupabase.from('settings').select('value').eq('key', 'crm_lead_campaigns').maybeSingle();
+    if (!rowErr && row && Array.isArray(row.value?.campaigns)) {
+      return row.value.campaigns;
+    }
+    return [];
+  } catch (err: any) {
+    console.error('[Supabase CRM Campaigns Read Exception]', err);
+    throw new Error('Supabase CRM database unavailable');
+  }
+}
+
+async function saveSupabaseCrmCampaigns(campaigns: any[]): Promise<void> {
+  if (!serverSupabase) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('Supabase database client is required in production environment.');
+    }
+    const data = readCmsData();
+    data.lead_campaigns = campaigns;
+    writeCmsData(data);
+    return;
+  }
+
+  const normalizedCampaigns = campaigns.map(c => ({
+    ...c,
+    id: isValidUuid(c.id) ? c.id : crypto.randomUUID()
+  }));
+
+  try {
+    const { error: tblErr } = await serverSupabase.from('lead_campaigns').upsert(normalizedCampaigns);
+    if (!tblErr) {
+      const now = new Date().toISOString();
+      await serverSupabase.from('settings').upsert({
+        key: 'crm_lead_campaigns',
+        value: { campaigns: normalizedCampaigns, updated_at: now },
+        updated_at: now
+      });
+      return;
+    }
+  } catch (e) {
+    // Fall back to settings
+  }
+
+  const now = new Date().toISOString();
+  const { error } = await serverSupabase.from('settings').upsert({
+    key: 'crm_lead_campaigns',
+    value: { campaigns: normalizedCampaigns, updated_at: now },
+    updated_at: now
+  });
+  if (error) {
+    console.error('[Supabase Save CRM Campaigns to Settings Error]', error.message);
+    throw new Error(`Failed to persist campaigns to Supabase: ${error.message}`);
+  }
+}
+
+async function getSupabaseCrmRecipients(): Promise<any[]> {
+  if (!serverSupabase) {
+    if (process.env.NODE_ENV === 'production') {
+      return [];
+    }
+    const data = readCmsData();
+    return data.campaign_leads || [];
+  }
+
+  try {
+    const { data, error } = await serverSupabase.from('campaign_leads').select('*').order('created_at', { ascending: false });
+    if (!error && Array.isArray(data)) {
+      return data;
+    }
+    const { data: row, error: rowErr } = await serverSupabase.from('settings').select('value').eq('key', 'crm_campaign_leads').maybeSingle();
+    if (!rowErr && row && Array.isArray(row.value?.recipients)) {
+      return row.value.recipients;
+    }
+    return [];
+  } catch (err: any) {
+    console.error('[Supabase CRM Recipients Read Exception]', err);
+    return [];
+  }
+}
+
+async function appendSupabaseCrmRecipients(newRecipients: any[]): Promise<void> {
+  if (!newRecipients || newRecipients.length === 0) return;
+
+  const normalizedRecipients = newRecipients.map(r => ({
+    ...r,
+    id: isValidUuid(r.id) ? r.id : crypto.randomUUID(),
+    lead_id: isValidUuid(r.lead_id) ? r.lead_id : null
+  }));
+
+  if (!serverSupabase) {
+    if (process.env.NODE_ENV !== 'production') {
+      const data = readCmsData();
+      data.campaign_leads = data.campaign_leads || [];
+      data.campaign_leads.push(...normalizedRecipients);
+      writeCmsData(data);
+    }
+    return;
+  }
+
+  try {
+    const { error: tblErr } = await serverSupabase.from('campaign_leads').insert(normalizedRecipients);
+    if (!tblErr) return;
+  } catch (e) {
+    // Continue to settings fallback
+  }
+
+  const existing = await getSupabaseCrmRecipients();
+  const combined = [...existing, ...normalizedRecipients];
+  const now = new Date().toISOString();
+  await serverSupabase.from('settings').upsert({
+    key: 'crm_campaign_leads',
+    value: { recipients: combined, updated_at: now },
+    updated_at: now
+  });
+}
+
 // GET All Leads with optional search and filters
 app.get('/api/admin/leads', requireAdmin, async (req, res) => {
   const { search, status, lead_priority, industry, follow_up } = req.query;
 
-  if (serverSupabase) {
-    try {
-      let query = serverSupabase.from('leads').select('*').order('created_at', { ascending: false });
-
-      if (status && typeof status === 'string' && status !== 'all') {
-        query = query.eq('status', status);
-      }
-      if (lead_priority && typeof lead_priority === 'string' && lead_priority !== 'all') {
-        query = query.eq('lead_priority', lead_priority);
-      }
-      if (industry && typeof industry === 'string' && industry !== 'all') {
-        query = query.ilike('industry', `%${industry}%`);
-      }
-      if (search && typeof search === 'string' && search.trim()) {
-        const term = search.trim();
-        query = query.or(`company_name.ilike.%${term}%,contact_person.ilike.%${term}%,email.ilike.%${term}%,powerbi_use_case.ilike.%${term}%,location.ilike.%${term}%`);
-      }
-
-      const { data, error } = await query;
-      if (error) {
-        // If the table doesn't exist yet in Supabase, fallback gracefully
-        console.warn('[Supabase GET Leads Warning]', error.message);
-        const localData = readCmsData();
-        return res.json(localData.leads || []);
-      }
-
-      let results = data || [];
-      if (follow_up && typeof follow_up === 'string') {
-        const todayStr = new Date().toISOString().split('T')[0];
-        if (follow_up === 'today') {
-          results = results.filter((l: any) => l.follow_up_date === todayStr);
-        } else if (follow_up === 'overdue') {
-          results = results.filter((l: any) => l.follow_up_date && l.follow_up_date < todayStr && l.status !== 'Converted' && l.status !== 'Not Interested');
-        } else if (follow_up === 'upcoming') {
-          results = results.filter((l: any) => l.follow_up_date && l.follow_up_date > todayStr);
-        } else if (follow_up === 'none') {
-          results = results.filter((l: any) => !l.follow_up_date);
+  try {
+    let leads: any[] = [];
+    if (serverSupabase) {
+      // First try dedicated table with SQL filter
+      try {
+        let query = serverSupabase.from('leads').select('*').order('created_at', { ascending: false });
+        if (status && typeof status === 'string' && status !== 'all') {
+          query = query.eq('status', status);
         }
+        if (lead_priority && typeof lead_priority === 'string' && lead_priority !== 'all') {
+          query = query.eq('lead_priority', lead_priority);
+        }
+        if (industry && typeof industry === 'string' && industry !== 'all') {
+          query = query.ilike('industry', `%${industry}%`);
+        }
+        if (search && typeof search === 'string' && search.trim()) {
+          const term = search.trim();
+          query = query.or(`company_name.ilike.%${term}%,contact_person.ilike.%${term}%,email.ilike.%${term}%,powerbi_use_case.ilike.%${term}%,location.ilike.%${term}%`);
+        }
+        const { data, error } = await query;
+        if (!error && Array.isArray(data)) {
+          leads = data;
+        } else {
+          leads = await getSupabaseCrmLeads();
+        }
+      } catch (e) {
+        leads = await getSupabaseCrmLeads();
       }
-
-      return res.json(results);
-    } catch (err: any) {
-      console.error('[Supabase GET Leads Exception]', err);
-      const localData = readCmsData();
-      return res.json(localData.leads || []);
+    } else {
+      const data = readCmsData();
+      leads = data.leads || [];
     }
-  }
 
-  const data = readCmsData();
-  let leads = data.leads || [];
-
-  if (status && typeof status === 'string' && status !== 'all') {
-    leads = leads.filter((l: any) => l.status === status);
-  }
-  if (lead_priority && typeof lead_priority === 'string' && lead_priority !== 'all') {
-    leads = leads.filter((l: any) => l.lead_priority === lead_priority);
-  }
-  if (industry && typeof industry === 'string' && industry !== 'all') {
-    const ind = industry.toLowerCase();
-    leads = leads.filter((l: any) => l.industry && l.industry.toLowerCase().includes(ind));
-  }
-  if (search && typeof search === 'string' && search.trim()) {
-    const s = search.trim().toLowerCase();
-    leads = leads.filter((l: any) =>
-      (l.company_name && l.company_name.toLowerCase().includes(s)) ||
-      (l.contact_person && l.contact_person.toLowerCase().includes(s)) ||
-      (l.email && l.email.toLowerCase().includes(s)) ||
-      (l.industry && l.industry.toLowerCase().includes(s)) ||
-      (l.powerbi_use_case && l.powerbi_use_case.toLowerCase().includes(s)) ||
-      (l.location && l.location.toLowerCase().includes(s))
-    );
-  }
-
-  if (follow_up && typeof follow_up === 'string') {
-    const todayStr = new Date().toISOString().split('T')[0];
-    if (follow_up === 'today') {
-      leads = leads.filter((l: any) => l.follow_up_date === todayStr);
-    } else if (follow_up === 'overdue') {
-      leads = leads.filter((l: any) => l.follow_up_date && l.follow_up_date < todayStr && l.status !== 'Converted' && l.status !== 'Not Interested');
-    } else if (follow_up === 'upcoming') {
-      leads = leads.filter((l: any) => l.follow_up_date && l.follow_up_date > todayStr);
-    } else if (follow_up === 'none') {
-      leads = leads.filter((l: any) => !l.follow_up_date);
+    // Apply memory/json filters if retrieved via settings or dev cache
+    if (status && typeof status === 'string' && status !== 'all') {
+      leads = leads.filter((l: any) => l.status === status);
     }
-  }
+    if (lead_priority && typeof lead_priority === 'string' && lead_priority !== 'all') {
+      leads = leads.filter((l: any) => l.lead_priority === lead_priority);
+    }
+    if (industry && typeof industry === 'string' && industry !== 'all') {
+      const ind = industry.toLowerCase();
+      leads = leads.filter((l: any) => l.industry && l.industry.toLowerCase().includes(ind));
+    }
+    if (search && typeof search === 'string' && search.trim()) {
+      const s = search.trim().toLowerCase();
+      leads = leads.filter((l: any) =>
+        (l.company_name && l.company_name.toLowerCase().includes(s)) ||
+        (l.contact_person && l.contact_person.toLowerCase().includes(s)) ||
+        (l.email && l.email.toLowerCase().includes(s)) ||
+        (l.industry && l.industry.toLowerCase().includes(s)) ||
+        (l.powerbi_use_case && l.powerbi_use_case.toLowerCase().includes(s)) ||
+        (l.location && l.location.toLowerCase().includes(s))
+      );
+    }
 
-  return res.json(leads);
+    if (follow_up && typeof follow_up === 'string') {
+      const todayStr = new Date().toISOString().split('T')[0];
+      if (follow_up === 'today') {
+        leads = leads.filter((l: any) => l.follow_up_date === todayStr);
+      } else if (follow_up === 'overdue') {
+        leads = leads.filter((l: any) => l.follow_up_date && l.follow_up_date < todayStr && l.status !== 'Converted' && l.status !== 'Not Interested');
+      } else if (follow_up === 'upcoming') {
+        leads = leads.filter((l: any) => l.follow_up_date && l.follow_up_date > todayStr);
+      } else if (follow_up === 'none') {
+        leads = leads.filter((l: any) => !l.follow_up_date);
+      }
+    }
+
+    return res.json(leads);
+  } catch (err: any) {
+    console.error('[GET /api/admin/leads Error]', err);
+    return res.status(503).json({ error: 'Database service unavailable' });
+  }
 });
 
 // GET Single Lead with Outreach History
@@ -2599,32 +2856,51 @@ app.get('/api/admin/leads/:id', requireAdmin, async (req, res) => {
     return res.status(400).json({ error: 'Invalid lead ID format' });
   }
 
-  if (serverSupabase) {
-    try {
-      const { data: lead, error } = await serverSupabase.from('leads').select('*').eq('id', id).single();
-      if (error || !lead) {
+  try {
+    let lead: any = null;
+    let outreachHistory: any[] = [];
+
+    if (serverSupabase) {
+      try {
+        const { data: dbLead, error: leadErr } = await serverSupabase.from('leads').select('*').eq('id', id).single();
+        if (!leadErr && dbLead) {
+          lead = dbLead;
+          const { data: hist } = await serverSupabase
+            .from('campaign_leads')
+            .select('*, lead_campaigns(name, subject, sent_at)')
+            .eq('lead_id', id)
+            .order('created_at', { ascending: false });
+          outreachHistory = hist || [];
+        }
+      } catch (e) {
+        // Fallback to settings
+      }
+    }
+
+    if (!lead) {
+      const allLeads = await getSupabaseCrmLeads();
+      lead = allLeads.find((l: any) => l.id === id);
+      if (!lead) {
         return res.status(404).json({ error: 'Lead not found' });
       }
 
-      const { data: outreachHistory } = await serverSupabase
-        .from('campaign_leads')
-        .select('*, lead_campaigns(name, subject, sent_at)')
-        .eq('lead_id', id)
-        .order('created_at', { ascending: false });
+      const allRecipients = await getSupabaseCrmRecipients();
+      const allCampaigns = await getSupabaseCrmCampaigns();
+      const campaignMap = new Map(allCampaigns.map(c => [c.id, { name: c.name, subject: c.subject, sent_at: c.sent_at }]));
 
-      return res.json({ ...lead, outreach_history: outreachHistory || [] });
-    } catch (err: any) {
-      console.error('[Supabase GET Single Lead Error]', err);
+      outreachHistory = allRecipients
+        .filter((cl: any) => cl.lead_id === id || (cl.lead_email && cl.lead_email.toLowerCase() === lead.email.toLowerCase()))
+        .map(cl => ({
+          ...cl,
+          lead_campaigns: campaignMap.get(cl.campaign_id) || null
+        }));
     }
-  }
 
-  const data = readCmsData();
-  const lead = (data.leads || []).find((l: any) => l.id === id);
-  if (!lead) {
-    return res.status(404).json({ error: 'Lead not found' });
+    return res.json({ ...lead, outreach_history: outreachHistory });
+  } catch (err: any) {
+    console.error('[GET /api/admin/leads/:id Error]', err);
+    return res.status(503).json({ error: 'Database service unavailable' });
   }
-  const outreachHistory = (data.campaign_leads || []).filter((cl: any) => cl.lead_id === id);
-  return res.json({ ...lead, outreach_history: outreachHistory });
 });
 
 // POST Save / Create / Update Single Lead
@@ -2636,6 +2912,22 @@ app.post('/api/admin/leads', requireAdmin, async (req, res) => {
 
   const cleanEmail = payload.email.trim().toLowerCase();
   const now = new Date().toISOString();
+
+  // If this is a new lead (no ID provided), check for existing duplicate email
+  if (!payload.id) {
+    try {
+      const existingLeads = await getSupabaseCrmLeads();
+      const duplicate = existingLeads.find((l: any) => l.email && l.email.toLowerCase() === cleanEmail);
+      if (duplicate && !payload.allowUpdate) {
+        return res.status(400).json({
+          error: `A lead with email "${cleanEmail}" already exists (${duplicate.company_name}).`,
+          existingLeadId: duplicate.id
+        });
+      }
+    } catch (e) {
+      // Continue
+    }
+  }
 
   const leadRecord = {
     company_name: payload.company_name.trim(),
@@ -2653,45 +2945,37 @@ app.post('/api/admin/leads', requireAdmin, async (req, res) => {
     updated_at: now
   };
 
-  let leadId = payload.id;
+  let leadId = isValidUuid(payload.id) ? payload.id : crypto.randomUUID();
 
   if (serverSupabase) {
     try {
-      const dbPayload: any = { ...leadRecord };
-      if (isValidUuid(leadId)) {
-        dbPayload.id = leadId;
-      }
-
+      const dbPayload: any = { ...leadRecord, id: leadId };
       const { data, error } = await serverSupabase.from('leads').upsert(dbPayload).select().single();
       if (!error && data) {
         return res.json({ success: true, lead: data });
       }
-      console.warn('[Supabase Save Lead Warning - Using Fallback]', error?.message);
     } catch (err: any) {
-      console.warn('[Supabase Save Lead Exception - Using Fallback]', err);
+      // Continue to Supabase settings persistence
     }
   }
 
-  const data = readCmsData();
-  data.leads = data.leads || [];
-
-  if (!leadId) {
-    leadId = 'lead-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4);
-    const newLead = { id: leadId, created_at: now, ...leadRecord };
-    data.leads.unshift(newLead);
-    writeCmsData(data);
-    return res.json({ success: true, lead: newLead });
+  try {
+    const leads = await getSupabaseCrmLeads();
+    const idx = leads.findIndex((l: any) => l.id === leadId);
+    let savedLead: any;
+    if (idx >= 0) {
+      savedLead = { ...leads[idx], ...leadRecord, id: leadId, updated_at: now };
+      leads[idx] = savedLead;
+    } else {
+      savedLead = { id: leadId, created_at: now, ...leadRecord };
+      leads.unshift(savedLead);
+    }
+    await saveSupabaseCrmLeads(leads);
+    return res.json({ success: true, lead: savedLead });
+  } catch (err: any) {
+    console.error('[POST /api/admin/leads Error]', err);
+    return res.status(500).json({ error: 'Failed to persist lead to Supabase database' });
   }
-
-  const idx = data.leads.findIndex((l: any) => l.id === leadId);
-  if (idx >= 0) {
-    data.leads[idx] = { ...data.leads[idx], ...leadRecord, updated_at: now };
-  } else {
-    data.leads.unshift({ id: leadId, created_at: now, ...leadRecord });
-  }
-  writeCmsData(data);
-
-  return res.json({ success: true, lead: data.leads[idx >= 0 ? idx : 0] });
 });
 
 // POST Batch Import Leads (CSV Import with Validation & Duplicate Prevention)
@@ -2771,96 +3055,61 @@ app.post('/api/admin/leads/import', requireAdmin, async (req, res) => {
   let skippedCount = 0;
   let updatedCount = 0;
 
-  if (serverSupabase) {
-    try {
-      // Query existing emails in Supabase to handle duplicates cleanly
-      const { data: existingRecords } = await serverSupabase.from('leads').select('id, email');
-      const existingEmailMap = new Map<string, string>();
-      if (Array.isArray(existingRecords)) {
-        existingRecords.forEach(r => {
-          if (r.email) existingEmailMap.set(r.email.toLowerCase(), r.id);
-        });
-      }
+  try {
+    const existingLeads = await getSupabaseCrmLeads();
+    const existingEmailMap = new Map<string, any>();
+    existingLeads.forEach(l => {
+      if (l.email) existingEmailMap.set(l.email.toLowerCase(), l);
+    });
 
-      const toInsert: any[] = [];
-      const toUpdate: any[] = [];
+    const toInsert: any[] = [];
+    const updatedList = [...existingLeads];
 
-      for (const lead of validatedLeads) {
-        const existingId = existingEmailMap.get(lead.email);
-        if (existingId) {
-          if (updateDuplicates) {
-            toUpdate.push({ ...lead, id: existingId });
-          } else if (skipDuplicates) {
-            skippedCount++;
+    for (const lead of validatedLeads) {
+      const existing = existingEmailMap.get(lead.email);
+      if (existing) {
+        if (updateDuplicates) {
+          const idx = updatedList.findIndex(l => l.id === existing.id);
+          if (idx >= 0) {
+            updatedList[idx] = { ...existing, ...lead, id: existing.id, updated_at: now };
           }
-        } else {
-          toInsert.push(lead);
-        }
-      }
-
-      if (toInsert.length > 0) {
-        const { error: insertErr } = await serverSupabase.from('leads').insert(toInsert);
-        if (insertErr) {
-          console.error('[Supabase Bulk Lead Insert Error]', insertErr.message);
-          return res.status(500).json({ error: `Supabase insert failed: ${insertErr.message}` });
-        }
-        importedCount += toInsert.length;
-      }
-
-      if (toUpdate.length > 0) {
-        for (const u of toUpdate) {
-          await serverSupabase.from('leads').update(u).eq('id', u.id);
           updatedCount++;
+        } else if (skipDuplicates) {
+          skippedCount++;
         }
+      } else {
+        const newId = crypto.randomUUID();
+        const newLead = { id: newId, ...lead };
+        toInsert.push(newLead);
+        updatedList.unshift(newLead);
+        importedCount++;
       }
-
-      return res.json({
-        success: true,
-        totalProvided: leads.length,
-        importedCount,
-        skippedCount,
-        updatedCount,
-        invalidCount: errors.length,
-        errors: errors.slice(0, 50)
-      });
-    } catch (err: any) {
-      console.error('[Supabase Import Leads Exception]', err);
-      return res.status(500).json({ error: 'Database error importing leads.' });
     }
-  }
 
-  // Local fallback
-  const data = readCmsData();
-  data.leads = data.leads || [];
-  const existingMap = new Map<string, any>();
-  data.leads.forEach((l: any) => existingMap.set(l.email.toLowerCase(), l));
+    await saveSupabaseCrmLeads(updatedList);
 
-  for (const lead of validatedLeads) {
-    const existing = existingMap.get(lead.email);
-    if (existing) {
-      if (updateDuplicates) {
-        Object.assign(existing, lead, { updated_at: now });
-        updatedCount++;
-      } else if (skipDuplicates) {
-        skippedCount++;
+    // Try also persisting to dedicated table if available
+    if (serverSupabase && toInsert.length > 0) {
+      try {
+        await serverSupabase.from('leads').insert(toInsert.map(l => ({ ...l, id: isValidUuid(l.id) ? l.id : crypto.randomUUID() })));
+      } catch (e) {
+        // Handled in settings
       }
-    } else {
-      const newId = 'lead-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4);
-      data.leads.unshift({ id: newId, ...lead });
-      importedCount++;
     }
-  }
-  writeCmsData(data);
 
-  return res.json({
-    success: true,
-    totalProvided: leads.length,
-    importedCount,
-    skippedCount,
-    updatedCount,
-    invalidCount: errors.length,
-    errors: errors.slice(0, 50)
-  });
+    return res.json({
+      success: true,
+      totalProvided: leads.length,
+      importedCount,
+      skippedCount,
+      updatedCount,
+      invalidCount: errors.length,
+      errors: errors.slice(0, 50)
+    });
+  } catch (err: any) {
+    console.error('[POST /api/admin/leads/import Error]', err);
+    return res.status(500).json({ error: 'Database error importing leads.' });
+  }
 });
 
 // PATCH Quick Update Lead Status / Follow-up / Notes
@@ -2884,21 +3133,24 @@ app.patch('/api/admin/leads/:id/status', requireAdmin, async (req, res) => {
       if (!error && data) {
         return res.json({ success: true, lead: data });
       }
-      console.warn('[Supabase Lead Status Update Warning - Using Fallback]', error?.message);
-    } catch (err: any) {
-      console.warn('[Supabase Lead Status Update Exception - Using Fallback]', err);
+    } catch (e) {
+      // Continue to settings
     }
   }
 
-  const data = readCmsData();
-  data.leads = data.leads || [];
-  const idx = data.leads.findIndex((l: any) => l.id === id);
-  if (idx >= 0) {
-    data.leads[idx] = { ...data.leads[idx], ...updates };
-    writeCmsData(data);
-    return res.json({ success: true, lead: data.leads[idx] });
+  try {
+    const leads = await getSupabaseCrmLeads();
+    const idx = leads.findIndex((l: any) => l.id === id);
+    if (idx >= 0) {
+      leads[idx] = { ...leads[idx], ...updates };
+      await saveSupabaseCrmLeads(leads);
+      return res.json({ success: true, lead: leads[idx] });
+    }
+    return res.status(404).json({ error: 'Lead not found' });
+  } catch (err: any) {
+    console.error('[PATCH /api/admin/leads/:id/status Error]', err);
+    return res.status(500).json({ error: 'Failed to update lead in database' });
   }
-  return res.status(404).json({ error: 'Lead not found' });
 });
 
 // DELETE Single Lead
@@ -2910,22 +3162,21 @@ app.delete('/api/admin/leads/:id', requireAdmin, async (req, res) => {
 
   if (serverSupabase) {
     try {
-      const { error } = await serverSupabase.from('leads').delete().eq('id', id);
-      if (error) {
-        console.error('[Supabase Delete Lead Error]', error.message);
-        return res.status(500).json({ error: 'Failed to delete lead' });
-      }
-      return res.json({ success: true });
-    } catch (err: any) {
-      console.error('[Supabase Delete Lead Exception]', err);
-      return res.status(500).json({ error: 'Failed to delete lead' });
+      await serverSupabase.from('leads').delete().eq('id', id);
+    } catch (e) {
+      // Handled in settings
     }
   }
 
-  const data = readCmsData();
-  data.leads = (data.leads || []).filter((l: any) => l.id !== id);
-  writeCmsData(data);
-  return res.json({ success: true });
+  try {
+    const leads = await getSupabaseCrmLeads();
+    const filtered = leads.filter((l: any) => l.id !== id);
+    await saveSupabaseCrmLeads(filtered);
+    return res.json({ success: true });
+  } catch (err: any) {
+    console.error('[DELETE /api/admin/leads/:id Error]', err);
+    return res.status(500).json({ error: 'Failed to delete lead from database' });
+  }
 });
 
 // DELETE Batch Leads
@@ -2937,51 +3188,35 @@ app.post('/api/admin/leads/batch-delete', requireAdmin, async (req, res) => {
 
   if (serverSupabase) {
     try {
-      const { error } = await serverSupabase.from('leads').delete().in('id', ids);
-      if (error) {
-        console.error('[Supabase Batch Delete Leads Error]', error.message);
-        return res.status(500).json({ error: 'Failed to delete leads' });
-      }
-      return res.json({ success: true, deletedCount: ids.length });
-    } catch (err: any) {
-      console.error('[Supabase Batch Delete Exception]', err);
-      return res.status(500).json({ error: 'Failed to delete leads' });
+      await serverSupabase.from('leads').delete().in('id', ids);
+    } catch (e) {
+      // Handled in settings
     }
   }
 
-  const data = readCmsData();
-  const idSet = new Set(ids);
-  data.leads = (data.leads || []).filter((l: any) => !idSet.has(l.id));
-  writeCmsData(data);
-  return res.json({ success: true, deletedCount: ids.length });
+  try {
+    const leads = await getSupabaseCrmLeads();
+    const idSet = new Set(ids);
+    const filtered = leads.filter((l: any) => !idSet.has(l.id));
+    await saveSupabaseCrmLeads(filtered);
+    return res.json({ success: true, deletedCount: ids.length });
+  } catch (err: any) {
+    console.error('[POST /api/admin/leads/batch-delete Error]', err);
+    return res.status(500).json({ error: 'Failed to delete leads from database' });
+  }
 });
 
 // --- LEAD OUTREACH CAMPAIGNS API ---
 
 // GET All Lead Campaigns
 app.get('/api/admin/lead-campaigns', requireAdmin, async (req, res) => {
-  if (serverSupabase) {
-    try {
-      const { data, error } = await serverSupabase
-        .from('lead_campaigns')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.warn('[Supabase GET Lead Campaigns Warning]', error.message);
-        const localData = readCmsData();
-        return res.json(localData.lead_campaigns || []);
-      }
-      return res.json(data || []);
-    } catch (err: any) {
-      console.error('[Supabase GET Lead Campaigns Exception]', err);
-      const localData = readCmsData();
-      return res.json(localData.lead_campaigns || []);
-    }
+  try {
+    const campaigns = await getSupabaseCrmCampaigns();
+    return res.json(campaigns);
+  } catch (err: any) {
+    console.error('[GET /api/admin/lead-campaigns Error]', err);
+    return res.status(503).json({ error: 'Database service unavailable' });
   }
-
-  const data = readCmsData();
-  return res.json(data.lead_campaigns || []);
 });
 
 // GET Single Lead Campaign with detailed recipient log
@@ -2991,37 +3226,54 @@ app.get('/api/admin/lead-campaigns/:id', requireAdmin, async (req, res) => {
     return res.status(400).json({ error: 'Invalid campaign ID format' });
   }
 
-  if (serverSupabase) {
-    try {
-      const { data: campaign, error: campErr } = await serverSupabase
-        .from('lead_campaigns')
-        .select('*')
-        .eq('id', id)
-        .single();
+  try {
+    let campaign: any = null;
+    let recipients: any[] = [];
 
-      if (campErr || !campaign) {
+    if (serverSupabase) {
+      try {
+        const { data: dbCamp, error: cErr } = await serverSupabase.from('lead_campaigns').select('*').eq('id', id).single();
+        if (!cErr && dbCamp) {
+          campaign = dbCamp;
+          const { data: rList } = await serverSupabase
+            .from('campaign_leads')
+            .select('*, leads(company_name, contact_person, email, industry, status, lead_priority)')
+            .eq('campaign_id', id)
+            .order('created_at', { ascending: false });
+          recipients = rList || [];
+        }
+      } catch (e) {
+        // Fallback to settings
+      }
+    }
+
+    if (!campaign) {
+      const allCampaigns = await getSupabaseCrmCampaigns();
+      campaign = allCampaigns.find((c: any) => c.id === id);
+      if (!campaign) {
         return res.status(404).json({ error: 'Lead campaign not found' });
       }
 
-      const { data: recipients } = await serverSupabase
-        .from('campaign_leads')
-        .select('*, leads(company_name, contact_person, email, industry, status, lead_priority)')
-        .eq('campaign_id', id)
-        .order('created_at', { ascending: false });
+      const allRecipients = await getSupabaseCrmRecipients();
+      const allLeads = await getSupabaseCrmLeads();
+      const leadMap = new Map(allLeads.map(l => [l.id, l]));
 
-      return res.json({ ...campaign, recipients: recipients || [] });
-    } catch (err: any) {
-      console.error('[Supabase GET Single Lead Campaign Error]', err);
+      recipients = allRecipients
+        .filter((cl: any) => cl.campaign_id === id)
+        .map(cl => ({
+          ...cl,
+          leads: leadMap.get(cl.lead_id) || {
+            company_name: cl.lead_company,
+            email: cl.lead_email
+          }
+        }));
     }
-  }
 
-  const data = readCmsData();
-  const campaign = (data.lead_campaigns || []).find((c: any) => c.id === id);
-  if (!campaign) {
-    return res.status(404).json({ error: 'Lead campaign not found' });
+    return res.json({ ...campaign, recipients });
+  } catch (err: any) {
+    console.error('[GET /api/admin/lead-campaigns/:id Error]', err);
+    return res.status(503).json({ error: 'Database service unavailable' });
   }
-  const recipients = (data.campaign_leads || []).filter((cl: any) => cl.campaign_id === id);
-  return res.json({ ...campaign, recipients });
 });
 
 // POST Save / Create / Update Lead Campaign
@@ -3032,56 +3284,49 @@ app.post('/api/admin/lead-campaigns', requireAdmin, async (req, res) => {
   }
 
   const now = new Date().toISOString();
-  let savedCampaign: any = {
-    ...payload,
+  let campaignId = isValidUuid(payload.id) ? payload.id : crypto.randomUUID();
+  const campaignRecord: any = {
+    name: payload.name.trim(),
     campaign_type: 'lead_outreach',
+    subject: payload.subject.trim(),
+    preheader: (payload.preheader || '').trim(),
+    html_content: payload.html_content,
+    status: payload.status || 'draft',
+    total_recipients: payload.total_recipients || 0,
+    successful_count: payload.successful_count || 0,
+    failed_count: payload.failed_count || 0,
     updated_at: now
   };
 
   if (serverSupabase) {
     try {
-      const dbPayload: any = {
-        name: payload.name.trim(),
-        campaign_type: 'lead_outreach',
-        subject: payload.subject.trim(),
-        preheader: (payload.preheader || '').trim(),
-        html_content: payload.html_content,
-        status: payload.status || 'draft',
-        total_recipients: payload.total_recipients || 0,
-        successful_count: payload.successful_count || 0,
-        failed_count: payload.failed_count || 0,
-        updated_at: now
-      };
-
-      if (isValidUuid(payload.id)) {
-        dbPayload.id = payload.id;
-      }
-
+      const dbPayload: any = { ...campaignRecord, id: campaignId };
       const { data, error } = await serverSupabase.from('lead_campaigns').upsert(dbPayload).select().single();
       if (!error && data) {
         return res.json({ success: true, campaign: data });
       }
-      console.warn('[Supabase Save Lead Campaign Warning - Using Fallback]', error?.message);
     } catch (err: any) {
-      console.warn('[Supabase Save Lead Campaign Exception - Using Fallback]', err);
+      // Continue to settings
     }
   }
 
-  if (!savedCampaign.id) {
-    savedCampaign.id = 'lcamp-' + Date.now();
-    savedCampaign.created_at = now;
+  try {
+    const campaigns = await getSupabaseCrmCampaigns();
+    const idx = campaigns.findIndex((c: any) => c.id === campaignId);
+    let savedCampaign: any;
+    if (idx >= 0) {
+      savedCampaign = { ...campaigns[idx], ...campaignRecord, id: campaignId, updated_at: now };
+      campaigns[idx] = savedCampaign;
+    } else {
+      savedCampaign = { id: campaignId, created_at: now, ...campaignRecord };
+      campaigns.unshift(savedCampaign);
+    }
+    await saveSupabaseCrmCampaigns(campaigns);
+    return res.json({ success: true, campaign: savedCampaign });
+  } catch (err: any) {
+    console.error('[POST /api/admin/lead-campaigns Error]', err);
+    return res.status(500).json({ error: 'Failed to persist lead campaign to database' });
   }
-  const data = readCmsData();
-  data.lead_campaigns = data.lead_campaigns || [];
-  const idx = data.lead_campaigns.findIndex((c: any) => c.id === savedCampaign.id);
-  if (idx >= 0) {
-    data.lead_campaigns[idx] = savedCampaign;
-  } else {
-    data.lead_campaigns.unshift(savedCampaign);
-  }
-  writeCmsData(data);
-
-  return res.json({ success: true, campaign: savedCampaign });
 });
 
 // DELETE Lead Campaign
@@ -3093,23 +3338,21 @@ app.delete('/api/admin/lead-campaigns/:id', requireAdmin, async (req, res) => {
 
   if (serverSupabase) {
     try {
-      const { error } = await serverSupabase.from('lead_campaigns').delete().eq('id', id);
-      if (error) {
-        console.error('[Supabase Delete Lead Campaign Error]', error.message);
-        return res.status(500).json({ error: 'Failed to delete lead campaign' });
-      }
-      return res.json({ success: true });
-    } catch (err: any) {
-      console.error('[Supabase Delete Lead Campaign Exception]', err);
-      return res.status(500).json({ error: 'Failed to delete lead campaign' });
+      await serverSupabase.from('lead_campaigns').delete().eq('id', id);
+    } catch (e) {
+      // Handled in settings
     }
   }
 
-  const data = readCmsData();
-  data.lead_campaigns = (data.lead_campaigns || []).filter((c: any) => c.id !== id);
-  data.campaign_leads = (data.campaign_leads || []).filter((cl: any) => cl.campaign_id !== id);
-  writeCmsData(data);
-  return res.json({ success: true });
+  try {
+    const campaigns = await getSupabaseCrmCampaigns();
+    const filtered = campaigns.filter((c: any) => c.id !== id);
+    await saveSupabaseCrmCampaigns(filtered);
+    return res.json({ success: true });
+  } catch (err: any) {
+    console.error('[DELETE /api/admin/lead-campaigns/:id Error]', err);
+    return res.status(500).json({ error: 'Failed to delete campaign from database' });
+  }
 });
 
 // POST Send Personalized Test Email for Lead Campaign
@@ -3124,60 +3367,48 @@ app.post('/api/admin/lead-campaigns/:id/test', requireAdmin, emailTestLimiter, a
     return res.status(400).json({ success: false, message: 'Valid test recipient email is required' });
   }
 
-  let campaign: any = null;
-  if (serverSupabase) {
-    try {
-      const { data, error } = await serverSupabase.from('lead_campaigns').select('*').eq('id', id).maybeSingle();
-      if (!error && data) campaign = data;
-    } catch (e) {
-      console.warn('[Supabase Test Lead Campaign Load Warning]', e);
-    }
-  }
-  if (!campaign) {
-    const data = readCmsData();
-    campaign = (data.lead_campaigns || []).find((c: any) => c.id === id);
-  }
+  try {
+    const campaigns = await getSupabaseCrmCampaigns();
+    const campaign = campaigns.find((c: any) => c.id === id);
 
-  if (!campaign) {
-    return res.status(404).json({ success: false, message: 'Lead campaign not found' });
-  }
-
-  // Fetch sample lead if provided
-  let leadData: any = customLeadData || null;
-  if (!leadData && sampleLeadId) {
-    if (serverSupabase) {
-      const { data: sLead } = await serverSupabase.from('leads').select('*').eq('id', sampleLeadId).maybeSingle();
-      if (sLead) leadData = sLead;
+    if (!campaign) {
+      return res.status(404).json({ success: false, message: 'Lead campaign not found' });
     }
+
+    // Fetch sample lead if provided
+    let leadData: any = customLeadData || null;
+    if (!leadData && sampleLeadId) {
+      const allLeads = await getSupabaseCrmLeads();
+      leadData = allLeads.find((l: any) => l.id === sampleLeadId);
+    }
+
     if (!leadData) {
-      const data = readCmsData();
-      leadData = (data.leads || []).find((l: any) => l.id === sampleLeadId);
+      leadData = {
+        company_name: 'Udaan Manufacturing Ltd',
+        industry: 'Automotive & Industrial Parts',
+        location: 'Pithampur Industrial Zone, MP',
+        contact_person: 'Rajesh Sharma',
+        email: testEmail,
+        phone: '+91 98260 12345',
+        linkedin: 'https://linkedin.com/company/udaan-mfg',
+        powerbi_use_case: 'Plant Production MIS & Scrap Costing Dashboard',
+        lead_priority: 'High'
+      };
     }
+
+    const result = await campaignEmailService.sendLeadTestEmail({
+      testEmail,
+      subject: campaign.subject,
+      preheader: campaign.preheader,
+      contentHtml: campaign.html_content,
+      lead: leadData
+    });
+
+    return res.json(result);
+  } catch (err: any) {
+    console.error('[POST /api/admin/lead-campaigns/:id/test Error]', err);
+    return res.status(500).json({ success: false, message: 'Failed to dispatch test email' });
   }
-
-  if (!leadData) {
-    leadData = {
-      company_name: 'Udaan Manufacturing Ltd',
-      industry: 'Automotive & Industrial Parts',
-      location: 'Pithampur Industrial Zone, MP',
-      contact_person: 'Rajesh Sharma',
-      email: testEmail,
-      phone: '+91 98260 12345',
-      linkedin: 'https://linkedin.com/company/udaan-mfg',
-      powerbi_use_case: 'Plant Production MIS & Scrap Costing Dashboard',
-      lead_priority: 'High'
-    };
-  }
-
-  const result = await campaignEmailService.sendLeadTestEmail({
-    testEmail,
-    subject: campaign.subject,
-    preheader: campaign.preheader,
-    contentHtml: campaign.html_content,
-    lead: leadData
-  });
-
-  return res.json(result);
 });
 
 // POST Send Bulk Lead Campaign with Safe Batches and Idempotency
@@ -3196,209 +3427,165 @@ app.post('/api/admin/lead-campaigns/:id/send', requireAdmin, emailSendLimiter, a
     });
   }
 
-  let campaign: any = null;
-  if (serverSupabase) {
-    try {
-      const { data, error } = await serverSupabase.from('lead_campaigns').select('*').eq('id', id).single();
-      if (error || !data) {
-        return res.status(404).json({ success: false, message: 'Lead campaign not found' });
-      }
-      campaign = data;
-    } catch (e: any) {
-      return res.status(503).json({ success: false, message: 'Database service unavailable' });
+  try {
+    const campaigns = await getSupabaseCrmCampaigns();
+    const campaign = campaigns.find((c: any) => c.id === id);
+
+    if (!campaign) {
+      return res.status(404).json({ success: false, message: 'Lead campaign not found' });
     }
-  } else {
-    const data = readCmsData();
-    campaign = (data.lead_campaigns || []).find((c: any) => c.id === id);
-  }
 
-  if (!campaign) {
-    return res.status(404).json({ success: false, message: 'Lead campaign not found' });
-  }
-
-  if (!campaignEmailService.isConfigured()) {
-    return res.status(400).json({
-      success: false,
-      error: 'Gmail SMTP is not configured',
-      details: 'GMAIL_USER or GMAIL_APP_PASSWORD is missing',
-      message: 'GMAIL_APP_PASSWORD is not configured in the server environment.'
-    });
-  }
-
-  // Fetch the selected leads
-  let selectedLeads: any[] = [];
-  if (serverSupabase) {
-    try {
-      const { data: sLeads, error: leadsErr } = await serverSupabase.from('leads').select('*').in('id', leadIds);
-      if (leadsErr) {
-        return res.status(503).json({ success: false, message: `Failed to load selected leads: ${leadsErr.message}` });
-      }
-      selectedLeads = sLeads || [];
-    } catch (e: any) {
-      return res.status(503).json({ success: false, message: 'Database error loading leads' });
+    if (!campaignEmailService.isConfigured()) {
+      return res.status(400).json({
+        success: false,
+        error: 'Gmail SMTP is not configured',
+        details: 'GMAIL_USER or GMAIL_APP_PASSWORD is missing',
+        message: 'GMAIL_APP_PASSWORD is not configured in the server environment.'
+      });
     }
-  } else {
-    const data = readCmsData();
+
+    // Fetch the selected leads from Supabase CRM store
+    const allLeads = await getSupabaseCrmLeads();
     const idSet = new Set(leadIds);
-    selectedLeads = (data.leads || []).filter((l: any) => idSet.has(l.id));
-  }
+    const selectedLeads = allLeads.filter((l: any) => idSet.has(l.id));
 
-  if (selectedLeads.length === 0) {
-    return res.status(400).json({ success: false, message: 'No valid leads found from the provided selection.' });
-  }
-
-  // Filter out any "Do Not Contact" or "Bounced" leads to protect sender reputation
-  const eligibleLeads = selectedLeads.filter(l => l.status !== 'Do Not Contact' && l.status !== 'Bounced');
-  if (eligibleLeads.length === 0) {
-    return res.status(400).json({
-      success: false,
-      message: 'All selected leads have status "Do Not Contact" or "Bounced" and cannot be emailed.'
-    });
-  }
-
-  // Fetch existing campaign_leads for this campaign to ensure idempotency (skip leads already sent)
-  const alreadySentLeadIds = new Set<string>();
-  if (serverSupabase) {
-    const { data: pastSends } = await serverSupabase
-      .from('campaign_leads')
-      .select('lead_id, status')
-      .eq('campaign_id', campaign.id)
-      .eq('status', 'sent');
-
-    if (Array.isArray(pastSends)) {
-      pastSends.forEach(ps => { if (ps.lead_id) alreadySentLeadIds.add(ps.lead_id); });
+    if (selectedLeads.length === 0) {
+      return res.status(400).json({ success: false, message: 'No valid leads found from the provided selection.' });
     }
-  } else {
-    const data = readCmsData();
-    (data.campaign_leads || [])
+
+    // Filter out any "Do Not Contact" or "Bounced" leads to protect sender reputation
+    const eligibleLeads = selectedLeads.filter(l => l.status !== 'Do Not Contact' && l.status !== 'Bounced');
+    if (eligibleLeads.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'All selected leads have status "Do Not Contact" or "Bounced" and cannot be emailed.'
+      });
+    }
+
+    // Fetch existing campaign_leads for this campaign to ensure idempotency (skip leads already sent)
+    const existingRecipients = await getSupabaseCrmRecipients();
+    const alreadySentLeadIds = new Set<string>();
+    existingRecipients
       .filter((cl: any) => cl.campaign_id === campaign.id && cl.status === 'sent')
       .forEach((cl: any) => { if (cl.lead_id) alreadySentLeadIds.add(cl.lead_id); });
-  }
 
-  const leadsToSend = eligibleLeads.filter(l => !alreadySentLeadIds.has(l.id));
-  if (leadsToSend.length === 0) {
-    return res.json({
-      success: true,
-      message: 'All selected leads have already been sent this campaign previously (idempotency check).',
-      campaign
-    });
-  }
+    const leadsToSend = eligibleLeads.filter(l => !alreadySentLeadIds.has(l.id));
+    if (leadsToSend.length === 0) {
+      return res.json({
+        success: true,
+        message: 'All selected leads have already been sent this campaign previously (idempotency check).',
+        campaign
+      });
+    }
 
-  let successfulCount = campaign.successful_count || 0;
-  let failedCount = campaign.failed_count || 0;
-  const recipientsLog: any[] = [];
-  const leadsToUpdateStatus: string[] = [];
+    let successfulCount = campaign.successful_count || 0;
+    let failedCount = campaign.failed_count || 0;
+    const recipientsLog: any[] = [];
+    const leadsToUpdateStatus: string[] = [];
 
-  // Safe chunked batch processing
-  const chunkSize = Math.max(1, Math.min(Number(batchSize) || 10, 50));
-  for (let i = 0; i < leadsToSend.length; i += chunkSize) {
-    const chunk = leadsToSend.slice(i, i + chunkSize);
+    // Safe chunked batch processing
+    const chunkSize = Math.max(1, Math.min(Number(batchSize) || 10, 50));
+    for (let i = 0; i < leadsToSend.length; i += chunkSize) {
+      const chunk = leadsToSend.slice(i, i + chunkSize);
 
-    for (const lead of chunk) {
-      try {
-        const sendRes = await campaignEmailService.sendLeadSingleRecipient({
-          toEmail: lead.email,
-          subject: campaign.subject,
-          preheader: campaign.preheader,
-          contentHtml: campaign.html_content,
-          lead: lead
-        });
+      for (const lead of chunk) {
+        try {
+          const sendRes = await campaignEmailService.sendLeadSingleRecipient({
+            toEmail: lead.email,
+            subject: campaign.subject,
+            preheader: campaign.preheader,
+            contentHtml: campaign.html_content,
+            lead: lead
+          });
 
-        const logEntry: any = {
-          campaign_id: campaign.id,
-          lead_id: lead.id,
-          lead_email: lead.email,
-          lead_company: lead.company_name,
-          status: sendRes.success ? 'sent' : 'failed',
-          provider_message_id: sendRes.messageId || null,
-          error_message: sendRes.error || null,
-          sent_at: sendRes.success ? new Date().toISOString() : null,
-          created_at: new Date().toISOString()
-        };
+          const logEntry: any = {
+            id: crypto.randomUUID(),
+            campaign_id: campaign.id,
+            lead_id: isValidUuid(lead.id) ? lead.id : null,
+            lead_email: lead.email,
+            lead_company: lead.company_name,
+            status: sendRes.success ? 'sent' : 'failed',
+            provider_message_id: sendRes.messageId || null,
+            error_message: sendRes.error || null,
+            sent_at: sendRes.success ? new Date().toISOString() : null,
+            created_at: new Date().toISOString()
+          };
 
-        if (sendRes.success) {
-          successfulCount++;
-          if (lead.status === 'Not Contacted') {
-            leadsToUpdateStatus.push(lead.id);
+          if (sendRes.success) {
+            successfulCount++;
+            if (lead.status === 'Not Contacted') {
+              leadsToUpdateStatus.push(lead.id);
+            }
+          } else {
+            failedCount++;
           }
-        } else {
+
+          recipientsLog.push(logEntry);
+        } catch (sendErr: any) {
           failedCount++;
+          recipientsLog.push({
+            id: crypto.randomUUID(),
+            campaign_id: campaign.id,
+            lead_id: isValidUuid(lead.id) ? lead.id : null,
+            lead_email: lead.email,
+            lead_company: lead.company_name,
+            status: 'failed',
+            error_message: sendErr?.message || 'SMTP Exception',
+            created_at: new Date().toISOString()
+          });
         }
+      }
 
-        recipientsLog.push(logEntry);
-      } catch (sendErr: any) {
-        failedCount++;
-        recipientsLog.push({
-          campaign_id: campaign.id,
-          lead_id: lead.id,
-          lead_email: lead.email,
-          lead_company: lead.company_name,
-          status: 'failed',
-          error_message: sendErr?.message || 'SMTP Exception',
-          created_at: new Date().toISOString()
-        });
+      // Delay between chunks if there are more chunks to respect SMTP rate limits
+      if (i + chunkSize < leadsToSend.length && delayMs > 0) {
+        await new Promise(resolve => setTimeout(resolve, Math.min(delayMs, 3000)));
       }
     }
 
-    // Delay between chunks if there are more chunks to respect SMTP rate limits
-    if (i + chunkSize < leadsToSend.length && delayMs > 0) {
-      await new Promise(resolve => setTimeout(resolve, Math.min(delayMs, 3000)));
+    const sentAt = new Date().toISOString();
+    const finalStatus = failedCount === 0 ? 'sent' : (successfulCount > 0 ? 'partially_sent' : 'failed');
+
+    campaign.status = finalStatus;
+    campaign.sent_at = sentAt;
+    campaign.total_recipients = (campaign.total_recipients || 0) + leadsToSend.length;
+    campaign.successful_count = successfulCount;
+    campaign.failed_count = failedCount;
+    campaign.updated_at = sentAt;
+
+    // Persist campaign update to Supabase
+    const campIdx = campaigns.findIndex((c: any) => c.id === campaign.id);
+    if (campIdx >= 0) campaigns[campIdx] = campaign;
+    await saveSupabaseCrmCampaigns(campaigns);
+
+    // Persist outreach history log to Supabase
+    if (recipientsLog.length > 0) {
+      await appendSupabaseCrmRecipients(recipientsLog);
     }
-  }
 
-  const sentAt = new Date().toISOString();
-  const finalStatus = failedCount === 0 ? 'sent' : (successfulCount > 0 ? 'partially_sent' : 'failed');
-
-  campaign.status = finalStatus;
-  campaign.sent_at = sentAt;
-  campaign.total_recipients = (campaign.total_recipients || 0) + leadsToSend.length;
-  campaign.successful_count = successfulCount;
-  campaign.failed_count = failedCount;
-  campaign.updated_at = sentAt;
-
-  if (serverSupabase) {
-    try {
-      await serverSupabase.from('lead_campaigns').upsert(campaign);
-      if (recipientsLog.length > 0) {
-        await serverSupabase.from('campaign_leads').insert(recipientsLog);
-      }
-      if (leadsToUpdateStatus.length > 0) {
-        await serverSupabase
-          .from('leads')
-          .update({ status: 'Contacted', updated_at: sentAt })
-          .in('id', leadsToUpdateStatus);
-      }
-    } catch (dbErr) {
-      console.warn('[Supabase Lead Campaign Dispatch DB Warning]', dbErr);
-    }
-  } else {
-    const data = readCmsData();
-    data.lead_campaigns = data.lead_campaigns || [];
-    const cIdx = data.lead_campaigns.findIndex((c: any) => c.id === campaign.id);
-    if (cIdx >= 0) data.lead_campaigns[cIdx] = campaign;
-    data.campaign_leads = data.campaign_leads || [];
-    data.campaign_leads.push(...recipientsLog);
-
+    // Update lead status to 'Contacted' in Supabase
     if (leadsToUpdateStatus.length > 0) {
       const updateSet = new Set(leadsToUpdateStatus);
-      (data.leads || []).forEach((l: any) => {
+      allLeads.forEach((l: any) => {
         if (updateSet.has(l.id)) {
           l.status = 'Contacted';
           l.updated_at = sentAt;
         }
       });
+      await saveSupabaseCrmLeads(allLeads);
     }
-    writeCmsData(data);
-  }
 
-  return res.json({
-    success: true,
-    message: `Lead outreach campaign dispatched! ${successfulCount} emails delivered successfully, ${failedCount} failed out of ${leadsToSend.length} processed leads.`,
-    campaign,
-    leadsProcessed: leadsToSend.length,
-    successfulCount,
-    failedCount
-  });
+    return res.json({
+      success: true,
+      message: `Lead outreach campaign dispatched! ${successfulCount} emails delivered successfully, ${failedCount} failed out of ${leadsToSend.length} processed leads.`,
+      campaign,
+      leadsProcessed: leadsToSend.length,
+      successfulCount,
+      failedCount
+    });
+  } catch (err: any) {
+    console.error('[POST /api/admin/lead-campaigns/:id/send Error]', err);
+    return res.status(500).json({ error: 'Failed to complete outreach dispatch in database' });
+  }
 });
 
 // ==================== SOCIAL, NAVIGATION, MEDIA, CATEGORIES ====================
