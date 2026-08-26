@@ -6,7 +6,7 @@ import { PROBITIAN_LOGO_URL } from '../constants/branding';
 
 interface HeaderProps {
   currentPage: NavPage;
-  onNavigate: (page: NavPage) => void;
+  onNavigate: (page: NavPage, slug?: string) => void;
   isDarkMode: boolean;
   onToggleDarkMode: () => void;
 }
@@ -49,13 +49,13 @@ export const Header: React.FC<HeaderProps> = ({
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  const navItems: { page: NavPage; label: string }[] = [
-    { page: 'home', label: 'Home' },
-    { page: 'learn', label: 'Learn' },
-    { page: 'projects', label: 'Projects' },
-    { page: 'blog', label: 'Blog' },
-    { page: 'about', label: 'About' },
-    { page: 'contact', label: 'Contact' },
+  const navItems: { page: NavPage; label: string; href: string }[] = [
+    { page: 'home', label: 'Home', href: '/' },
+    { page: 'learn', label: 'Learn', href: '/learn' },
+    { page: 'projects', label: 'Projects', href: '/projects' },
+    { page: 'blog', label: 'Blog', href: '/blog' },
+    { page: 'about', label: 'About', href: '/about' },
+    { page: 'contact', label: 'Contact', href: '/contact' },
   ];
 
   return (
@@ -69,8 +69,10 @@ export const Header: React.FC<HeaderProps> = ({
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between">
           {/* Left: Brand Logo & Title */}
-          <button
-            onClick={() => {
+          <a
+            href="/"
+            onClick={(e) => {
+              e.preventDefault();
               onNavigate('home');
               setMobileMenuOpen(false);
             }}
@@ -80,7 +82,7 @@ export const Header: React.FC<HeaderProps> = ({
             <div className="relative w-10 h-10 rounded-full bg-white dark:bg-slate-800 p-0.5 shadow-sm border border-purple-200 dark:border-purple-800/40 group-hover:scale-105 transition-transform duration-300 flex items-center justify-center overflow-hidden shrink-0">
               <img 
                 src={logoUrl} 
-                alt="ProBItian Official Logo" 
+                alt="ProBItian Official Brand Logo" 
                 className="w-full h-full object-contain" 
                 onError={(e) => { e.currentTarget.src = PROBITIAN_LOGO_URL; }}
               />
@@ -93,16 +95,20 @@ export const Header: React.FC<HeaderProps> = ({
                 Learn Data. Build Skills.
               </span>
             </div>
-          </button>
+          </a>
 
           {/* Desktop Nav Links */}
           <nav className="hidden md:flex items-center gap-1 bg-slate-100/80 dark:bg-slate-800/80 p-1.5 rounded-full border border-slate-200/60 dark:border-slate-700/50 backdrop-blur-md">
             {navItems.map((item) => {
               const isActive = currentPage === item.page;
               return (
-                <button
+                <a
                   key={item.page}
-                  onClick={() => onNavigate(item.page)}
+                  href={item.href}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    onNavigate(item.page);
+                  }}
                   className={`px-4 py-1.5 text-xs font-semibold rounded-full transition-all duration-200 ${
                     isActive
                       ? 'bg-purple-600 text-white shadow-sm'
@@ -110,7 +116,7 @@ export const Header: React.FC<HeaderProps> = ({
                   }`}
                 >
                   {item.label}
-                </button>
+                </a>
               );
             })}
           </nav>
@@ -165,9 +171,11 @@ export const Header: React.FC<HeaderProps> = ({
             {navItems.map((item) => {
               const isActive = currentPage === item.page;
               return (
-                <button
+                <a
                   key={item.page}
-                  onClick={() => {
+                  href={item.href}
+                  onClick={(e) => {
+                    e.preventDefault();
                     onNavigate(item.page);
                     setMobileMenuOpen(false);
                   }}
@@ -178,7 +186,7 @@ export const Header: React.FC<HeaderProps> = ({
                   }`}
                 >
                   {item.label}
-                </button>
+                </a>
               );
             })}
           </nav>

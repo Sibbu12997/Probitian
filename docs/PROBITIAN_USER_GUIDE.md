@@ -17,30 +17,29 @@ ProBitian is a premium, end-to-end Business Intelligence and Data Analytics lear
 - **Direct Engagement**: Connect directly via contact forms and newsletter subscription channels.
 
 ## 2. Getting Started & Website Navigation
-The ProBitian website features a single-page application (SPA) architecture with hash-based route navigation (#/, #/learn, #/projects, etc.) for instantaneous page transitions.
+The ProBitian website features a single-page application (SPA) architecture with clean, path-based route navigation (`/`, `/learn`, `/projects`, `/blog`, `/about`, `/contact`, etc.) for instantaneous page transitions and optimal search engine discoverability.
 
 ### Header Navigation Bar
-- **ProBitian Logo**: Click anytime to return to the Home page.
-- **Navigation Links**: Home, Learn, Projects, Blog, YouTube, About, Contact.
+- **ProBitian Logo**: Click anytime to return to the Home page (`/`).
+- **Navigation Links**: Home (`/`), Learn (`/learn`), Projects (`/projects`), Blog (`/blog`), About (`/about`), Contact (`/contact`).
 - **Theme Switcher**: Sun/Moon icon in the top header bar toggles between Light Mode and Dark Mode.
 - **Responsive Mobile Menu**: On mobile screens (<768px), a hamburger icon opens a full-screen mobile menu.
 
 ### Public Website Pages & Routes
-- **Home (#/)**: Platform overview, hero statistics, core features, top courses, featured portfolio projects, and YouTube highlights.
-- **Learn (#/learn)**: Complete course catalog with filter tabs, skill level badges, video lessons, PDF cheat sheets, and dataset downloads.
-- **Projects (#/projects)**: Portfolio gallery of real-world Power BI & SQL dashboards featuring problem statements, live interactive demos, GitHub repos, and raw sample dataset downloads.
-- **Blog (#/blog)**: Technical articles, DAX optimization guides, and BI career frameworks with code snippets and video walk-throughs.
-- **YouTube (#/youtube)**: Curated repository of video tutorials, playlists, and channel subscription highlights.
-- **About (#/about)**: Project Owner profile (Shivam Singh), platform mission statement, impact metrics, and learning roadmap.
-- **Contact (#/contact)**: Direct message portal for course inquiries, mentorship, or project collaborations, plus official ProBitian Community Hub location.
-- **Terms of Service (#/terms)**: Platform usage terms, intellectual property, and learner guidelines.
-- **Privacy Policy (#/privacy-policy / #/privacy)**: Data handling practices, cookie policies, user rights, and privacy controls.
+- **Home (`/`)**: Platform overview, hero statistics, core features, top courses, featured portfolio projects, and YouTube highlights.
+- **Learn (`/learn`)**: Complete course catalog with filter tabs, skill level badges, video lessons, PDF cheat sheets, and dataset downloads.
+- **Projects (`/projects`)**: Portfolio gallery of real-world Power BI & SQL dashboards featuring problem statements, live interactive demos, GitHub repos, and raw sample dataset downloads.
+- **Blog (`/blog`)**: Technical articles, DAX optimization guides, and BI career frameworks with direct slug routing (`/blog/:slug`), code snippets, and video walk-throughs.
+- **About (`/about`)**: Project Owner profile (Shivam Singh), platform mission statement, impact metrics, and learning roadmap.
+- **Contact (`/contact`)**: Direct message portal for course inquiries, mentorship, or project collaborations, plus official ProBitian Community Hub location.
+- **Terms of Service (`/terms`)**: Platform usage terms, intellectual property, and learner guidelines.
+- **Privacy Policy (`/privacy` / `/privacy-policy`)**: Data handling practices, cookie policies, user rights, and privacy controls.
 
 ## 3. Home Page Guide
 The Home page serves as the entry point to the ProBitian ecosystem.
 
 ### Key Sections & Interactions
-1. **Hero Banner**: Features primary headline, tagline, "Start Learning" CTA (#/learn), and "Explore Projects" CTA (#/projects).
+1. **Hero Banner**: Features primary headline, tagline, "Start Learning" CTA (`/learn`), and "Explore Projects" CTA (`/projects`).
 2. **Value Proposition Cards**: Highlights core skill pillars—Power BI Mastery, SQL Querying, Advanced Excel, and AI Tools for Data Professionals.
 3. **Featured Course Cards**: Direct buttons opening detailed course curriculum modals.
 4. **Featured Project Showcase**: Interactive cards displaying project badges, tools used, and direct modal popups.

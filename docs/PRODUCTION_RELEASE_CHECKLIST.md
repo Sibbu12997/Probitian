@@ -49,7 +49,29 @@ Prior to releasing a new deployment or major update, ensure every item below is 
 - [x] **API 404 Handling Verified**: Catch-all `app.all('/api/*', ...)` returns JSON `404` errors before SPA fallback.
 - [x] **Secrets Isolated**: Zero client exposures of `SUPABASE_SECRET_KEY`, `GMAIL_APP_PASSWORD`, `ADMIN_PASSKEY`, or `GEMINI_API_KEY`.
 
-### 5. Quality & Build
+### 5. SEO, Crawling & Metadata Verification
+- [x] **Production Domain Verified**: Normalized to `https://probitian.ai.studio/` across canonicals, Open Graph, Twitter, JSON-LD, sitemap, and robots.
+- [x] **HTTPS Protocol Verified**: All internal URLs enforce HTTPS without redirect loops.
+- [x] **Path-Based Routes Verified**: Navigation uses clean browser paths (`/`, `/about`, `/projects`, `/blog`, `/learn`, `/contact`, `/privacy`, `/terms`) without `#` fragments.
+- [x] **Canonical URLs Verified**: Dynamic canonical `<link rel="canonical">` updates on every route without trailing query strings.
+- [x] **Page Titles Verified**: Unique, descriptive titles with `\| ProBItian` suffix rendered across all pages.
+- [x] **Meta Descriptions Verified**: Informative meta descriptions populated for each public page.
+- [x] **Robots Directives Verified**: Public pages use `index, follow`; `/admin` and 404 views use `noindex, nofollow`.
+- [x] **Open Graph & Twitter Cards Verified**: `og:*` and `twitter:*` tags render with image fallbacks and exact URLs.
+- [x] **JSON-LD Structured Data Verified**: `EducationalOrganization`, `WebSite`, `BreadcrumbList`, and `BlogPosting` schemas serialize valid JSON.
+- [x] **robots.txt Verified**: Accessible at `/robots.txt` with `Allow: /`, disallowing `/admin` & `/api/`, and pointing to sitemap.
+- [x] **sitemap.xml Verified**: Accessible at `/sitemap.xml` with valid XML tags, updated `lastmod` dates, and priorities.
+- [x] **Blog Article SEO Verified**: Direct URL `/blog/:slug` access loads full content with custom article metadata and schema.
+- [x] **Draft Articles Excluded**: Unpublished blogs omitted from `sitemap.xml` and public listing.
+- [x] **Admin Noindex Verified**: Admin portal is protected with `noindex, nofollow` and excluded from crawling.
+- [x] **HTTP 404 Status Verified**: Invalid URLs return true `HTTP 404 Not Found` response with 404 UI.
+- [x] **Internal Links Verified**: Standard semantic `<a href="...">` links used across menus, cards, and footers.
+- [x] **Image Alt-Text Verified**: Descriptive `alt` attributes present across all meaningful imagery.
+- [x] **Mobile Responsiveness Verified**: Mobile layouts tested and verified at 375px, 390px, and 412px widths.
+- [x] **Technical Performance Status**: Bundle minification and fast local response times verified (Real-world Core Web Vitals: NOT VERIFIED pending live PageSpeed run).
+- [x] **Google Search Console Status**: Technical prerequisites complete (Live indexing status: NOT VERIFIED pending site owner console setup).
+
+### 6. Quality & Build
 - [x] **Typecheck Passed**: `npm run lint` (`tsc --noEmit`) exits with code 0.
 - [x] **Production Build Passed**: `npm run build` completes with zero errors.
 - [x] **Fresh Deployment Tested**: Application verified live at `https://probitian.ai.studio/`.

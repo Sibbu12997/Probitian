@@ -97,7 +97,7 @@ export const ProjectsPage: React.FC<ProjectsPageProps> = ({ onSelectProject }) =
             <div className="relative h-52 overflow-hidden bg-slate-950">
               <img
                 src={project.imagePlaceholder}
-                alt={project.title}
+                alt={`${project.title} - Power BI Portfolio Project Preview`}
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 opacity-90"
               />
               <span className="absolute top-3 right-3 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-slate-900/80 text-white backdrop-blur-md border border-slate-700">

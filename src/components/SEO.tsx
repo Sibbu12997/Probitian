@@ -1,20 +1,40 @@
 import React, { useEffect, useState } from 'react';
 import { cmsService } from '../services/cmsService';
-import { SeoSettings } from '../types';
+import { SeoSettings, BlogArticle, NavPage } from '../types';
 import { PROBITIAN_LOGO_URL } from '../constants/branding';
+import { CANONICAL_SITE_URL, getPageCanonicalUrl } from '../lib/routing';
+
+interface BreadcrumbItem {
+  name: string;
+  url: string;
+}
 
 interface SEOProps {
   title?: string;
   description?: string;
+  page?: NavPage;
+  slug?: string | null;
   pageUrl?: string;
   ogImage?: string;
+  ogType?: 'website' | 'article' | 'blog';
+  robots?: string;
+  keywords?: string;
+  article?: Partial<BlogArticle> | null;
+  breadcrumbs?: BreadcrumbItem[];
 }
 
 export const SEO: React.FC<SEOProps> = ({
   title,
   description,
-  pageUrl = 'https://probitian.com',
+  page = 'home',
+  slug,
+  pageUrl,
   ogImage,
+  ogType = 'website',
+  robots,
+  keywords,
+  article,
+  breadcrumbs,
 }) => {
   const [cmsSeo, setCmsSeo] = useState<SeoSettings | null>(null);
   const [contactEmail, setContactEmail] = useState<string>('probitianofficial@gmail.com');
@@ -35,11 +55,30 @@ export const SEO: React.FC<SEOProps> = ({
     }).catch(() => {});
   }, []);
 
-  const finalTitle = title || cmsSeo?.meta_title || 'ProBItian | Master Business Intelligence';
-  const finalDesc = description || cmsSeo?.meta_description || 'Master Power BI, SQL, Excel, Power Query, AI Tools, and Dashboard Design through practical projects and industry-focused tutorials.';
-  const finalOgImage = ogImage || cmsSeo?.og_image || 'https://probitian.com/banner.svg';
-  const finalKeywords = cmsSeo?.keywords || 'Power BI, SQL, Excel, Business Intelligence, Data Analytics';
-  const finalRobots = cmsSeo?.robots_txt || 'index, follow';
+  // Compute clean, normalized canonical URL without hash, query params, or duplicate slashes
+  const canonicalUrl = pageUrl 
+    ? pageUrl.split('?')[0].split('#')[0] 
+    : getPageCanonicalUrl(page, slug);
+
+  // Derive final values
+  const defaultTitle = cmsSeo?.meta_title || 'ProBItian | Master Business Intelligence, Power BI & SQL';
+  const defaultDesc = cmsSeo?.meta_description || 'Master Power BI, SQL, Excel, Power Query, AI Tools, and Dashboard Design through practical projects and industry-focused tutorials.';
+  
+  const finalTitle = title || (article?.metaTitle || article?.title ? `${article.metaTitle || article.title} | ProBItian Blog` : defaultTitle);
+  const finalDesc = description || (article?.metaDescription || article?.excerpt ? (article.metaDescription || article.excerpt) : defaultDesc);
+  const finalOgImage = ogImage || article?.imageUrl || cmsSeo?.og_image || `${CANONICAL_SITE_URL}/banner.svg`;
+  const finalKeywords = keywords || cmsSeo?.keywords || 'Power BI, SQL, Excel, Business Intelligence, Data Analytics, DAX, Power Query, AI Tools';
+  const finalTwitterHandle = cmsSeo?.twitter_handle || '@probitian';
+
+  // Robots directive (fail-closed for 404 or admin, or unpublished drafts)
+  let computedRobots = robots;
+  if (!computedRobots) {
+    if (page === 'admin' || page === '404' || (article && article.status && article.status !== 'published')) {
+      computedRobots = 'noindex, nofollow';
+    } else {
+      computedRobots = cmsSeo?.robots_txt?.includes('User-agent') ? 'index, follow' : (cmsSeo?.robots_txt || 'index, follow');
+    }
+  }
 
   useEffect(() => {
     // Document Title
@@ -56,13 +95,30 @@ export const SEO: React.FC<SEOProps> = ({
       element.setAttribute('content', content);
     };
 
+    // Helper to set property meta tags
+    const setPropertyMeta = (property: string, content: string) => {
+      setMetaTag(`meta[property="${property}"]`, 'property', property, content);
+    };
+
+    // Standard Search Engine Meta
     setMetaTag('meta[name="description"]', 'name', 'description', finalDesc);
     setMetaTag('meta[name="keywords"]', 'name', 'keywords', finalKeywords);
-    setMetaTag('meta[name="robots"]', 'name', 'robots', finalRobots);
-    setMetaTag('meta[property="og:title"]', 'property', 'og:title', finalTitle);
-    setMetaTag('meta[property="og:description"]', 'property', 'og:description', finalDesc);
-    setMetaTag('meta[property="og:image"]', 'property', 'og:image', finalOgImage);
-    setMetaTag('meta[property="og:url"]', 'property', 'og:url', pageUrl);
+    setMetaTag('meta[name="robots"]', 'name', 'robots', computedRobots);
+
+    // Open Graph Metadata
+    setPropertyMeta('og:site_name', 'ProBItian');
+    setPropertyMeta('og:title', finalTitle);
+    setPropertyMeta('og:description', finalDesc);
+    setPropertyMeta('og:image', finalOgImage);
+    setPropertyMeta('og:url', canonicalUrl);
+    setPropertyMeta('og:type', article ? 'article' : ogType);
+
+    // Twitter Card Metadata
+    setMetaTag('meta[name="twitter:card"]', 'name', 'twitter:card', 'summary_large_image');
+    setMetaTag('meta[name="twitter:title"]', 'name', 'twitter:title', finalTitle);
+    setMetaTag('meta[name="twitter:description"]', 'name', 'twitter:description', finalDesc);
+    setMetaTag('meta[name="twitter:image"]', 'name', 'twitter:image', finalOgImage);
+    setMetaTag('meta[name="twitter:site"]', 'name', 'twitter:site', finalTwitterHandle);
 
     // Canonical link tag
     let canonical = document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
@@ -71,38 +127,119 @@ export const SEO: React.FC<SEOProps> = ({
       canonical.setAttribute('rel', 'canonical');
       document.head.appendChild(canonical);
     }
-    canonical.setAttribute('href', pageUrl);
-  }, [finalTitle, finalDesc, finalOgImage, finalKeywords, finalRobots, pageUrl]);
+    canonical.setAttribute('href', canonicalUrl);
+  }, [finalTitle, finalDesc, finalOgImage, finalKeywords, computedRobots, canonicalUrl, ogType, finalTwitterHandle, article]);
 
-  const jsonLd = {
-    '@context': 'https://schema.org',
-    '@type': 'EducationalOrganization',
-    name: 'ProBItian',
-    url: pageUrl,
-    logo: cmsSeo?.og_image || PROBITIAN_LOGO_URL,
-    sameAs: [
-      'https://youtube.com/@probitian',
-      'https://instagram.com/probitian',
-      'https://facebook.com/probitian',
-      'https://github.com/probitian',
-      'https://www.linkedin.com/company/probitian/',
-    ],
-    description: finalDesc,
-    founder: {
-      '@type': 'Person',
-      name: 'Shivam Singh',
-      email: contactEmail,
-    },
-    knowsAbout: ['Power BI', 'SQL', 'Excel', 'Power Query', 'DAX', 'Business Intelligence', 'Data Analytics', 'AI Tools'],
-  };
+  // Structured Data Schemas
+  const schemas: any[] = [
+    // 1. Primary Educational Organization Schema
+    {
+      '@context': 'https://schema.org',
+      '@type': 'EducationalOrganization',
+      '@id': `${CANONICAL_SITE_URL}/#organization`,
+      name: 'ProBItian',
+      url: `${CANONICAL_SITE_URL}/`,
+      logo: {
+        '@type': 'ImageObject',
+        url: cmsSeo?.og_image || PROBITIAN_LOGO_URL,
+      },
+      sameAs: [
+        'https://youtube.com/@probitian',
+        'https://instagram.com/probitian',
+        'https://facebook.com/probitian',
+        'https://github.com/probitian',
+        'https://www.linkedin.com/company/probitian/',
+      ],
+      description: finalDesc,
+      founder: {
+        '@type': 'Person',
+        name: 'Shivam Singh',
+        email: contactEmail,
+      },
+      knowsAbout: ['Power BI', 'SQL', 'Excel', 'Power Query', 'DAX', 'Business Intelligence', 'Data Analytics', 'AI Tools'],
+    }
+  ];
+
+  // 2. WebSite Schema (on Home page)
+  if (page === 'home') {
+    schemas.push({
+      '@context': 'https://schema.org',
+      '@type': 'WebSite',
+      '@id': `${CANONICAL_SITE_URL}/#website`,
+      url: `${CANONICAL_SITE_URL}/`,
+      name: 'ProBItian',
+      description: 'Master Business Intelligence, Power BI & SQL with Practical Projects',
+      publisher: {
+        '@id': `${CANONICAL_SITE_URL}/#organization`,
+      },
+    });
+  }
+
+  // 3. BreadcrumbList Schema
+  const activeBreadcrumbs: BreadcrumbItem[] = breadcrumbs || (
+    page === 'home' ? [] : [
+      { name: 'Home', url: `${CANONICAL_SITE_URL}/` },
+      { 
+        name: page.charAt(0).toUpperCase() + page.slice(1), 
+        url: `${CANONICAL_SITE_URL}/${page}` 
+      },
+      ...(article ? [{ name: article.title || 'Article', url: canonicalUrl }] : [])
+    ]
+  );
+
+  if (activeBreadcrumbs.length > 0) {
+    schemas.push({
+      '@context': 'https://schema.org',
+      '@type': 'BreadcrumbList',
+      itemListElement: activeBreadcrumbs.map((crumb, idx) => ({
+        '@type': 'ListItem',
+        position: idx + 1,
+        name: crumb.name,
+        item: crumb.url,
+      })),
+    });
+  }
+
+  // 4. Article Schema (for blog articles)
+  if (article && page === 'blog') {
+    schemas.push({
+      '@context': 'https://schema.org',
+      '@type': 'BlogPosting',
+      headline: article.title || finalTitle,
+      description: article.excerpt || article.metaDescription || finalDesc,
+      image: article.imageUrl || finalOgImage,
+      datePublished: article.date || '2026-08-15',
+      dateModified: article.date || '2026-08-15',
+      author: {
+        '@type': 'Person',
+        name: article.author || 'Shivam Singh',
+      },
+      publisher: {
+        '@type': 'Organization',
+        name: 'ProBItian',
+        url: `${CANONICAL_SITE_URL}/`,
+        logo: {
+          '@type': 'ImageObject',
+          url: PROBITIAN_LOGO_URL,
+        },
+      },
+      mainEntityOfPage: {
+        '@type': 'WebPage',
+        '@id': canonicalUrl,
+      },
+      keywords: article.category ? `${article.category}, ${article.tags?.join(', ') || 'Business Intelligence'}` : undefined,
+    });
+  }
 
   return (
     <React.Fragment>
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, '\\u003c') }}
-      />
+      {schemas.map((schema, i) => (
+        <script
+          key={`schema-${i}`}
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(schema).replace(/</g, '\\u003c') }}
+        />
+      ))}
     </React.Fragment>
   );
 };
-

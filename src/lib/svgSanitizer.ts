@@ -1,6 +1,8 @@
+import DOMPurify from 'isomorphic-dompurify';
+
 /**
  * SVG Sanitizer & Security Validator
- * Protects against XSS attacks, malicious scripts, and invalid markup
+ * Protects against XSS attacks, malicious scripts, XXE entities, and invalid markup
  * while preserving aspect ratios, colors, typography, and vector structures.
  */
 
@@ -19,34 +21,40 @@ export function sanitizeSvgContent(rawSvgText: string): SvgValidationResult {
   const trimmed = rawSvgText.trim();
 
   // Basic structure check
-  if (!trimmed.includes('<svg') || !trimmed.includes('</svg>')) {
+  if (!trimmed.toLowerCase().includes('<svg') || !trimmed.toLowerCase().includes('</svg>')) {
     return { isValid: false, error: 'Invalid SVG structure: Missing <svg> root element.' };
   }
 
   try {
     let sanitizedText = trimmed;
 
-    // 1. Strip script tags completely
-    sanitizedText = sanitizedText.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+    // 1. Strip XML DOCTYPE and ENTITY declarations to prevent XXE / entity expansion
+    sanitizedText = sanitizedText.replace(/<!DOCTYPE[\s\S]*?>/gi, '');
+    sanitizedText = sanitizedText.replace(/<!ENTITY[\s\S]*?>/gi, '');
+    sanitizedText = sanitizedText.replace(/<\?xml-stylesheet[\s\S]*?\?>/gi, '');
 
-    // 2. Strip dangerous tags (iframe, object, embed, foreignObject, applet, meta, link, form)
-    const dangerousTags = ['iframe', 'object', 'embed', 'foreignObject', 'applet', 'meta', 'link', 'form', 'base'];
-    for (const tag of dangerousTags) {
-      const regex = new RegExp(`<${tag}\\b[^<]*(?:(?!<\\/${tag}>)<[^<]*)*<\\/${tag}>`, 'gi');
-      sanitizedText = sanitizedText.replace(regex, '');
-      // Also self-closing variants
-      const selfClosingRegex = new RegExp(`<${tag}\\b[^>]*\\/?>`, 'gi');
-      sanitizedText = sanitizedText.replace(selfClosingRegex, '');
-    }
+    // 2. Parser-backed DOMPurify sanitization with strict SVG profile
+    sanitizedText = DOMPurify.sanitize(sanitizedText, {
+      USE_PROFILES: { svg: true, svgFilters: true },
+      ADD_TAGS: ['use', 'linearGradient', 'radialGradient', 'stop', 'filter', 'feGaussianBlur', 'feMerge', 'feMergeNode'],
+      FORBID_TAGS: [
+        'script', 'iframe', 'object', 'embed', 'foreignObject', 'applet', 'meta',
+        'link', 'form', 'base', 'frame', 'frameset', 'input', 'textarea',
+        'button', 'select', 'option', 'canvas', 'video', 'audio', 'source'
+      ],
+      FORBID_ATTR: ['onload', 'onerror', 'onclick', 'onmouseover', 'onfocus', 'onblur', 'style', 'formaction', 'action'],
+      ALLOW_DATA_ATTR: false
+    });
 
-    // 3. Strip inline event handlers (onload, onerror, onclick, etc.)
+    // 3. Post-sanitization safety checks against dangerous schemes and residual active markup
+    sanitizedText = sanitizedText.replace(/(href|src|xlink:href)\s*=\s*(?:"\s*(?:javascript|vbscript|data:text\/html)[^"]*"|'\s*(?:javascript|vbscript|data:text\/html)[^']*')/gi, '$1="#"');
     sanitizedText = sanitizedText.replace(/\s+on[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '');
 
-    // 4. Strip dangerous protocols in attributes (javascript:, data:text/html)
-    sanitizedText = sanitizedText.replace(/(href|src|xlink:href)\s*=\s*(?:"javascript:[^"]*"|'javascript:[^']*')/gi, '$1="#"');
-    sanitizedText = sanitizedText.replace(/(href|src|xlink:href)\s*=\s*(?:"data:text\/html[^"]*"|'data:text\/html[^']*')/gi, '$1="#"');
+    if (!sanitizedText.toLowerCase().includes('<svg') || !sanitizedText.toLowerCase().includes('</svg>')) {
+      return { isValid: false, error: 'SVG markup contains prohibited active content or was completely stripped.' };
+    }
 
-    // 5. DOMParser check if running in browser
+    // 4. DOMParser check if running in browser
     if (typeof window !== 'undefined' && typeof window.DOMParser !== 'undefined') {
       const parser = new DOMParser();
       const doc = parser.parseFromString(sanitizedText, 'image/svg+xml');

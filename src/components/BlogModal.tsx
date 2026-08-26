@@ -60,7 +60,7 @@ export const BlogModal: React.FC<BlogModalProps> = ({ article, onClose }) => {
         <div className="relative h-64 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800">
           <img 
             src={article.imageUrl} 
-            alt={article.title} 
+            alt={`${article.title} - ProBItian Technical Guide Banner`} 
             className="w-full h-full object-cover"
           />
         </div>

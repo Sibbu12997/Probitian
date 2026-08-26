@@ -70,10 +70,14 @@ All database migrations are forward-only, incremental SQL scripts explicitly app
 Immediately following a deployment:
 1. Load `https://probitian.ai.studio/` in a fresh browser session.
 2. Verify home page layout, featured courses, and project showcases.
-3. Submit a test enquiry via `#/contact` and verify email dispatch.
-4. Subscribe a test email via footer and confirm Supabase `newsletter` insert.
-5. Log into `#/admin` with `ADMIN_PASSKEY` and verify GA4 analytics metrics load.
-6. Test uploading a sample image in the Media Library.
+3. Verify public path routing (`/about`, `/projects`, `/blog`, `/learn`, `/contact`, `/privacy`, `/terms`).
+4. Verify dynamic blog routing (`/blog/mastering-advanced-dax-calculation-groups`).
+5. Verify `/robots.txt` and `/sitemap.xml` endpoints return valid HTTP 200 responses.
+6. Verify an invalid URL (`/nonexistent-route`) returns `HTTP 404 Not Found` with 404 UI.
+7. Submit a test enquiry via `/contact` and verify email dispatch.
+8. Subscribe a test email via footer and confirm Supabase `newsletter` insert.
+9. Log into `/admin` with `ADMIN_PASSKEY` and verify GA4 analytics metrics load.
+10. Test uploading a sample image in the Media Library.
 
 ---
 

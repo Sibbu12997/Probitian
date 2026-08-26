@@ -3,12 +3,23 @@ import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
 import dotenv from 'dotenv';
+import DOMPurify from 'isomorphic-dompurify';
 import { createServer as createViteServer } from 'vite';
 import { createClient } from '@supabase/supabase-js';
 import { emailService } from './src/services/emailService';
 import { campaignEmailService } from './src/services/campaignEmailService';
 
 dotenv.config();
+
+// Authorized Administrator Emails Allowlist
+const OFFICIAL_ADMIN_EMAIL = (process.env.ADMIN_EMAIL || process.env.VITE_CONTACT_EMAIL || 'probitianofficial@gmail.com').toLowerCase().trim();
+const CONFIGURED_ADMIN_EMAILS = [
+  OFFICIAL_ADMIN_EMAIL,
+  'probitianofficial@gmail.com',
+  'shivam@probitian.com',
+  'shivambaghel79@gmail.com',
+  ...(process.env.ADMIN_EMAILS ? process.env.ADMIN_EMAILS.split(',').map(e => e.trim().toLowerCase()) : [])
+];
 
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
@@ -290,7 +301,16 @@ setInterval(() => {
 
 function getAdminSession(req: express.Request): AdminSession | null {
   const cookies = parseCookies(req);
-  const token = cookies['admin_session'];
+  let token = cookies['admin_session'];
+
+  if (!token) {
+    const authHeader = req.headers['authorization'];
+    if (authHeader && typeof authHeader === 'string' && authHeader.startsWith('Bearer ')) {
+      token = authHeader.slice(7).trim();
+    } else if (req.headers['x-admin-token'] && typeof req.headers['x-admin-token'] === 'string') {
+      token = req.headers['x-admin-token'].trim();
+    }
+  }
 
   if (!token) return null;
   if (revokedSessions.has(token)) return null;
@@ -332,6 +352,7 @@ interface RateLimitOptions {
 
 function createRateLimiter(options: RateLimitOptions) {
   const requests = new Map<string, { count: number; resetTime: number }>();
+  const MAX_ENTRIES = 10000;
 
   setInterval(() => {
     const now = Date.now();
@@ -344,20 +365,40 @@ function createRateLimiter(options: RateLimitOptions) {
     // Express with 'trust proxy' configured securely resolves req.ip from trusted upstream headers.
     const ip = (req.ip || (req.socket && req.socket.remoteAddress) || 'unknown').trim();
     const now = Date.now();
-    const record = requests.get(ip);
+
+    // Prevent unbounded memory growth under distributed scanning
+    if (requests.size > MAX_ENTRIES) {
+      for (const [key, val] of requests.entries()) {
+        if (now > val.resetTime) requests.delete(key);
+      }
+    }
+
+    let record = requests.get(ip);
 
     if (!record || now > record.resetTime) {
-      requests.set(ip, { count: 1, resetTime: now + options.windowMs });
+      record = { count: 1, resetTime: now + options.windowMs };
+      requests.set(ip, record);
+      res.setHeader('RateLimit-Limit', options.max);
+      res.setHeader('RateLimit-Remaining', Math.max(0, options.max - 1));
+      res.setHeader('RateLimit-Reset', Math.ceil(record.resetTime / 1000));
       return next();
     }
 
     if (record.count >= options.max) {
+      const retryAfterSec = Math.max(1, Math.ceil((record.resetTime - now) / 1000));
+      res.setHeader('RateLimit-Limit', options.max);
+      res.setHeader('RateLimit-Remaining', 0);
+      res.setHeader('RateLimit-Reset', Math.ceil(record.resetTime / 1000));
+      res.setHeader('Retry-After', retryAfterSec);
       return res.status(429).json({
         error: options.message || 'Too many requests. Please try again later.'
       });
     }
 
     record.count += 1;
+    res.setHeader('RateLimit-Limit', options.max);
+    res.setHeader('RateLimit-Remaining', Math.max(0, options.max - record.count));
+    res.setHeader('RateLimit-Reset', Math.ceil(record.resetTime / 1000));
     next();
   };
 }
@@ -460,30 +501,28 @@ function sanitizeSvg(svgContent: string): string {
   if (!svgContent || typeof svgContent !== 'string') return '';
   let clean = svgContent.trim();
   
-  // Strip XML DOCTYPE and ENTITY declarations to prevent XXE / entity expansion attacks
+  // 1. Strip XML DOCTYPE and ENTITY declarations to prevent XXE / entity expansion attacks
   clean = clean.replace(/<!DOCTYPE[\s\S]*?>/gi, '');
   clean = clean.replace(/<!ENTITY[\s\S]*?>/gi, '');
+  clean = clean.replace(/<\?xml-stylesheet[\s\S]*?\?>/gi, '');
 
-  // Strip all executable script tags and contents
-  clean = clean.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
-  
-  // Strip dangerous embedded content tags
-  const dangerousTags = [
-    'iframe', 'object', 'embed', 'foreignObject', 'applet', 'meta',
-    'link', 'form', 'base', 'frame', 'frameset', 'input', 'textarea',
-    'button', 'select', 'option', 'canvas', 'video', 'audio', 'source'
-  ];
-  for (const tag of dangerousTags) {
-    clean = clean.replace(new RegExp(`<${tag}\\b[^<]*(?:(?!<\\/${tag}>)<[^<]*)*<\\/${tag}>`, 'gi'), '');
-    clean = clean.replace(new RegExp(`<${tag}\\b[^>]*\\/?>`, 'gi'), '');
-  }
+  // 2. Parser-backed DOMPurify sanitization with strict SVG profile
+  clean = DOMPurify.sanitize(clean, {
+    USE_PROFILES: { svg: true, svgFilters: true },
+    ADD_TAGS: ['use', 'linearGradient', 'radialGradient', 'stop', 'filter', 'feGaussianBlur', 'feMerge', 'feMergeNode'],
+    FORBID_TAGS: [
+      'script', 'iframe', 'object', 'embed', 'foreignObject', 'applet', 'meta',
+      'link', 'form', 'base', 'frame', 'frameset', 'input', 'textarea',
+      'button', 'select', 'option', 'canvas', 'video', 'audio', 'source'
+    ],
+    FORBID_ATTR: ['onload', 'onerror', 'onclick', 'onmouseover', 'onfocus', 'onblur', 'style', 'formaction', 'action'],
+    ALLOW_DATA_ATTR: false
+  });
 
-  // Strip all inline DOM event handlers (onload, onerror, onclick, onmouseover, etc.)
-  clean = clean.replace(/\s+on[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '');
-
-  // Strip dangerous URL schemes in attributes (javascript:, data:text/html, vbscript:)
+  // 3. Post-sanitization safety checks against dangerous schemes and residual active markup
   clean = clean.replace(/(href|src|xlink:href|action|data)\s*=\s*(?:"\s*(?:javascript|vbscript|data:text\/html)[^"]*"|'\s*(?:javascript|vbscript|data:text\/html)[^']*')/gi, '$1="#"');
   clean = clean.replace(/(href|src|xlink:href|action|data)\s*=\s*(?:javascript|vbscript|data:text\/html)[^\s>]+/gi, '$1="#"');
+  clean = clean.replace(/\s+on[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '');
 
   return clean;
 }
@@ -700,12 +739,14 @@ app.post('/api/admin/verify-passkey', loginLimiter, (req, res) => {
   const enteredPasskey = passkey.trim();
 
   if (constantTimeCompare(enteredPasskey, serverPasskey)) {
-    let adminEmail = 'admin@probitian.com';
+    // Strict Administrator Identity Binding (Prevent arbitrary email override)
+    let adminEmail = OFFICIAL_ADMIN_EMAIL;
     if (typeof email === 'string' && email.trim()) {
       const cleanEmail = email.trim().toLowerCase();
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (emailRegex.test(cleanEmail)) {
+      if (CONFIGURED_ADMIN_EMAILS.includes(cleanEmail)) {
         adminEmail = cleanEmail;
+      } else {
+        console.warn(`[SECURITY AUDIT] Unauthorized email override attempt '${cleanEmail}' during passkey login. Reverted to official admin identity.`);
       }
     }
 
@@ -835,7 +876,17 @@ app.get('/api/admin/session', (req, res) => {
 // POST /api/admin/logout
 app.post('/api/admin/logout', (req, res) => {
   const cookies = parseCookies(req);
-  const token = cookies['admin_session'];
+  let token = cookies['admin_session'];
+
+  if (!token) {
+    const authHeader = req.headers['authorization'];
+    if (authHeader && typeof authHeader === 'string' && authHeader.startsWith('Bearer ')) {
+      token = authHeader.slice(7).trim();
+    } else if (req.headers['x-admin-token'] && typeof req.headers['x-admin-token'] === 'string') {
+      token = req.headers['x-admin-token'].trim();
+    }
+  }
+
   if (token) {
     adminSessions.delete(token);
     revokedSessions.add(token);
@@ -5630,23 +5681,186 @@ app.all('/api/*', (req, res) => {
   });
 });
 
+// SEO Endpoints: robots.txt and sitemap.xml
+app.get('/robots.txt', (req, res) => {
+  res.type('text/plain');
+  res.send(`User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /api/
+
+Sitemap: https://probitian.ai.studio/sitemap.xml
+`);
+});
+
+app.get('/sitemap.xml', async (req, res) => {
+  const baseUrl = 'https://probitian.ai.studio';
+  const currentDate = new Date().toISOString().split('T')[0];
+
+  let dynamicBlogUrls = `  <url>
+    <loc>${baseUrl}/blog/mastering-advanced-dax-calculation-groups</loc>
+    <lastmod>2026-08-15</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>${baseUrl}/blog/essential-sql-window-functions-bi-analysts</loc>
+    <lastmod>2026-08-10</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>${baseUrl}/blog/power-query-m-optimization-dataflows</loc>
+    <lastmod>2026-08-04</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>`;
+
+  if (serverSupabase) {
+    try {
+      const { data: blogs } = await serverSupabase
+        .from('blogs')
+        .select('slug, title, updated_at, created_at, status')
+        .eq('status', 'published');
+
+      if (blogs && blogs.length > 0) {
+        dynamicBlogUrls = blogs.map((b: any) => {
+          const rawSlug = b.slug || b.title?.toLowerCase().replace(/[^\w\s-]/g, '').replace(/[\s_-]+/g, '-').replace(/^-+|-+$/g, '') || 'article';
+          const lastmod = (b.updated_at || b.created_at || currentDate).split('T')[0];
+          return `  <url>
+    <loc>${baseUrl}/blog/${rawSlug}</loc>
+    <lastmod>${lastmod}</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>`;
+        }).join('\n');
+      }
+    } catch (e) {
+      console.warn('[SEO Sitemap] Error querying database blogs:', e);
+    }
+  }
+
+  const sitemapXml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <!-- Core Public Pages -->
+  <url>
+    <loc>${baseUrl}/</loc>
+    <lastmod>${currentDate}</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>${baseUrl}/learn</loc>
+    <lastmod>${currentDate}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>${baseUrl}/projects</loc>
+    <lastmod>${currentDate}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>${baseUrl}/blog</loc>
+    <lastmod>${currentDate}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>${baseUrl}/about</loc>
+    <lastmod>${currentDate}</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>${baseUrl}/contact</loc>
+    <lastmod>${currentDate}</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>${baseUrl}/privacy</loc>
+    <lastmod>${currentDate}</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>${baseUrl}/terms</loc>
+    <lastmod>${currentDate}</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+
+  <!-- Published Technical Blog Posts -->
+${dynamicBlogUrls}
+</urlset>`;
+
+  res.type('application/xml');
+  res.send(sitemapXml);
+});
+
 // Serve public directory and documentation assets
 app.use('/docs', express.static(path.join(process.cwd(), 'public', 'docs')));
 app.use(express.static(path.join(process.cwd(), 'public')));
+
+// Known valid frontend SPA paths
+const VALID_SPA_ROUTES = new Set([
+  '/',
+  '/about',
+  '/projects',
+  '/blog',
+  '/learn',
+  '/courses',
+  '/contact',
+  '/privacy',
+  '/privacy-policy',
+  '/terms',
+  '/terms-of-service',
+  '/admin'
+]);
+
+function isKnownSpaRoute(urlPath: string): boolean {
+  const cleanPath = urlPath.split('?')[0].toLowerCase().replace(/\/+$/, '') || '/';
+  if (VALID_SPA_ROUTES.has(cleanPath)) return true;
+  if (cleanPath.startsWith('/blog/')) return true;
+  return false;
+}
 
 // Start Express and Vite server
 async function startServer() {
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
       server: { middlewareMode: true },
-      appType: 'spa',
+      appType: 'custom',
     });
     app.use(vite.middlewares);
+
+    app.get('*', async (req, res, next) => {
+      const url = req.originalUrl;
+      if (url.startsWith('/api/')) {
+        return next();
+      }
+
+      try {
+        const templatePath = path.join(process.cwd(), 'index.html');
+        let template = fs.readFileSync(templatePath, 'utf-8');
+        template = await vite.transformIndexHtml(url, template);
+
+        const status = isKnownSpaRoute(url) ? 200 : 404;
+        res.status(status).set({ 'Content-Type': 'text/html' }).send(template);
+      } catch (e) {
+        vite.ssrFixStacktrace(e as Error);
+        next(e);
+      }
+    });
   } else {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
     app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
+      const url = req.originalUrl;
+      const status = isKnownSpaRoute(url) ? 200 : 404;
+      res.status(status).sendFile(path.join(distPath, 'index.html'));
     });
   }
 

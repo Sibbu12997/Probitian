@@ -4,6 +4,7 @@ import { BLOG_ARTICLES } from '../data/mockData';
 import { cmsService } from '../services/cmsService';
 import { Search, Calendar, Clock, User, ChevronLeft, ChevronRight, ArrowRight } from 'lucide-react';
 import { trackBlogClick } from '../lib/analytics';
+import { getBlogSlug } from '../lib/routing';
 
 interface BlogPageProps {
   onSelectBlog: (article: BlogArticle) => void;
@@ -103,56 +104,61 @@ export const BlogPage: React.FC<BlogPageProps> = ({ onSelectBlog }) => {
 
       {/* Articles Listing */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        {paginatedArticles.map((article) => (
-          <div
-            key={article.id}
-            onClick={() => {
-              trackBlogClick(article.title);
-              onSelectBlog(article);
-            }}
-            className="card-radius bg-white dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 shadow-soft hover:shadow-soft-lg hover:-translate-y-1 transition-all duration-300 overflow-hidden flex flex-col justify-between cursor-pointer group"
-          >
-            <div className="relative h-56 overflow-hidden bg-slate-950">
-              <img
-                src={article.imageUrl}
-                alt={article.title}
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 opacity-90"
-              />
-              <span className="absolute top-3 left-3 px-3 py-1 rounded-full bg-purple-600 text-white text-xs font-bold uppercase tracking-wider">
-                {article.category}
-              </span>
-            </div>
+        {paginatedArticles.map((article) => {
+          const slug = getBlogSlug(article);
+          return (
+            <a
+              key={article.id}
+              href={`/blog/${slug}`}
+              onClick={(e) => {
+                e.preventDefault();
+                trackBlogClick(article.title);
+                onSelectBlog(article);
+              }}
+              className="card-radius bg-white dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 shadow-soft hover:shadow-soft-lg hover:-translate-y-1 transition-all duration-300 overflow-hidden flex flex-col justify-between cursor-pointer group"
+            >
+              <div className="relative h-56 overflow-hidden bg-slate-950">
+                <img
+                  src={article.imageUrl}
+                  alt={`${article.title} - ProBItian Analytics Guide Cover`}
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 opacity-90"
+                />
+                <span className="absolute top-3 left-3 px-3 py-1 rounded-full bg-purple-600 text-white text-xs font-bold uppercase tracking-wider">
+                  {article.category}
+                </span>
+              </div>
 
-            <div className="p-6 space-y-4 flex-1 flex flex-col justify-between">
-              <div className="space-y-2">
-                <div className="flex items-center gap-4 text-xs text-slate-500 dark:text-slate-400">
-                  <span className="flex items-center gap-1">
-                    <User className="w-3.5 h-3.5 text-purple-600" /> {article.author}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Calendar className="w-3.5 h-3.5" /> {article.date}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Clock className="w-3.5 h-3.5" /> {article.readTime}
-                  </span>
+              <div className="p-6 space-y-4 flex-1 flex flex-col justify-between">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-4 text-xs text-slate-500 dark:text-slate-400">
+                    <span className="flex items-center gap-1">
+                      <User className="w-3.5 h-3.5 text-purple-600" /> {article.author}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Calendar className="w-3.5 h-3.5" /> {article.date}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Clock className="w-3.5 h-3.5" /> {article.readTime}
+                    </span>
+                  </div>
+
+                  <h3 className="text-xl font-extrabold text-slate-900 dark:text-white group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors leading-snug">
+                    {article.title}
+                  </h3>
+
+                  <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 line-clamp-3 leading-relaxed">
+                    {article.excerpt}
+                  </p>
                 </div>
 
-                <h3 className="text-xl font-extrabold text-slate-900 dark:text-white group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors leading-snug">
-                  {article.title}
-                </h3>
-
-                <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 line-clamp-3 leading-relaxed">
-                  {article.excerpt}
-                </p>
+                <div className="pt-3 border-t border-slate-100 dark:border-slate-700/60 flex items-center justify-between text-xs font-semibold text-purple-600 dark:text-purple-400">
+                  <span>Read Full Article</span>
+                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                </div>
               </div>
-
-              <div className="pt-3 border-t border-slate-100 dark:border-slate-700/60 flex items-center justify-between text-xs font-semibold text-purple-600 dark:text-purple-400">
-                <span>Read Full Article</span>
-                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-              </div>
-            </div>
-          </div>
-        ))}
+            </a>
+          );
+        })}
       </div>
 
       {/* Pagination */}

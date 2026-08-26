@@ -230,7 +230,29 @@ Clicking any lead in the CRM opens the **Lead Details Drawer**:
 
 ---
 
-## 10. Step-by-Step Admin Recipes (Quick Reference)
+## 10. Website SEO & Metadata Administration (`Branding & Layout` -> `SEO & Meta Tags`)
+
+The **SEO & Meta Tags** module allows administrators to control global search engine metadata, Open Graph cards, Twitter cards, and crawler indexing settings directly from the Admin Portal.
+
+### 10.1 Global SEO Controls
+- **Global Meta Title**: Sets the base document title tag for the platform (e.g., `ProBItian | Master Business Intelligence, Power BI & SQL`).
+- **Meta Description**: Configures the default search engine snippet summary displayed in SERPs.
+- **Meta Keywords**: Configures target technical search keywords (e.g., `Power BI, DAX, SQL, Business Intelligence, Data Analytics`).
+- **Default Social Share Image (Open Graph / Twitter)**: High-resolution preview image (1200×630px recommended) picked from the Supabase Media Library.
+- **Search Engine Indexing Toggle**: Controls global indexing rules (`index, follow` vs `noindex, nofollow`).
+
+### 10.2 Blog Post SEO & Dynamic Slugs (`CMS` -> `Technical Blog & Articles`)
+When creating or editing articles in the Technical Blog module:
+- **Title & Slug**: Setting the article title or custom slug automatically generates clean canonical URLs (`/blog/your-custom-slug`).
+- **Excerpt / Meta Summary**: Used directly as the article's `<meta name="description">` and `og:description`.
+- **Cover Image**: Automatically mapped to `og:image` and `twitter:image` for rich social media cards.
+- **Publishing Status**: 
+  - `published`: Article is immediately made public, assigned canonical tags, injected with `BlogPosting` JSON-LD schema, and dynamically added to `/sitemap.xml`.
+  - `draft`: Article is restricted from public index, omitted from sitemaps, and kept private.
+
+---
+
+## 11. Step-by-Step Admin Recipes (Quick Reference)
 
 ### Recipe 1: Add a Single Lead
 1. Open **B2B Leads CRM**.
@@ -263,9 +285,16 @@ Clicking any lead in the CRM opens the **Lead Details Drawer**:
 2. In the **Lead Details Drawer**, find the active sequence under *Automated Email Sequences*.
 3. Click the **Stop** button.
 
+### Recipe 6: Publish a Blog Post & Update SEO Metadata
+1. Open **Technical Blog & Articles** -> Click **Create Article**.
+2. Enter Title, custom URL slug, Category, and Markdown/HTML content.
+3. Select an optimized cover image from the **Media Library**.
+4. Set Status to **Published** and click **Save Article**.
+5. The article automatically renders at `https://probitian.ai.studio/blog/<slug>` and appears in `https://probitian.ai.studio/sitemap.xml`.
+
 ---
 
-## 11. Troubleshooting & FAQ
+## 12. Troubleshooting & FAQ
 
 - **Issue: CSV imported successfully, but leads are not visible.**
   - **Solution**: Refresh the browser page. Verify your status/priority filters are set to "All".

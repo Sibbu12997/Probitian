@@ -1,51 +1,72 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <!-- Core Static Pages -->
   <url>
-    <loc>https://probitian.com/</loc>
-    <lastmod>2026-08-07</lastmod>
+    <loc>https://probitian.ai.studio/</loc>
+    <lastmod>2026-08-26</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://probitian.com/learn</loc>
-    <lastmod>2026-08-07</lastmod>
+    <loc>https://probitian.ai.studio/learn</loc>
+    <lastmod>2026-08-26</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://probitian.com/projects</loc>
-    <lastmod>2026-08-07</lastmod>
+    <loc>https://probitian.ai.studio/projects</loc>
+    <lastmod>2026-08-26</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://probitian.com/blog</loc>
-    <lastmod>2026-08-07</lastmod>
+    <loc>https://probitian.ai.studio/blog</loc>
+    <lastmod>2026-08-26</lastmod>
     <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://probitian.ai.studio/about</loc>
+    <lastmod>2026-08-26</lastmod>
+    <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://probitian.com/about</loc>
-    <lastmod>2026-08-07</lastmod>
+    <loc>https://probitian.ai.studio/contact</loc>
+    <lastmod>2026-08-26</lastmod>
     <changefreq>monthly</changefreq>
-    <priority>0.7</priority>
+    <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://probitian.com/contact</loc>
-    <lastmod>2026-08-07</lastmod>
+    <loc>https://probitian.ai.studio/privacy</loc>
+    <lastmod>2026-08-26</lastmod>
     <changefreq>monthly</changefreq>
-    <priority>0.7</priority>
+    <priority>0.4</priority>
   </url>
   <url>
-    <loc>https://probitian.com/privacy</loc>
-    <lastmod>2026-08-07</lastmod>
-    <changefreq>yearly</changefreq>
-    <priority>0.3</priority>
+    <loc>https://probitian.ai.studio/terms</loc>
+    <lastmod>2026-08-26</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+
+  <!-- Published Technical Blog Posts -->
+  <url>
+    <loc>https://probitian.ai.studio/blog/mastering-advanced-dax-calculation-groups</loc>
+    <lastmod>2026-08-15</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://probitian.com/terms</loc>
-    <lastmod>2026-08-07</lastmod>
-    <changefreq>yearly</changefreq>
-    <priority>0.3</priority>
+    <loc>https://probitian.ai.studio/blog/essential-sql-window-functions-bi-analysts</loc>
+    <lastmod>2026-08-10</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://probitian.ai.studio/blog/power-query-m-optimization-dataflows</loc>
+    <lastmod>2026-08-04</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
   </url>
 </urlset>

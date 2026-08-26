@@ -62,7 +62,7 @@ export const CampaignsManager: React.FC = () => {
     name: '',
     subject: '',
     preview_text: '',
-    content: '<p>Hi BI Specialist,</p>\n<p>Welcome to this week\'s ProBitian Business Intelligence digest! Here are the latest guides and tutorials designed to help you master Power BI and SQL.</p>\n<h2>🚀 What\'s New This Week</h2>\n<p>Check out our latest portfolio project guide on building executive dashboards.</p>\n<p style="text-align: center; margin: 24px 0;"><a href="https://probitian.com/learn" style="background-color: #7c3aed; color: #ffffff; padding: 12px 24px; border-radius: 8px; font-weight: bold; text-decoration: none; display: inline-block;">Explore Latest Courses &rarr;</a></p>',
+    content: '<p>Hi BI Specialist,</p>\n<p>Welcome to this week\'s ProBitian Business Intelligence digest! Here are the latest guides and tutorials designed to help you master Power BI and SQL.</p>\n<h2>🚀 What\'s New This Week</h2>\n<p>Check out our latest portfolio project guide on building executive dashboards.</p>\n<p style="text-align: center; margin: 24px 0;"><a href="https://probitian.ai.studio/learn" style="background-color: #7c3aed; color: #ffffff; padding: 12px 24px; border-radius: 8px; font-weight: bold; text-decoration: none; display: inline-block;">Explore Latest Courses &rarr;</a></p>',
     status: 'draft',
     audience_type: 'all_active'
   });
@@ -114,7 +114,7 @@ export const CampaignsManager: React.FC = () => {
       name: '',
       subject: '',
       preview_text: '',
-      content: '<p>Hi BI Specialist,</p>\n<p>Welcome to this week\'s ProBitian Business Intelligence update! Here are our latest tutorials and portfolio guides.</p>\n<h2>🚀 What\'s New</h2>\n<p>Master DAX formulas and Power BI data models with our hands-on guides.</p>\n<p style="text-align: center; margin: 24px 0;"><a href="https://probitian.com/learn" style="background-color: #7c3aed; color: #ffffff; padding: 12px 24px; border-radius: 8px; font-weight: bold; text-decoration: none; display: inline-block;">Explore Masterclasses &rarr;</a></p>',
+      content: '<p>Hi BI Specialist,</p>\n<p>Welcome to this week\'s ProBitian Business Intelligence update! Here are our latest tutorials and portfolio guides.</p>\n<h2>🚀 What\'s New</h2>\n<p>Master DAX formulas and Power BI data models with our hands-on guides.</p>\n<p style="text-align: center; margin: 24px 0;"><a href="https://probitian.ai.studio/learn" style="background-color: #7c3aed; color: #ffffff; padding: 12px 24px; border-radius: 8px; font-weight: bold; text-decoration: none; display: inline-block;">Explore Masterclasses &rarr;</a></p>',
       status: 'draft',
       audience_type: 'all_active'
     });
@@ -605,7 +605,7 @@ export const CampaignsManager: React.FC = () => {
                         </button>
                         <button
                           type="button"
-                          onClick={() => insertContentSnippet('<p style="text-align: center; margin: 24px 0;"><a href="https://probitian.com/learn" style="background-color: #7c3aed; color: #ffffff; padding: 12px 24px; border-radius: 8px; font-weight: bold; text-decoration: none; display: inline-block;">View Course &rarr;</a></p>')}
+                          onClick={() => insertContentSnippet('<p style="text-align: center; margin: 24px 0;"><a href="https://probitian.ai.studio/learn" style="background-color: #7c3aed; color: #ffffff; padding: 12px 24px; border-radius: 8px; font-weight: bold; text-decoration: none; display: inline-block;">View Course &rarr;</a></p>')}
                           className="px-2 py-1 rounded bg-purple-500/10 text-purple-600 dark:text-purple-400 text-[10px] font-bold hover:bg-purple-500/20 cursor-pointer"
                         >
                           + Button CTA

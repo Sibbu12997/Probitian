@@ -40,6 +40,10 @@ Official LinkedIn: [https://www.linkedin.com/company/probitian/](https://www.lin
 ### 📊 Analytics & Security
 - 📈 **[Google Analytics 4 (GA4) Specification](ANALYTICS.md)**  
   GA4 frontend event measurement, conversion tracking, and Admin GA4 Command Center proxy architecture.
+- 🔍 **[SEO Architecture & Implementation Specification](SEO_ARCHITECTURE.md)**  
+  Path-based routing, dynamic metadata engine, canonical URL normalization, structured data schemas (JSON-LD), robots.txt, dynamic XML sitemaps, and HTTP 404 response architecture.
+- 🧪 **[SEO User Acceptance Testing (UAT) Report](SEO_UAT.md)**  
+  Comprehensive production verification report across 22 test checkpoints, production URL matrix, and post-deployment search console guide.
 - 🛡 **[Security & Secret Isolation Architecture](SECURITY.md)**  
   Passkey authentication, Row Level Security (RLS) enforcement, service role isolation, and input sanitization.
 

@@ -210,4 +210,130 @@ Official LinkedIn: [https://www.linkedin.com/company/probitian/](https://www.lin
 
 ---
 
+## 🔍 SEO & Discoverability Troubleshooting
+
+### 20. Incorrect Canonical URL
+- **Problem**: Page canonical tag contains an old domain, tracking query parameters, or hash fragment.
+- **Cause**: Hardcoded URL or malformed `getPageCanonicalUrl()` call without canonical domain stripping.
+- **How to Verify**: View source / inspect `<link rel="canonical" href="...">` in document `<head>`.
+- **Solution**: Ensure canonical URL is generated using `CANONICAL_SITE_URL` (`https://probitian.ai.studio`) from `src/lib/routing.ts` without query strings or hashes.
+- **Prevention**: Always pass clean route names and slugs to `src/components/SEO.tsx`.
+
+---
+
+### 21. Hash URL Appearing (`/#/`)
+- **Problem**: Links or browser URL bar displays legacy hash routing like `/#/about` or `/#/projects`.
+- **Cause**: Hardcoded `href="#..."` in a component or outdated bookmark.
+- **How to Verify**: Inspect internal links across the page to ensure they use clean paths like `/about`.
+- **Solution**: Update navigation links to clean paths (`/about`, `/projects`, `/blog`, `/learn`, `/contact`). The router in `src/lib/routing.ts` automatically strips legacy hashes and normalizes history state.
+- **Prevention**: Use the `<Link to="...">` pattern or semantic `<a href="/path">` with route change handlers.
+
+---
+
+### 22. Page Not Appearing in Sitemap
+- **Problem**: A new public landing page is missing from `/sitemap.xml`.
+- **Cause**: Page URL is missing from the static core pages list in the `/sitemap.xml` Express route handler in `server.ts`.
+- **How to Verify**: Visit `https://probitian.ai.studio/sitemap.xml` and search for the page path.
+- **Solution**: Add the new page URL block to the `/sitemap.xml` route definition in `server.ts` with appropriate change frequency and priority.
+- **Prevention**: Keep `server.ts` sitemap definitions synchronized with `src/lib/routing.ts` route definitions.
+
+---
+
+### 23. Blog Article Missing from Sitemap
+- **Problem**: A published blog article does not show up in `https://probitian.ai.studio/sitemap.xml`.
+- **Cause**: Article status is set to `draft` instead of `published` in Supabase, or slug normalization failed.
+- **How to Verify**: Check the `blogs` table in Supabase PostgreSQL where `status = 'published'`. Check server logs for sitemap generation warnings.
+- **Solution**: Set article status to `published` in the Admin Blog Manager. The server dynamically fetches all published articles when `/sitemap.xml` is requested.
+- **Prevention**: Verify the article's publish toggle before checking Search Console.
+
+---
+
+### 24. robots.txt Blocking Public Pages
+- **Problem**: Google Search Console reports "Blocked by robots.txt" for public pages like `/projects` or `/learn`.
+- **Cause**: Broad `Disallow: /` rule or misconfigured path pattern in `robots.txt`.
+- **How to Verify**: Visit `https://probitian.ai.studio/robots.txt`. Verify that `Allow: /` is present and only `/admin` and `/api/` are disallowed.
+- **Solution**: Ensure `server.ts` robots route returns:
+  ```text
+  User-agent: *
+  Allow: /
+  Disallow: /admin
+  Disallow: /api/
+  Sitemap: https://probitian.ai.studio/sitemap.xml
+  ```
+- **Prevention**: Never edit `robots.txt` without running live curl validation.
+
+---
+
+### 25. Admin Route Accidentally Indexable
+- **Problem**: Search engines crawl or index `/admin` URLs.
+- **Cause**: Missing `noindex, nofollow` robots directive on admin views, or missing disallow rule in `robots.txt`.
+- **How to Verify**: Inspect `/admin` page source for `<meta name="robots" content="noindex, nofollow" />` and check `robots.txt` for `Disallow: /admin`.
+- **Solution**: The `SEO.tsx` component automatically injects `noindex, nofollow` for `page === 'admin'`. Ensure `Disallow: /admin` is present in `robots.txt`.
+- **Prevention**: Keep admin authentication gated and disallow rules active.
+
+---
+
+### 26. 404 Returning Incorrect HTTP Status (Soft-404)
+- **Problem**: An invalid URL like `/nonexistent-page` returns `HTTP 200` while showing a 404 UI.
+- **Cause**: Single-page application server fallback sends `HTTP 200` on all wildcard routes.
+- **How to Verify**: Run `curl -I https://probitian.ai.studio/this-page-does-not-exist`. Verify status code is `404 Not Found`.
+- **Solution**: The Express server checks paths against known SPA routes (`isKnownSpaRoute()`) and explicitly sends status code `404` for unknown paths.
+- **Prevention**: Update `VALID_SPA_ROUTES` in `server.ts` whenever adding new top-level public routes.
+
+---
+
+### 27. Duplicate Canonical URLs
+- **Problem**: Multiple `<link rel="canonical">` tags exist in `<head>`, or canonical differs between desktop and mobile views.
+- **Cause**: Static canonical tag in `index.html` conflicting with dynamic `<SEO>` component injection.
+- **How to Verify**: Run `document.querySelectorAll('link[rel="canonical"]').length` in browser DevTools console.
+- **Solution**: Ensure `src/components/SEO.tsx` manages the canonical link element exclusively and updates its `href` attribute in place.
+- **Prevention**: Do not add hardcoded static canonical tags to `index.html`.
+
+---
+
+### 28. Missing or Inaccurate Page Metadata
+- **Problem**: Browser tab title or social shares show placeholder or default title on sub-pages.
+- **Cause**: Sub-page component not passing specific title/description props to `SEO.tsx`.
+- **How to Verify**: Open page in browser and inspect `<title>` and `<meta name="description">` in DOM.
+- **Solution**: Ensure `SEO.tsx` receives appropriate `title`, `description`, `image`, and `page` props from the page component.
+- **Prevention**: Test each view with the metadata matrix in `docs/SEO_UAT.md`.
+
+---
+
+### 29. Invalid JSON-LD Structured Data
+- **Problem**: Google Rich Results Test reports structured data syntax errors or missing required fields.
+- **Cause**: Malformed JSON string, missing `@context`, or unescaped characters in blog post content.
+- **How to Verify**: Test URL in Google Rich Results Test tool or inspect `<script type="application/ld+json">` contents.
+- **Solution**: Use `JSON.stringify()` in `SEO.tsx` to safely serialize schema objects, ensuring all required schema properties (`@context`, `@type`, `name`/`headline`, `url`) are populated.
+- **Prevention**: Validate JSON-LD schemas whenever altering schema generators.
+
+---
+
+### 30. Google Not Indexing a Newly Published Page
+- **Problem**: Newly created page does not appear in Google search results immediately.
+- **Cause**: Normal search engine indexing latency, or sitemap has not been re-crawled.
+- **How to Verify**: Perform a URL Inspection in Google Search Console for the specific URL.
+- **Solution**: Use Google Search Console "Request Indexing" button to queue the URL for high-priority crawling. Ensure the URL is present in `sitemap.xml` and returns `200 OK`.
+- **Prevention**: Submit updated sitemaps to Search Console upon releasing major content sections.
+
+---
+
+### 31. Search Console Sitemap Fetch Errors
+- **Problem**: Google Search Console reports "Could not fetch" or "Sitemap is an HTML page" error.
+- **Cause**: Sitemap route returned HTML error page or `Content-Type` header was not `application/xml`.
+- **How to Verify**: Run `curl -I https://probitian.ai.studio/sitemap.xml` and check `Content-Type: application/xml`.
+- **Solution**: Verify Express route `app.get('/sitemap.xml', ...)` sets `res.type('application/xml')` and returns valid XML syntax.
+- **Prevention**: Validate XML sitemap with an XML validator before submission.
+
+---
+
+### 32. Image Missing Alt-Text
+- **Problem**: SEO audits flag images without descriptive `alt` text.
+- **Cause**: `<img>` tags missing `alt` attribute or containing generic values like "image" or "photo".
+- **How to Verify**: Inspect image elements in browser DevTools: `document.querySelectorAll('img:not([alt]), img[alt=""]')`.
+- **Solution**: Add descriptive, contextual `alt` attributes explaining image contents (e.g., `alt="Executive Sales & Revenue Cockpit Power BI Dashboard"`).
+- **Prevention**: Enforce `alt` attribute presence across all image components and media pickers.
+
+---
+
 *Documentation maintained by Shivam Singh — ProBitian.*

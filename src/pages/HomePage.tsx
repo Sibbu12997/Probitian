@@ -214,12 +214,16 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate, onSelectProject,
                 Featured BI Dashboards
               </h2>
             </div>
-            <button
-              onClick={() => onNavigate('projects')}
+            <a
+              href="/projects"
+              onClick={(e) => {
+                e.preventDefault();
+                onNavigate('projects');
+              }}
               className="inline-flex items-center gap-1.5 text-xs font-semibold text-purple-600 dark:text-purple-400 hover:underline"
             >
               View All 6 Portfolio Projects <ArrowRight className="w-4 h-4" />
-            </button>
+            </a>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -231,7 +235,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate, onSelectProject,
                 <div className="relative h-48 overflow-hidden bg-slate-950">
                   <img
                     src={project.imagePlaceholder}
-                    alt={project.title}
+                    alt={`${project.title} - Power BI Portfolio Project Preview`}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 opacity-90"
                   />
                   <div className="absolute top-3 right-3 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-slate-900/80 text-white backdrop-blur-md border border-slate-700">
@@ -323,7 +327,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate, onSelectProject,
                 <div className="relative h-44 overflow-hidden bg-slate-950">
                   <img
                     src={video.thumbnail}
-                    alt={video.title}
+                    alt={`${video.title} - ProBItian Video Tutorial Thumbnail`}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 opacity-90"
                   />
                   <div className="absolute inset-0 bg-slate-900/30 flex items-center justify-center group-hover:bg-slate-900/10 transition-colors">
@@ -359,12 +363,16 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate, onSelectProject,
             <h3 className="text-xl font-extrabold text-slate-900 dark:text-white">
               Recent Blog Posts
             </h3>
-            <button
-              onClick={() => onNavigate('blog')}
+            <a
+              href="/blog"
+              onClick={(e) => {
+                e.preventDefault();
+                onNavigate('blog');
+              }}
               className="text-xs font-semibold text-purple-600 dark:text-purple-400 hover:underline"
             >
               Browse All Articles →
-            </button>
+            </a>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -380,7 +388,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate, onSelectProject,
                 <div className="relative h-36 overflow-hidden bg-slate-950">
                   <img
                     src={article.imageUrl}
-                    alt={article.title}
+                    alt={`${article.title} - ProBItian Analytics Guide Cover`}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 opacity-90"
                   />
                   <span className="absolute top-2.5 left-2.5 px-2 py-0.5 rounded bg-purple-600 text-white text-[10px] font-bold uppercase">

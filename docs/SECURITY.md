@@ -1,99 +1,103 @@
-# ProBitian — Security & Isolation Specification
+# Probitian Security Architecture & Hardening Guide
 
-Official Security Architecture & Data Protection Specification for ProBitian.
+## 1. Threat Model & Architecture Overview
 
-Project Owner: **Shivam Singh**  
-Official Website: [https://probitian.ai.studio/](https://probitian.ai.studio/)  
-Official Communication Email: [probitianofficial@gmail.com](mailto:probitianofficial@gmail.com)  
-Official LinkedIn: [https://www.linkedin.com/company/probitian/](https://www.linkedin.com/company/probitian/)  
+Probitian is designed with a defense-in-depth, zero-trust security architecture ensuring data integrity, strict access control, and complete protection against unauthorized privilege escalation, cross-site attacks, and data leakage.
+
+```
+                    ┌────────────────────────┐
+                    │    End-User Browser    │
+                    └───────────┬────────────┘
+                                │ HTTPS / WSS
+                                ▼
+                    ┌────────────────────────┐
+                    │  Express Edge Shield   │
+                    │  - Rate Limiting       │
+                    │  - CORS & CSRF Defense │
+                    │  - Security Headers    │
+                    └───────────┬────────────┘
+                                │
+                 ┌──────────────┴──────────────┐
+                 ▼                             ▼
+       ┌──────────────────┐          ┌───────────────────┐
+       │ Public Endpoints │          │  Admin Endpoints  │
+       │ - Read Content   │          │  - requireAdmin   │
+       │ - Insert Msg/Sub │          │  - Identity Bound │
+       └─────────┬────────┘          │  - Signed Session │
+                 │                   └─────────┬─────────┘
+                 │                             │
+                 │   ┌─────────────────────┐   │
+                 └──►│ Supabase PostgreSQL ├───┘
+                     │ (RLS Strict Zero-   │
+                     │  Trust & Service-   │
+                     │  Role Privilege)    │
+                     └─────────────────────┘
+```
 
 ---
 
-## 1. Core Security Principles
+## 2. Authentication & Admin Authorization Model
 
-ProBitian adheres to enterprise security standards to protect administrative controls, user data, media assets, and backend operations:
+### Passkey Authentication & Identity Binding
+- **Timing Attack Defense:** Passkeys are validated via `crypto.timingSafeEqual` against constant-time SHA-256 digests.
+- **Admin Identity Binding:** Client-supplied email parameters cannot override the administrator identity. All passkey authentications are strictly bound to the configured administrator identity allowlist (`OFFICIAL_ADMIN_EMAIL`, `CONFIGURED_ADMIN_EMAILS`).
+- **Cryptographic Session Tokens:** Sessions use HMAC-SHA-256 signatures over base64url payloads containing random cryptographic nonces, creation timestamps, and explicit expiry timestamps.
+- **Revocation & Logout:** Logging out immediately invalidates tokens in the active session map and registers them in the `revokedSessions` blocklist.
+- **Multi-Instance Support:** Stateless cryptographic signature verification enables resilient zero-downtime horizontal scaling across Cloud Run container instances.
 
-1. **Strict Secret Isolation**: All privileged keys (`SUPABASE_SECRET_KEY`, `GMAIL_APP_PASSWORD`, `ADMIN_PASSKEY`, `GEMINI_API_KEY`, `GA4_PRIVATE_KEY`) reside exclusively in the server environment and are never exposed in client JS bundles, API responses, or localStorage.
-2. **Server-Mediated Database Access**: Client-side direct postgREST access is restricted via Supabase Row Level Security (RLS). All privileged CMS mutations pass through authenticated Express backend handlers using server-side service role privileges.
-3. **No Production Fallback Risk**: Production queries communicate directly with Supabase PostgreSQL. There are no silent fallbacks to local JSON or mock data in production.
-4. **No Destructive Startup Operations**: Server startup scripts (`server.ts`) never execute `TRUNCATE`, `DROP TABLE`, or automated database resets.
-
----
-
-## 2. Authentication & Admin Session Security
-
-- **HttpOnly Session Cookies**: Administrative authentication issues an encrypted, time-bound `admin_session` cookie marked `HttpOnly`, `SameSite=Lax`, and `Secure` (in HTTPS environments), preventing XSS token exfiltration.
-- **Passkey Verification**: Protected endpoint `POST /api/admin/verify-passkey` verifies the administrator passkey against `ADMIN_PASSKEY`.
-- **Supabase Auth Bridge**: Administrator authentication through Supabase Auth is validated server-side (`POST /api/admin/supabase-login`) and upgraded to a verified admin session only after verifying admin permissions.
-- **Header & Bearer Compatibility**: Requests from trusted origins support standard `Authorization: Bearer <token>` and `x-admin-token` headers alongside HttpOnly cookies.
-- **Session Revocation & Multi-Instance Behavior**:
-  - Administrative session tokens are signed with HMAC-SHA256 containing embedded cryptographically verified expirations (`expiresAt`) and random nonces.
-  - When an administrator logs out via `POST /api/admin/logout`, the `admin_session` cookie is cleared (`Max-Age=0`) and the token is added to the in-memory revocation set on that container instance.
-  - In horizontal scaling / multi-instance deployments (such as Google Cloud Run), the client-side cookie deletion guarantees immediate termination on the user's browser, while HMAC cryptographic expiration provides hard boundary expiry across all instances. In-memory revocation sets operate at the per-instance container level.
+### Supabase Admin Session Verification
+- Access tokens are verified server-side with Supabase Auth (`getUser(accessToken)`).
+- Authorization requires explicit administrative status: verified email in `CONFIGURED_ADMIN_EMAILS`, `profiles.role === 'admin'`, or `app_metadata.role === 'admin'`.
 
 ---
 
 ## 3. Database Security & Row Level Security (RLS)
 
-- **RLS Enforcement**: Row Level Security is enabled across all production tables (`projects`, `blogs`, `courses`, `videos`, `newsletter`, `messages`, `media`, `categories`, `pages`, `settings`, `email_campaigns`, `email_campaign_recipients`).
-- **Anon Key Restrictions**: Direct client queries using public keys can only read published content and insert contact messages/newsletter signups according to strict policy rules. Direct table alterations return `HTTP 403 Permission Denied`.
-- **Service Role Isolation**: Server endpoints execute mutations via `SUPABASE_SECRET_KEY` (service role) safely on the Express backend after performing authorization checks.
+- **Least-Privilege Schema Grants:** Public/unauthenticated clients (`anon`, `authenticated`) have zero direct privileges on private tables.
+- **Strict Private Isolation:** Tables `leads`, `lead_campaigns`, `campaign_leads`, `email_campaigns`, and `email_campaign_recipients` are completely inaccessible to `anon` and `authenticated` roles.
+- **Backend Exclusivity:** All management operations are mediated exclusively through the Express backend using the Supabase `service_role` key.
+- **Inbound Submissions:** Contact messages and newsletter subscriptions are granted `INSERT-only` permissions; client roles cannot read or list submitted records.
 
 ---
 
-## 4. Origin Allowlist, CORS & CSRF Defense
+## 4. Rate Limiting & DoS Protection
 
-- **Explicit Origin Allowlist**: Requests are checked against an explicit allowlist containing official production hostnames, AI Studio preview domains, local dev hosts, and configured `APP_URL` / `CORS_ALLOWED_ORIGINS`.
-- **No Wildcard Credentials**: Wildcard `Access-Control-Allow-Origin: *` is strictly prohibited in conjunction with credentials.
-- **CSRF & State-Changing Request Defense**: State-modifying requests (`POST`, `PATCH`, `PUT`, `DELETE`) targeting administrative routes `/api/admin/*` and `/api/cms/*` validate `Origin` and `Referer` headers, blocking untrusted cross-origin request forgeries.
+Rate limiters protect critical endpoints from brute force and resource exhaustion:
 
----
+| Limiter | Window | Max Requests | Target Routes |
+|---|---|---|---|
+| `apiLimiter` | 15 min | 300 | General API endpoints |
+| `loginLimiter` | 15 min | 5 | `/api/admin/verify-*` |
+| `contactLimiter` | 15 min | 10 | `/api/messages` |
+| `newsletterLimiter` | 15 min | 10 | `/api/newsletter` |
+| `emailSendLimiter` | 15 min | 10 | Campaign bulk dispatches |
+| `emailTestLimiter` | 15 min | 20 | Test email triggers |
+| `uploadLimiter` | 15 min | 30 | Media file uploads |
 
-## 5. Rate Limiting & Abuse Prevention
-
-Granular rate limiters protect sensitive endpoints against brute-force attacks and volumetric spam:
-
-- **Passkey Auth Limiter**: Limits rapid passkey attempts per IP.
-- **Supabase Bridge Limiter**: Prevents repeated authentication bridge calls.
-- **Contact Form Limiter**: Restricts contact message submissions.
-- **Newsletter Subscription & Unsubscribe Limiters**: Throttles subscriber registrations and unsubscription requests.
-- **Media Upload Limiter**: Caps file upload frequency per IP.
-- **Email Test & Broadcast Limiters**: Guards test email dispatches and mass campaign dispatches.
+- **Bounded Memory:** Rate limiters maintain internal maps capped at 10,000 entries with automatic expired entry pruning to prevent memory exhaustion under distributed scanning.
+- **Standard Headers:** Responses include standard `RateLimit-Limit`, `RateLimit-Remaining`, `RateLimit-Reset`, and `Retry-After` headers.
 
 ---
 
-## 6. IDOR Protection & Parameter Sanitization
+## 5. Media & SVG Security Controls
 
-- **Strict Identifier Validation**: All parameterized route handlers validate IDs with `isValidId` regex and UUID format checks, blocking illegal characters, path traversals (`../`), and null bytes (`\0`).
-- **Unauthorized Manipulation Blocking**: Unauthenticated and unauthorized users receive `401 Unauthorized` or `400 Bad Request` and cannot read, modify, or delete records.
-
----
-
-## 7. Media Upload & SVG Sanitization
-
-- **File Validation**: File size capped at 15MB. MIME types and extensions validated against strict allowlists.
-- **SVG Sanitization**: All uploaded SVG graphics pass through server-side sanitization removing script tags, event handlers (`onload`, `onerror`), and external entities.
-- **Storage Deletion Sanitization**: Media deletion paths are sanitized to prevent directory traversal outside the `probitian-media` bucket.
+- **Magic Byte Validation:** Uploaded binaries are inspected at the byte level to prevent MIME-type spoofing. Executables (`.exe`, `.dll`, Linux ELF, scripts, and PHP tags) are rejected regardless of file extension or declared MIME type.
+- **Parser-Backed SVG Sanitization:** SVG files are sanitized using `isomorphic-dompurify` with strict SVG profiles. XML DOCTYPE and ENTITY declarations are stripped to prevent XML External Entity (XXE) expansion.
+- **Active Content Elimination:** All `<script>`, `<iframe>`, `<object>`, `<foreignObject>`, `<embed>`, inline event handlers (`onload`, `onerror`, `onclick`), and dangerous protocols (`javascript:`, `vbscript:`, `data:text/html`) are completely neutralized.
 
 ---
 
-## 8. HTML Sanitization & XSS Prevention
+## 6. Continuous Security Automation
 
-- **Preview & Markdown Sanitization**: Rich text, HTML previews, and markdown content strip executable tags (`<script>`, `<iframe>`, `<object>`, `<embed>`, `<applet>`, `<meta>`, `<link>`) and neutralize dangerous URI protocols (`javascript:`, `vbscript:`, `data:`).
-
----
-
-## 9. HTTP Security Headers & Error Redaction
-
-- **Security Headers Enforced**:
-  - `X-Content-Type-Options: nosniff`
-  - `X-XSS-Protection: 1; mode=block`
-  - `Referrer-Policy: strict-origin-when-cross-origin`
-  - `Permissions-Policy: camera=(), microphone=(), geolocation=()`
-  - `Strict-Transport-Security: max-age=31536000; includeSubDomains` (production HTTPS)
-  - `Content-Security-Policy`: Configured to support AI Studio preview frames and secure asset loading.
-- **Error Redaction**: Production error handlers return safe generic messages (`{ error: "..." }`) and never expose stack traces, database credentials, internal server paths, or environment variables.
+- **GitHub Actions CodeQL:** Automated static application security testing (SAST) runs on every push, pull request, and weekly schedule (`.github/workflows/codeql.yml`).
+- **Dependabot:** Automated weekly vulnerability dependency scanning and updates for npm packages and GitHub Actions (`.github/dependabot.yml`).
+- **CI Pipeline:** Automated linting, build verification, `npm audit` check, and security regression test suite execution (`.github/workflows/ci.yml`).
 
 ---
 
-*Documentation maintained by Shivam Singh — ProBitian.*
+## 7. Security Vulnerability Reporting
+
+If you discover a security vulnerability, please report it privately:
+- **Email:** `probitianofficial@gmail.com` or `shivam@probitian.com`
+- **Issue Tracker:** Submit using the [Security Issue Template](/.github/ISSUE_TEMPLATE/security.md)
+- **Response SLA:** Initial acknowledgment within 24 hours; remediation deployment within 72 hours.

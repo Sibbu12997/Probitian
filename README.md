@@ -59,19 +59,34 @@ ProBitian is designed specifically for aspiring and experienced Data Analysts, B
 
 ## 3. Public Website
 
-The public website caters to learners and site visitors with seamless hash routing:
-- **Home (`#/`)**: Hero overview, platform stats, core skill pillars, featured courses, project showcases, and recent articles.
-- **Learn (`#/learn`)**: Filterable course directory with interactive curriculum modals, lesson video links, downloadable cheat sheets, and practice datasets.
-- **Projects (`#/projects`)**: Portfolio gallery of production-grade BI dashboards with live demo links, GitHub repositories, video walkthroughs, and raw sample data files.
-- **Blog (`#/blog`)**: Deep-dive technical articles, DAX optimization guides, and SQL walkthroughs with code snippets and embedded videos.
-- **YouTube (`#/youtube`)**: Video tutorial repository and playlist directory.
-- **About (`#/about`)**: Profile of Project Owner Shivam Singh, mission statement, impact metrics, and learning roadmap.
-- **Contact (`#/contact`)**: Inquiry submission form and Community Hub physical location details.
-- **Legal Pages (`#/terms`, `#/privacy-policy`)**: Terms of Service and Privacy Policy.
+The public website caters to learners and site visitors with clean, path-based HTML5 routing:
+- **Home (`/`)**: Hero overview, platform stats, core skill pillars, featured courses, project showcases, and recent articles.
+- **Learn (`/learn`)**: Filterable course directory with interactive curriculum modals, lesson video links, downloadable cheat sheets, and practice datasets.
+- **Projects (`/projects`)**: Portfolio gallery of production-grade BI dashboards with live demo links, GitHub repositories, video walkthroughs, and raw sample data files.
+- **Blog (`/blog`)**: Deep-dive technical articles, DAX optimization guides, and SQL walkthroughs with code snippets, embedded videos, and direct slug routing (`/blog/:slug`).
+- **About (`/about`)**: Profile of Project Owner Shivam Singh, mission statement, impact metrics, and learning roadmap.
+- **Contact (`/contact`)**: Inquiry submission form and Community Hub physical location details.
+- **Legal Pages (`/terms`, `/privacy`)**: Terms of Service and Privacy Policy.
 
 ---
 
-## 4. Admin Portal
+## 4. SEO, Metadata & Discoverability Architecture
+
+ProBitian is built for discoverability and crawler performance:
+- **Authoritative Canonical Domain**: Strictly normalized to `https://probitian.ai.studio/` across all meta tags, canonicals, Open Graph, Twitter cards, sitemap, and structured data.
+- **Path-Based Routing**: Clean HTML5 browser paths (`/about`, `/projects`, `/blog`, etc.) without hash `#` fragments.
+- **Dynamic `<SEO>` Engine**: Centralized React component managing page `<title>`, `<meta name="description">`, canonical `<link rel="canonical">`, Open Graph, and Twitter Cards on every route change.
+- **JSON-LD Structured Data**: High-fidelity Schema.org schemas (`EducationalOrganization`, `WebSite`, `BreadcrumbList`, and `BlogPosting`) dynamically injected into the document head.
+- **Dynamic XML Sitemap (`/sitemap.xml`)**: Server endpoint serving valid XML urlsets containing core public pages and dynamically querying all published articles from Supabase PostgreSQL.
+- **Robots Directives (`/robots.txt`)**: Crawler rules allowing public paths, disallowing `/admin` and `/api/`, and linking to the sitemap.
+- **True HTTP 404 Status**: Nonexistent paths return `HTTP 404 Not Found` status codes from Express while mounting the client-side 404 view with `noindex, nofollow` to prevent soft-404 penalties.
+- **Admin Indexing Protection**: The `/admin` portal is protected with `noindex, nofollow`, excluded from the sitemap, and disallowed in `robots.txt`.
+- **Crawlable Internal Links**: Semantic `<a href="/path">` elements utilized across navigation bars, card lists, and footer links.
+- **Detailed Documentation**: See [SEO Architecture Specification](docs/SEO_ARCHITECTURE.md) and [SEO UAT Report](docs/SEO_UAT.md).
+
+---
+
+## 5. Admin Portal
 
 Accessible at `#/admin`, the Admin Control Center provides 20 comprehensive administrative modules:
 1. **Dashboard Overview**: KPI cards, recent activity, and quick CMS shortcuts.

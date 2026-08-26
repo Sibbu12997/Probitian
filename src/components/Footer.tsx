@@ -63,14 +63,19 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-10 pb-12 border-b border-slate-800">
           {/* Column 1: Brand & Description */}
           <div className="lg:col-span-2 space-y-4">
-            <button
-              onClick={() => onNavigate('home')}
+            <a
+              href="/"
+              onClick={(e) => {
+                e.preventDefault();
+                onNavigate('home');
+              }}
               className="flex items-center gap-3 text-left focus:outline-none group"
+              aria-label="ProBItian Home"
             >
               <div className="w-10 h-10 rounded-full bg-slate-800 p-0.5 border border-purple-500/40 group-hover:scale-105 transition-transform overflow-hidden flex items-center justify-center shrink-0">
                 <img 
                   src={logoUrl} 
-                  alt="ProBItian Official Logo" 
+                  alt="ProBItian Official Brand Logo" 
                   className="w-full h-full object-contain" 
                   onError={(e) => { e.currentTarget.src = PROBITIAN_LOGO_URL; }}
                 />
@@ -78,7 +83,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
               <span className="text-2xl font-extrabold tracking-tight text-white">
                 Pro<span className="text-amber-500 font-black">BI</span>tian
               </span>
-            </button>
+            </a>
 
             <p className="text-slate-400 text-sm leading-relaxed max-w-sm">
               Learn Data Analytics the Practical Way. Master Power BI, SQL, Excel, AI, and Dashboard Design through industry-focused tutorials and real projects.
@@ -91,7 +96,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
                 rel="noopener noreferrer"
                 onClick={() => trackSocialClick('youtube', 'https://youtube.com/@probitian')}
                 className="p-2.5 rounded-xl bg-slate-800 hover:bg-red-600/20 hover:text-red-400 text-slate-300 border border-slate-700/60 transition-all"
-                aria-label="YouTube Channel"
+                aria-label="ProBItian YouTube Channel"
               >
                 <Youtube className="w-4 h-4" />
               </a>
@@ -101,7 +106,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
                 rel="noopener noreferrer"
                 onClick={() => trackSocialClick('instagram', 'https://instagram.com/probitian')}
                 className="p-2.5 rounded-xl bg-slate-800 hover:bg-pink-600/20 hover:text-pink-400 text-slate-300 border border-slate-700/60 transition-all"
-                aria-label="Instagram Account"
+                aria-label="ProBItian Instagram Profile"
               >
                 <Instagram className="w-4 h-4" />
               </a>
@@ -111,7 +116,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
                 rel="noopener noreferrer"
                 onClick={() => trackSocialClick('facebook', 'https://facebook.com/probitian')}
                 className="p-2.5 rounded-xl bg-slate-800 hover:bg-blue-600/20 hover:text-blue-400 text-slate-300 border border-slate-700/60 transition-all"
-                aria-label="Facebook Page"
+                aria-label="ProBItian Facebook Page"
               >
                 <Facebook className="w-4 h-4" />
               </a>
@@ -121,7 +126,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
                 rel="noopener noreferrer"
                 onClick={() => trackSocialClick('github', 'https://github.com/probitian')}
                 className="p-2.5 rounded-xl bg-slate-800 hover:bg-purple-600/20 hover:text-purple-400 text-slate-300 border border-slate-700/60 transition-all"
-                aria-label="GitHub Profile"
+                aria-label="ProBItian GitHub Repositories"
               >
                 <Github className="w-4 h-4" />
               </a>
@@ -131,7 +136,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
                 rel="noopener noreferrer"
                 onClick={() => trackSocialClick('linkedin', 'https://www.linkedin.com/company/probitian/')}
                 className="p-2.5 rounded-xl bg-slate-800 hover:bg-blue-600/20 hover:text-blue-400 text-slate-300 border border-slate-700/60 transition-all"
-                aria-label="LinkedIn Company Page"
+                aria-label="ProBItian LinkedIn Company Profile"
               >
                 <Linkedin className="w-4 h-4" />
               </a>
@@ -139,7 +144,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
                 href={`mailto:${contactEmail}`}
                 onClick={() => trackContactClick('footer_email')}
                 className="p-2.5 rounded-xl bg-slate-800 hover:bg-emerald-600/20 hover:text-emerald-400 text-slate-300 border border-slate-700/60 transition-all"
-                aria-label="Direct Email"
+                aria-label="Direct Email ProBItian"
               >
                 <Mail className="w-4 h-4" />
               </a>
@@ -181,22 +186,22 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
             <h4 className="text-xs font-bold uppercase tracking-wider text-purple-400 mb-4">Quick Links</h4>
             <ul className="space-y-2.5 text-xs text-slate-300">
               <li>
-                <button onClick={() => onNavigate('home')} className="hover:text-purple-400 transition-colors">Home</button>
+                <a href="/" onClick={(e) => { e.preventDefault(); onNavigate('home'); }} className="hover:text-purple-400 transition-colors">Home</a>
               </li>
               <li>
-                <button onClick={() => onNavigate('learn')} className="hover:text-purple-400 transition-colors">Learn</button>
+                <a href="/learn" onClick={(e) => { e.preventDefault(); onNavigate('learn'); }} className="hover:text-purple-400 transition-colors">Learn</a>
               </li>
               <li>
-                <button onClick={() => onNavigate('projects')} className="hover:text-purple-400 transition-colors">Projects</button>
+                <a href="/projects" onClick={(e) => { e.preventDefault(); onNavigate('projects'); }} className="hover:text-purple-400 transition-colors">Projects</a>
               </li>
               <li>
-                <button onClick={() => onNavigate('blog')} className="hover:text-purple-400 transition-colors">Blog</button>
+                <a href="/blog" onClick={(e) => { e.preventDefault(); onNavigate('blog'); }} className="hover:text-purple-400 transition-colors">Blog</a>
               </li>
               <li>
-                <button onClick={() => onNavigate('about')} className="hover:text-purple-400 transition-colors">About</button>
+                <a href="/about" onClick={(e) => { e.preventDefault(); onNavigate('about'); }} className="hover:text-purple-400 transition-colors">About</a>
               </li>
               <li>
-                <button onClick={() => onNavigate('contact')} className="hover:text-purple-400 transition-colors">Contact</button>
+                <a href="/contact" onClick={(e) => { e.preventDefault(); onNavigate('contact'); }} className="hover:text-purple-400 transition-colors">Contact</a>
               </li>
             </ul>
           </div>
@@ -206,22 +211,22 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
             <h4 className="text-xs font-bold uppercase tracking-wider text-purple-400 mb-4">Skill Modules</h4>
             <ul className="space-y-2.5 text-xs text-slate-300">
               <li>
-                <button onClick={() => onNavigate('learn')} className="hover:text-purple-400 transition-colors">Power BI Dashboards</button>
+                <a href="/learn" onClick={(e) => { e.preventDefault(); onNavigate('learn'); }} className="hover:text-purple-400 transition-colors">Power BI Dashboards</a>
               </li>
               <li>
-                <button onClick={() => onNavigate('learn')} className="hover:text-purple-400 transition-colors">SQL Database Queries</button>
+                <a href="/learn" onClick={(e) => { e.preventDefault(); onNavigate('learn'); }} className="hover:text-purple-400 transition-colors">SQL Database Queries</a>
               </li>
               <li>
-                <button onClick={() => onNavigate('learn')} className="hover:text-purple-400 transition-colors">Excel Dynamic Arrays</button>
+                <a href="/learn" onClick={(e) => { e.preventDefault(); onNavigate('learn'); }} className="hover:text-purple-400 transition-colors">Excel Dynamic Arrays</a>
               </li>
               <li>
-                <button onClick={() => onNavigate('learn')} className="hover:text-purple-400 transition-colors">Power Query ETL</button>
+                <a href="/learn" onClick={(e) => { e.preventDefault(); onNavigate('learn'); }} className="hover:text-purple-400 transition-colors">Power Query ETL</a>
               </li>
               <li>
-                <button onClick={() => onNavigate('learn')} className="hover:text-purple-400 transition-colors">DAX Measures</button>
+                <a href="/learn" onClick={(e) => { e.preventDefault(); onNavigate('learn'); }} className="hover:text-purple-400 transition-colors">DAX Measures</a>
               </li>
               <li>
-                <button onClick={() => onNavigate('learn')} className="hover:text-purple-400 transition-colors">AI for Data Analysts</button>
+                <a href="/learn" onClick={(e) => { e.preventDefault(); onNavigate('learn'); }} className="hover:text-purple-400 transition-colors">AI for Data Analysts</a>
               </li>
             </ul>
           </div>
@@ -259,10 +264,10 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
         <div className="pt-8 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-400 gap-4">
           <p>© 2026 ProBItian. All Rights Reserved.</p>
           <div className="flex items-center gap-6">
-            <button onClick={() => onNavigate('privacy')} className="hover:text-purple-400 transition-colors">Privacy Policy</button>
-            <button onClick={() => onNavigate('terms')} className="hover:text-purple-400 transition-colors">Terms of Service</button>
-            <button onClick={() => onNavigate('contact')} className="hover:text-purple-400 transition-colors">Support</button>
-            <button onClick={() => onNavigate('admin')} className="hover:text-amber-400 font-semibold transition-colors text-amber-500/80">Admin Portal</button>
+            <a href="/privacy" onClick={(e) => { e.preventDefault(); onNavigate('privacy'); }} className="hover:text-purple-400 transition-colors">Privacy Policy</a>
+            <a href="/terms" onClick={(e) => { e.preventDefault(); onNavigate('terms'); }} className="hover:text-purple-400 transition-colors">Terms of Service</a>
+            <a href="/contact" onClick={(e) => { e.preventDefault(); onNavigate('contact'); }} className="hover:text-purple-400 transition-colors">Support</a>
+            <a href="/admin" onClick={(e) => { e.preventDefault(); onNavigate('admin'); }} className="hover:text-amber-400 font-semibold transition-colors text-amber-500/80">Admin Portal</a>
           </div>
         </div>
       </div>
