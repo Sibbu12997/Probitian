@@ -87,11 +87,25 @@ Rate limiters protect critical endpoints from brute force and resource exhaustio
 
 ---
 
-## 6. Continuous Security Automation
+## 6. Continuous Security Automation & CI/CD Validation
 
-- **GitHub Actions CodeQL:** Automated static application security testing (SAST) runs on every push, pull request, and weekly schedule (`.github/workflows/codeql.yml`).
-- **Dependabot:** Automated weekly vulnerability dependency scanning and updates for npm packages and GitHub Actions (`.github/dependabot.yml`).
-- **CI Pipeline:** Automated linting, build verification, `npm audit` check, and security regression test suite execution (`.github/workflows/ci.yml`).
+### Automated Security & CI Pipeline (`.github/workflows/ci.yml`)
+The continuous integration pipeline validates code quality, type safety, regression suites, dependency integrity, and production build readiness on every push and pull request:
+1. **Clean Installation:** `npm ci` (verifies synchronized dependency tree in `package-lock.json`).
+2. **Typecheck & Static Analysis:** `npm run lint` (`tsc --noEmit`).
+3. **Security & Regression Tests:** `npm test` (`tsx --test tests/**/*.test.ts` across all 7 security subtests and 19 assertions).
+4. **Vulnerability Audit:** `npm audit --audit-level=high` (verifies zero high/critical severity dependency advisories).
+5. **Production Build:** `npm run build` (compiles Vite React SPA and bundles `server.ts` with `esbuild`).
+
+### CodeQL Static Application Security Testing (`.github/workflows/codeql.yml`)
+ProBitian enforces deep Static Application Security Testing (SAST) using a custom advanced GitHub Actions CodeQL workflow:
+- **Languages:** `javascript-typescript`
+- **Query Suites:** `+security-extended,security-and-quality` (extended security vulnerabilities, CWEs, injection risks, data flow leaks, and code quality).
+- **Triggers:** Push to `main`, pull requests against `main`, and scheduled weekly security scans (`cron: '0 6 * * 1'`).
+- **Configuration Architecture:** ProBitian utilizes the custom advanced CodeQL workflow exclusively. GitHub CodeQL **Default Setup** must **NOT** be simultaneously enabled in repository settings, as GitHub disallows processing advanced configuration SARIF uploads when Default Setup is active.
+
+### Automated Dependency Maintenance (`.github/dependabot.yml`)
+- Automated weekly vulnerability dependency scanning and updates for npm packages and GitHub Actions.
 
 ---
 

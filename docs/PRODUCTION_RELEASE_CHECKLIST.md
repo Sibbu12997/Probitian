@@ -71,9 +71,14 @@ Prior to releasing a new deployment or major update, ensure every item below is 
 - [x] **Technical Performance Status**: Bundle minification and fast local response times verified (Real-world Core Web Vitals: NOT VERIFIED pending live PageSpeed run).
 - [x] **Google Search Console Status**: Technical prerequisites complete (Live indexing status: NOT VERIFIED pending site owner console setup).
 
-### 6. Quality & Build
+### 6. CI/CD, Quality & Security Automation
+- [x] **Dependency Lockfile Synchronized**: `package-lock.json` and `package.json` synchronized; `npm ci` installs cleanly.
 - [x] **Typecheck Passed**: `npm run lint` (`tsc --noEmit`) exits with code 0.
+- [x] **Security & Regression Test Suite Passed**: `npm test` runs 7 suites / 19 tests with 0 failures.
+- [x] **Dependency Audit Clean**: `npm audit --audit-level=high` reports 0 vulnerabilities.
 - [x] **Production Build Passed**: `npm run build` completes with zero errors.
+- [x] **Custom CodeQL SAST Configured**: `.github/workflows/codeql.yml` configured with `security-extended,security-and-quality`.
+- [x] **CodeQL Default Setup Disabled**: GitHub CodeQL Default Setup disabled to avoid conflicts with custom advanced workflow.
 - [x] **Fresh Deployment Tested**: Application verified live at `https://probitian.ai.studio/`.
 - [x] **Data Persistence Verified**: Subscriptions, messages, and settings persist safely across container restarts.
 

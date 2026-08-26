@@ -359,7 +359,25 @@ npm start
 
 ---
 
-## 20. Production Checklist
+## 20. Continuous Integration & Security Automation
+
+ProBitian maintains a zero-compromise automated CI/CD and security testing pipeline:
+
+### CI Validation Pipeline (`.github/workflows/ci.yml`)
+- `npm ci`: Ensures clean, reproducible dependency installation from a synchronized `package-lock.json`.
+- `npm run lint`: Validates TypeScript strict type checking (`tsc --noEmit`).
+- `npm test`: Runs automated security, authorization, origin defense, upload sanitization, and cryptographic session regression tests (`tsx --test`).
+- `npm audit --audit-level=high`: Enforces zero high or critical dependency vulnerabilities.
+- `npm run build`: Validates production compilation of the React SPA (Vite) and backend server bundle (esbuild).
+
+### Static Application Security Testing (CodeQL) (`.github/workflows/codeql.yml`)
+- Utilizes custom advanced CodeQL scanning targeting `javascript-typescript` with `+security-extended,security-and-quality` query suites.
+- Runs automatically on pushes to `main`, pull requests, and weekly schedules.
+- **Architecture Note:** GitHub CodeQL **Default Setup** must be disabled in repository settings so GitHub routes analysis exclusively through the custom advanced CodeQL workflow.
+
+---
+
+## 21. Production Checklist
 
 - [x] Supabase PostgreSQL project provisioned and configured.
 - [x] All 6 migration files applied (`0001` through `0006`).
@@ -370,11 +388,13 @@ npm start
 - [x] Admin Passkey (`ADMIN_PASSKEY`) configured in server environment.
 - [x] GA4 Measurement ID (`VITE_GA4_MEASUREMENT_ID`) active.
 - [x] Firebase and Cloud SQL dependencies removed.
-- [x] Production build and TypeScript checks passing cleanly.
+- [x] Synchronized `package-lock.json` and clean `npm ci` installation.
+- [x] Production build, TypeScript checks, and security test suite passing cleanly.
+- [x] Custom CodeQL advanced SAST workflow active.
 
 ---
 
-## 21. Community & Contributions
+## 22. Community & Contributions
 
 ProBitian is an open and collaborative learning ecosystem. We welcome thoughtful contributions from software developers, Business Intelligence professionals, data analysts, analytics engineers, educators, technical writers, and learners.
 

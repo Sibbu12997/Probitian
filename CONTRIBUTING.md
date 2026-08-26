@@ -104,8 +104,11 @@ ProBitian is built with **Node.js**, **Express**, **React 19**, **TypeScript**, 
 
 | Command | Description |
 | ------- | ----------- |
+| `npm ci` | Clean, reproducible installation of exact locked dependencies from `package-lock.json`. |
 | `npm run dev` | Starts the unified Express + Vite development server using `tsx` on port `3000`. |
 | `npm run lint` | Runs the TypeScript compiler typecheck (`tsc --noEmit`) to validate type safety. |
+| `npm test` | Runs the full security, authentication, and regression test suite using `tsx --test`. |
+| `npm audit --audit-level=high` | Validates that zero high or critical dependency vulnerabilities exist. |
 | `npm run build` | Compiles the React SPA via Vite and bundles `server.ts` into `dist/server.cjs` using `esbuild`. |
 | `npm start` | Runs the bundled production CommonJS server (`node dist/server.cjs`). |
 | `npm run preview` | Starts a Vite preview server for static client assets. |

@@ -18,11 +18,15 @@ This document outlines the step-by-step production deployment workflow for ProBi
 ## 2. Standard Deployment Pipeline
 
 ```
-1. LOCAL DEVELOPMENT
+1. LOCAL DEVELOPMENT & LOCKFILE INTEGRITY
+   └── Clean dependencies: `npm ci`
    └── Code Changes & Bug Fixes
         ↓
-2. TYPECHECK & LINT
-   └── Run `npm run lint` (`tsc --noEmit`)
+2. AUTOMATED CI/CD VALIDATION
+   ├── Typecheck & Lint: `npm run lint` (`tsc --noEmit`)
+   ├── Security & Regression Suite: `npm test` (`tsx --test tests/**/*.test.ts`)
+   ├── Dependency Vulnerability Audit: `npm audit --audit-level=high`
+   └── Custom CodeQL Security Analysis: `+security-extended,security-and-quality`
         ↓
 3. PRODUCTION BUILD
    └── Run `npm run build` (`vite build` + `esbuild server.ts`)
