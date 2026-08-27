@@ -25,7 +25,7 @@ import {
   SequenceDeliveryLog
 } from '../types';
 import { LegalSettings, DEFAULT_LEGAL_SETTINGS } from '../data/defaultLegalData';
-import { PROBITIAN_LOGO_URL } from '../constants/branding';
+import { PROBITIAN_LOGO_URL, PROBITIAN_X_URL, DEFAULT_SOCIAL_LINKS } from '../constants/branding';
 
 /**
  * Safe fetch helper for Express API routes (Single source of truth: Supabase via Express)
@@ -1029,8 +1029,8 @@ export const cmsService = {
   // --- SOCIAL LINKS ---
   async getSocialLinks(): Promise<SocialLinkItem[]> {
     const data = await safeFetchJson<any[]>('/api/cms/social');
-    if (Array.isArray(data)) {
-      return data.map((s: any) => ({
+    if (Array.isArray(data) && data.length > 0) {
+      const items: SocialLinkItem[] = data.map((s: any) => ({
         id: String(s.id),
         platform: s.platform || 'youtube',
         url: s.url || '',
@@ -1038,8 +1038,23 @@ export const cmsService = {
         is_active: s.is_active !== false,
         display_order: s.display_order ?? 0
       }));
+
+      // Ensure X is always present if missing from database
+      const hasX = items.some((s) => s.platform && (s.platform.toLowerCase() === 'x' || s.platform.toLowerCase() === 'twitter'));
+      if (!hasX) {
+        items.push({
+          id: 'default_x_link',
+          platform: 'x',
+          url: PROBITIAN_X_URL,
+          icon: 'X',
+          is_active: true,
+          display_order: 7
+        });
+      }
+
+      return items.sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
     }
-    return [];
+    return DEFAULT_SOCIAL_LINKS;
   },
 
   async saveSocialLink(item: SocialLinkItem): Promise<boolean> {

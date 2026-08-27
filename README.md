@@ -4,6 +4,7 @@
 
 Official Website: [https://probitian.ai.studio/](https://probitian.ai.studio/)  
 Official Communication Email: [probitianofficial@gmail.com](mailto:probitianofficial@gmail.com)  
+Official X: [https://x.com/Probitian](https://x.com/Probitian) (@Probitian)  
 Official LinkedIn: [https://www.linkedin.com/company/probitian/](https://www.linkedin.com/company/probitian/)  
 Project Owner: **Shivam Singh**
 
@@ -88,7 +89,7 @@ ProBitian is built for discoverability and crawler performance:
 
 ## 5. Admin Portal
 
-Accessible at `#/admin`, the Admin Control Center provides 20 comprehensive administrative modules:
+Accessible at `/admin`, the Admin Control Center provides 20 comprehensive administrative modules:
 1. **Dashboard Overview**: KPI cards, recent activity, and quick CMS shortcuts.
 2. **GA4 Analytics**: Real-time traffic, page views, duration, country map, and conversion events.
 3. **Home Page Editor**: Headlines, value proposition cards, and platform statistics.
@@ -220,6 +221,8 @@ VITE_YOUTUBE_URL="https://youtube.com/@probitian"
 VITE_INSTAGRAM_URL="https://instagram.com/probitian"
 VITE_FACEBOOK_URL="https://facebook.com/probitian"
 VITE_GITHUB_URL="https://github.com/probitian"
+VITE_X_URL="https://x.com/Probitian"
+VITE_LINKEDIN_URL="https://www.linkedin.com/company/probitian/"
 VITE_CONTACT_EMAIL="probitianofficial@gmail.com"
 
 # SUPABASE CONFIGURATION
@@ -425,6 +428,7 @@ Please make sure to use the appropriate issue template in `.github/ISSUE_TEMPLAT
 - **Project**: ProBitian
 - **Website**: [https://probitian.ai.studio/](https://probitian.ai.studio/)
 - **Official Email**: [probitianofficial@gmail.com](mailto:probitianofficial@gmail.com)
+- **Official X**: [https://x.com/Probitian](https://x.com/Probitian) (@Probitian)
 - **Official LinkedIn**: [https://www.linkedin.com/company/probitian/](https://www.linkedin.com/company/probitian/)
 
 ---

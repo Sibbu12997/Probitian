@@ -3120,7 +3120,7 @@ async function ensureDefaultLeadSequence(): Promise<void> {
           html_content: `<h2>Hello {{contact_person}},</h2>
 <p>I noticed <strong>{{company_name}}</strong> operates in the {{industry}} space.</p>
 <p>Based on your business scale in {{location}}, a dedicated Power BI dashboard tailored for <strong>{{powerbi_use_case}}</strong> can eliminate manual Excel consolidation and deliver executive clarity in real time.</p>
-<p><a href="https://probitian.ai.studio/#/contact" class="btn-cta">Schedule Power BI Consultation</a></p>
+<p><a href="https://probitian.ai.studio/contact" class="btn-cta">Schedule Power BI Consultation</a></p>
 <p>Best regards,<br/><strong>Shivam Baghel</strong><br/>ProBitian Analytics</p>`,
           enabled: true,
           created_at: now,
@@ -3137,7 +3137,7 @@ async function ensureDefaultLeadSequence(): Promise<void> {
 <p>Following up on my previous note regarding <strong>{{company_name}}</strong>'s analytics workflow in {{location}}.</p>
 <p>We specialize in turning complex multi-source data into real-time Power BI executive dashboards for {{industry}} organizations — specifically around <strong>{{powerbi_use_case}}</strong>.</p>
 <p>Would you have 10 minutes this week for a brief walkthrough of live enterprise dashboards?</p>
-<p><a href="https://probitian.ai.studio/#/projects" class="btn-cta">Explore Live Portfolio</a> &nbsp; <a href="https://probitian.ai.studio/#/contact" class="btn-cta" style="background-color: #0f172a !important;">Book Meeting</a></p>
+<p><a href="https://probitian.ai.studio/projects" class="btn-cta">Explore Live Portfolio</a> &nbsp; <a href="https://probitian.ai.studio/contact" class="btn-cta" style="background-color: #0f172a !important;">Book Meeting</a></p>
 <p>Regards,<br/><strong>Shivam Baghel</strong><br/>ProBitian Analytics</p>`,
           enabled: true,
           created_at: now,
@@ -3153,7 +3153,7 @@ async function ensureDefaultLeadSequence(): Promise<void> {
           html_content: `<h2>Hello {{contact_person}},</h2>
 <p>I wanted to share a practical insight regarding <strong>{{powerbi_use_case}}</strong> for companies in {{industry}}.</p>
 <p>Most leadership teams spend 15+ hours weekly consolidating departmental sheets. Our automated Power BI pipeline connects directly to your databases, ERP, and operations data to deliver instant KPI tracking without manual overhead.</p>
-<p><a href="https://probitian.ai.studio/#/contact" class="btn-cta">Request Custom Demo</a></p>
+<p><a href="https://probitian.ai.studio/contact" class="btn-cta">Request Custom Demo</a></p>
 <p>Best,<br/><strong>Shivam Baghel</strong><br/>ProBitian Analytics</p>`,
           enabled: true,
           created_at: now,
@@ -3169,7 +3169,7 @@ async function ensureDefaultLeadSequence(): Promise<void> {
           html_content: `<h2>Hi {{contact_person}},</h2>
 <p>I understand timing is everything and you are likely focused on other high priorities at <strong>{{company_name}}</strong>.</p>
 <p>I will pause outreach for now. Whenever you are ready to explore Power BI solutions or automate <strong>{{powerbi_use_case}}</strong>, feel free to reach out directly.</p>
-<p><a href="https://probitian.ai.studio/" style="color:#7c3aed;font-weight:bold;">Visit ProBitian</a> &bull; <a href="https://probitian.ai.studio/#/contact" style="color:#7c3aed;font-weight:bold;">Contact Shivam</a></p>
+<p><a href="https://probitian.ai.studio/" style="color:#7c3aed;font-weight:bold;">Visit ProBitian</a> &bull; <a href="https://probitian.ai.studio/contact" style="color:#7c3aed;font-weight:bold;">Contact Shivam</a></p>
 <p>Wishing you and the team at {{company_name}} continued success!</p>
 <p>Warm regards,<br/><strong>Shivam Baghel</strong><br/>ProBitian Analytics</p>`,
           enabled: true,
@@ -4788,6 +4788,16 @@ app.get('/api/admin/leads/:id/sequences', requireAdmin, async (req, res) => {
 // ==================== SOCIAL, NAVIGATION, MEDIA, CATEGORIES ====================
 
 // SOCIAL LINKS (PUBLIC READ)
+const DEFAULT_SOCIAL_LINKS = [
+  { id: '1', platform: 'youtube', url: 'https://youtube.com/@probitian', icon: 'Youtube', is_active: true, display_order: 1 },
+  { id: '2', platform: 'instagram', url: 'https://instagram.com/probitian', icon: 'Instagram', is_active: true, display_order: 2 },
+  { id: '3', platform: 'facebook', url: 'https://facebook.com/probitian', icon: 'Facebook', is_active: true, display_order: 3 },
+  { id: '4', platform: 'github', url: 'https://github.com/probitian', icon: 'Github', is_active: true, display_order: 4 },
+  { id: '5', platform: 'email', url: 'mailto:probitianofficial@gmail.com', icon: 'Mail', is_active: true, display_order: 5 },
+  { id: '6', platform: 'linkedin', url: 'https://www.linkedin.com/company/probitian/', icon: 'Linkedin', is_active: true, display_order: 6 },
+  { id: '7', platform: 'x', url: 'https://x.com/Probitian', icon: 'X', is_active: true, display_order: 7 }
+];
+
 app.get('/api/cms/social', async (req, res) => {
   if (serverSupabase) {
     try {
@@ -4796,14 +4806,34 @@ app.get('/api/cms/social', async (req, res) => {
         console.error('[Supabase GET Social Error]', error.message);
         return res.status(503).json({ error: 'Database service unavailable' });
       }
-      return res.json(data || []);
+      let links = data && data.length > 0 ? data : DEFAULT_SOCIAL_LINKS;
+      const hasX = links.some((s: any) => s.platform && (s.platform.toLowerCase() === 'x' || s.platform.toLowerCase() === 'twitter'));
+      if (!hasX) {
+        const xLink = { platform: 'x', url: 'https://x.com/Probitian', icon: 'X', is_active: true, display_order: 7 };
+        try {
+          const { data: inserted, error: insertErr } = await serverSupabase.from('social_links').insert(xLink).select();
+          if (!insertErr && inserted && inserted.length > 0) {
+            links = [...links, inserted[0]];
+          } else {
+            links = [...links, { id: 'x_default', ...xLink }];
+          }
+        } catch {
+          links = [...links, { id: 'x_default', ...xLink }];
+        }
+      }
+      return res.json(links.sort((a: any, b: any) => (a.display_order ?? 0) - (b.display_order ?? 0)));
     } catch (err) {
       console.error('[Supabase GET Social Exception]', err);
       return res.status(503).json({ error: 'Database service unavailable' });
     }
   }
   const data = readCmsData();
-  return res.json(data.social_links || []);
+  let links = data.social_links && data.social_links.length > 0 ? data.social_links : DEFAULT_SOCIAL_LINKS;
+  const hasX = links.some((s: any) => s.platform && (s.platform.toLowerCase() === 'x' || s.platform.toLowerCase() === 'twitter'));
+  if (!hasX) {
+    links = [...links, { id: 'x_default', platform: 'x', url: 'https://x.com/Probitian', icon: 'X', is_active: true, display_order: 7 }];
+  }
+  return res.json(links.sort((a: any, b: any) => (a.display_order ?? 0) - (b.display_order ?? 0)));
 });
 
 // SOCIAL LINKS (PROTECTED WRITE)

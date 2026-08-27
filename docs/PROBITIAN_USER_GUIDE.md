@@ -5,6 +5,7 @@ Official User & Learner Guide for the ProBitian Business Intelligence & Data Ana
 Project Owner: **Shivam Singh**
 Official Website: https://probitian.ai.studio/
 Official Communication Email: probitianofficial@gmail.com
+Official X: https://x.com/Probitian (@Probitian)
 Official LinkedIn: https://www.linkedin.com/company/probitian/
 
 ## 1. Introduction & Platform Overview
@@ -17,29 +18,30 @@ ProBitian is a premium, end-to-end Business Intelligence and Data Analytics lear
 - **Direct Engagement**: Connect directly via contact forms and newsletter subscription channels.
 
 ## 2. Getting Started & Website Navigation
-The ProBitian website features a single-page application (SPA) architecture with clean, path-based route navigation (`/`, `/learn`, `/projects`, `/blog`, `/about`, `/contact`, etc.) for instantaneous page transitions and optimal search engine discoverability.
+The ProBitian website features a single-page application (SPA) architecture with clean HTML5 path-based route navigation (/, /learn, /projects, etc.) for instantaneous page transitions.
 
 ### Header Navigation Bar
-- **ProBitian Logo**: Click anytime to return to the Home page (`/`).
-- **Navigation Links**: Home (`/`), Learn (`/learn`), Projects (`/projects`), Blog (`/blog`), About (`/about`), Contact (`/contact`).
+- **ProBitian Logo**: Click anytime to return to the Home page.
+- **Navigation Links**: Home, Learn, Projects, Blog, YouTube, About, Contact.
 - **Theme Switcher**: Sun/Moon icon in the top header bar toggles between Light Mode and Dark Mode.
 - **Responsive Mobile Menu**: On mobile screens (<768px), a hamburger icon opens a full-screen mobile menu.
 
 ### Public Website Pages & Routes
-- **Home (`/`)**: Platform overview, hero statistics, core features, top courses, featured portfolio projects, and YouTube highlights.
-- **Learn (`/learn`)**: Complete course catalog with filter tabs, skill level badges, video lessons, PDF cheat sheets, and dataset downloads.
-- **Projects (`/projects`)**: Portfolio gallery of real-world Power BI & SQL dashboards featuring problem statements, live interactive demos, GitHub repos, and raw sample dataset downloads.
-- **Blog (`/blog`)**: Technical articles, DAX optimization guides, and BI career frameworks with direct slug routing (`/blog/:slug`), code snippets, and video walk-throughs.
-- **About (`/about`)**: Project Owner profile (Shivam Singh), platform mission statement, impact metrics, and learning roadmap.
-- **Contact (`/contact`)**: Direct message portal for course inquiries, mentorship, or project collaborations, plus official ProBitian Community Hub location.
-- **Terms of Service (`/terms`)**: Platform usage terms, intellectual property, and learner guidelines.
-- **Privacy Policy (`/privacy` / `/privacy-policy`)**: Data handling practices, cookie policies, user rights, and privacy controls.
+- **Home (/)**: Platform overview, hero statistics, core features, top courses, featured portfolio projects, and YouTube highlights.
+- **Learn (/learn)**: Complete course catalog with filter tabs, skill level badges, video lessons, PDF cheat sheets, and dataset downloads.
+- **Projects (/projects)**: Portfolio gallery of real-world Power BI & SQL dashboards featuring problem statements, live interactive demos, GitHub repos, and raw sample dataset downloads.
+- **Blog (/blog)**: Technical articles, DAX optimization guides, and BI career frameworks with code snippets and video walk-throughs.
+- **YouTube (/youtube)**: Curated repository of video tutorials, playlists, and channel subscription highlights.
+- **About (/about)**: Project Owner profile (Shivam Singh), platform mission statement, impact metrics, and learning roadmap.
+- **Contact (/contact)**: Direct message portal for course inquiries, mentorship, or project collaborations, plus official ProBitian Community Hub location.
+- **Terms of Service (/terms)**: Platform usage terms, intellectual property, and learner guidelines.
+- **Privacy Policy (/privacy)**: Data handling practices, cookie policies, user rights, and privacy controls.
 
 ## 3. Home Page Guide
 The Home page serves as the entry point to the ProBitian ecosystem.
 
 ### Key Sections & Interactions
-1. **Hero Banner**: Features primary headline, tagline, "Start Learning" CTA (`/learn`), and "Explore Projects" CTA (`/projects`).
+1. **Hero Banner**: Features primary headline, tagline, "Start Learning" CTA (/learn), and "Explore Projects" CTA (/projects).
 2. **Value Proposition Cards**: Highlights core skill pillars—Power BI Mastery, SQL Querying, Advanced Excel, and AI Tools for Data Professionals.
 3. **Featured Course Cards**: Direct buttons opening detailed course curriculum modals.
 4. **Featured Project Showcase**: Interactive cards displaying project badges, tools used, and direct modal popups.
@@ -84,7 +86,7 @@ The Blog section contains technical tutorials and industry insights.
 Get in touch with Shivam Singh or the ProBitian support team.
 
 ### How to Submit an Enquiry
-1. Navigate to **Contact** (#/contact).
+1. Navigate to **Contact** (/contact).
 2. Enter your **Full Name**, **Email Address**, and optional **Phone Number**.
 3. Select your **Subject or Interested Course** (e.g., Power BI Mastery, SQL Bootcamp).
 4. Type your message in the text box.
@@ -103,8 +105,8 @@ Get in touch with Shivam Singh or the ProBitian support team.
 - Immediate on-screen confirmation. Subscriptions persist directly to Supabase PostgreSQL and trigger a welcome email via Gmail SMTP.
 
 ## 9. Legal & Policy Pages
-- **Terms of Service (#/terms)**: Outlines user conduct, intellectual property, course access, and liability limits.
-- **Privacy Policy (#/privacy-policy)**: Explains data collection, email communication preferences, and security measures.
+- **Terms of Service (/terms)**: Outlines user conduct, intellectual property, course access, and liability limits.
+- **Privacy Policy (/privacy)**: Explains data collection, email communication preferences, and security measures.
 
 ## 10. Analytics & Privacy
 - Website visits are anonymously measured via Google Analytics 4 (GA4) for site quality and performance optimizations. Users do not need any setup or configuration.
@@ -115,4 +117,4 @@ Get in touch with Shivam Singh or the ProBitian support team.
 - **Q: Are all learning resources free?**
   - **A**: Yes, ProBitian provides free public access to course curriculum guides, video links, and sample datasets.
 - **Q: How do I contact ProBitian directly?**
-  - **A**: Use the Contact page (#/contact) or email probitianofficial@gmail.com.
+  - **A**: Use the Contact page (/contact) or email probitianofficial@gmail.com.

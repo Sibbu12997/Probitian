@@ -5,6 +5,7 @@ Official Technical Documentation for the Newsletter Subscription & Welcome Email
 Project Owner: **Shivam Singh**  
 Official Website: [https://probitian.ai.studio/](https://probitian.ai.studio/)  
 Official Communication Email: [probitianofficial@gmail.com](mailto:probitianofficial@gmail.com)  
+Official X: [https://x.com/Probitian](https://x.com/Probitian) (@Probitian)  
 Official LinkedIn: [https://www.linkedin.com/company/probitian/](https://www.linkedin.com/company/probitian/)  
 
 ---
@@ -73,7 +74,7 @@ To maintain absolute data integrity:
 
 ## 📬 Unsubscribe Flow
 
-1. Subscriber clicks the **Unsubscribe** link in any email footer or navigates to `#/unsubscribe`.
+1. Subscriber clicks the **Unsubscribe** link in any email footer or navigates to `/unsubscribe`.
 2. Request sent to `POST /api/newsletter/unsubscribe`.
 3. Server updates Supabase PostgreSQL: `UPDATE newsletter SET status = 'unsubscribed', unsubscribed_at = NOW() WHERE email = $1`.
 4. Subscriber receives confirmation that they have been unsubscribed.

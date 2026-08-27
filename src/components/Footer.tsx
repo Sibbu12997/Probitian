@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { NavPage } from '../types';
 import { Youtube, Instagram, Facebook, Github, Linkedin, Mail, ArrowUpRight, Send, CheckCircle2 } from 'lucide-react';
+import { XIcon } from './icons/XIcon';
 import { trackSocialClick, trackContactClick, trackCtaClick, trackNewsletterSubscribe } from '../lib/analytics';
 import { cmsService } from '../services/cmsService';
 import { PROBITIAN_LOGO_URL } from '../constants/branding';
@@ -96,7 +97,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
                 rel="noopener noreferrer"
                 onClick={() => trackSocialClick('youtube', 'https://youtube.com/@probitian')}
                 className="p-2.5 rounded-xl bg-slate-800 hover:bg-red-600/20 hover:text-red-400 text-slate-300 border border-slate-700/60 transition-all"
-                aria-label="ProBItian YouTube Channel"
+                aria-label="ProBitian YouTube Channel"
               >
                 <Youtube className="w-4 h-4" />
               </a>
@@ -106,7 +107,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
                 rel="noopener noreferrer"
                 onClick={() => trackSocialClick('instagram', 'https://instagram.com/probitian')}
                 className="p-2.5 rounded-xl bg-slate-800 hover:bg-pink-600/20 hover:text-pink-400 text-slate-300 border border-slate-700/60 transition-all"
-                aria-label="ProBItian Instagram Profile"
+                aria-label="ProBitian Instagram Profile"
               >
                 <Instagram className="w-4 h-4" />
               </a>
@@ -116,7 +117,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
                 rel="noopener noreferrer"
                 onClick={() => trackSocialClick('facebook', 'https://facebook.com/probitian')}
                 className="p-2.5 rounded-xl bg-slate-800 hover:bg-blue-600/20 hover:text-blue-400 text-slate-300 border border-slate-700/60 transition-all"
-                aria-label="ProBItian Facebook Page"
+                aria-label="ProBitian Facebook Page"
               >
                 <Facebook className="w-4 h-4" />
               </a>
@@ -126,9 +127,19 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
                 rel="noopener noreferrer"
                 onClick={() => trackSocialClick('github', 'https://github.com/probitian')}
                 className="p-2.5 rounded-xl bg-slate-800 hover:bg-purple-600/20 hover:text-purple-400 text-slate-300 border border-slate-700/60 transition-all"
-                aria-label="ProBItian GitHub Repositories"
+                aria-label="ProBitian GitHub Repositories"
               >
                 <Github className="w-4 h-4" />
+              </a>
+              <a
+                href="https://x.com/Probitian"
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => trackSocialClick('x', 'https://x.com/Probitian')}
+                className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 hover:text-white text-slate-300 border border-slate-700/60 transition-all"
+                aria-label="ProBitian on X"
+              >
+                <XIcon className="w-4 h-4" />
               </a>
               <a
                 href="https://www.linkedin.com/company/probitian/"
@@ -136,7 +147,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
                 rel="noopener noreferrer"
                 onClick={() => trackSocialClick('linkedin', 'https://www.linkedin.com/company/probitian/')}
                 className="p-2.5 rounded-xl bg-slate-800 hover:bg-blue-600/20 hover:text-blue-400 text-slate-300 border border-slate-700/60 transition-all"
-                aria-label="ProBItian LinkedIn Company Profile"
+                aria-label="ProBitian LinkedIn Company Profile"
               >
                 <Linkedin className="w-4 h-4" />
               </a>
@@ -144,7 +155,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
                 href={`mailto:${contactEmail}`}
                 onClick={() => trackContactClick('footer_email')}
                 className="p-2.5 rounded-xl bg-slate-800 hover:bg-emerald-600/20 hover:text-emerald-400 text-slate-300 border border-slate-700/60 transition-all"
-                aria-label="Direct Email ProBItian"
+                aria-label="Direct Email ProBitian"
               >
                 <Mail className="w-4 h-4" />
               </a>

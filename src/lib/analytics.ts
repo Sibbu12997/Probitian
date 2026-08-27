@@ -122,7 +122,7 @@ export const trackEvent = (eventName: string, parameters?: Record<string, any>) 
 
 // Convenience helper trackers for specific user interactions
 
-export const trackSocialClick = (platform: 'youtube' | 'instagram' | 'facebook' | 'github' | 'linkedin' | string, targetUrl: string) => {
+export const trackSocialClick = (platform: 'youtube' | 'instagram' | 'facebook' | 'github' | 'x' | 'twitter' | 'linkedin' | 'email' | string, targetUrl: string) => {
   trackEvent(`${platform.toLowerCase()}_click`, {
     platform,
     link_url: targetUrl,

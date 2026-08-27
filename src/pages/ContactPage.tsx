@@ -19,6 +19,7 @@ import {
   Clock, 
   ShieldCheck 
 } from 'lucide-react';
+import { XIcon } from '../components/icons/XIcon';
 import { cmsService } from '../services/cmsService';
 import { trackContactFormSubmit, trackSocialClick } from '../lib/analytics';
 import { SocialLinkItem } from '../types';
@@ -135,9 +136,46 @@ export const ContactPage: React.FC = () => {
     if (p.includes('instagram')) return <Instagram className="w-4 h-4 text-pink-500" />;
     if (p.includes('facebook')) return <Facebook className="w-4 h-4 text-blue-500" />;
     if (p.includes('github')) return <Github className="w-4 h-4 text-purple-400" />;
+    if (p === 'x' || p.includes('twitter') || p.includes('x.com')) return <XIcon className="w-4 h-4 text-slate-900 dark:text-white" />;
     if (p.includes('linkedin')) return <Linkedin className="w-4 h-4 text-blue-600 dark:text-blue-400" />;
     if (p.includes('email') || p.includes('mail')) return <Mail className="w-4 h-4 text-emerald-500" />;
     return <Mail className="w-4 h-4 text-emerald-500" />;
+  };
+
+  const getSocialLabel = (platform: string) => {
+    const p = platform.toLowerCase();
+    if (p === 'x' || p.includes('twitter') || p.includes('x.com')) return 'X';
+    if (p.includes('youtube')) return 'YouTube';
+    if (p.includes('instagram')) return 'Instagram';
+    if (p.includes('facebook')) return 'Facebook';
+    if (p.includes('github')) return 'GitHub';
+    if (p.includes('linkedin')) return 'LinkedIn';
+    if (p.includes('email') || p.includes('mail')) return 'Email';
+    return platform.charAt(0).toUpperCase() + platform.slice(1);
+  };
+
+  const getSocialAriaLabel = (platform: string) => {
+    const p = platform.toLowerCase();
+    if (p === 'x' || p.includes('twitter') || p.includes('x.com')) return 'ProBitian on X';
+    if (p.includes('email') || p.includes('mail')) return 'Direct Email ProBitian';
+    if (p.includes('youtube')) return 'ProBitian on YouTube';
+    if (p.includes('instagram')) return 'ProBitian on Instagram';
+    if (p.includes('facebook')) return 'ProBitian on Facebook';
+    if (p.includes('github')) return 'ProBitian on GitHub';
+    if (p.includes('linkedin')) return 'ProBitian on LinkedIn';
+    return `ProBitian on ${platform}`;
+  };
+
+  const getSocialHoverClass = (platform: string) => {
+    const p = platform.toLowerCase();
+    if (p.includes('youtube')) return 'hover:bg-red-50 dark:hover:bg-red-950/30';
+    if (p.includes('instagram')) return 'hover:bg-pink-50 dark:hover:bg-pink-950/30';
+    if (p.includes('facebook')) return 'hover:bg-blue-50 dark:hover:bg-blue-950/30';
+    if (p.includes('github')) return 'hover:bg-purple-50 dark:hover:bg-purple-950/30';
+    if (p === 'x' || p.includes('twitter') || p.includes('x.com')) return 'hover:bg-slate-100 dark:hover:bg-slate-700/80';
+    if (p.includes('linkedin')) return 'hover:bg-blue-50 dark:hover:bg-blue-950/30';
+    if (p.includes('email') || p.includes('mail')) return 'hover:bg-emerald-50 dark:hover:bg-emerald-950/30';
+    return 'hover:bg-purple-50 dark:hover:bg-slate-700/80';
   };
 
   return (
@@ -377,10 +415,11 @@ export const ContactPage: React.FC = () => {
                       target="_blank"
                       rel="noopener noreferrer"
                       onClick={() => trackSocialClick(link.platform, link.url)}
-                      className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-purple-50 dark:hover:bg-slate-700/80 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2 transition-all"
+                      className={`p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 ${getSocialHoverClass(link.platform)} border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2 transition-all`}
+                      aria-label={getSocialAriaLabel(link.platform)}
                     >
                       {getSocialIcon(link.platform)}
-                      <span className="capitalize">{link.platform}</span>
+                      <span>{getSocialLabel(link.platform)}</span>
                     </a>
                   ))
                 ) : (
@@ -391,6 +430,7 @@ export const ContactPage: React.FC = () => {
                       rel="noopener noreferrer"
                       onClick={() => trackSocialClick('youtube', 'https://youtube.com/@probitian')}
                       className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-red-50 dark:hover:bg-red-950/30 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2 transition-all"
+                      aria-label="ProBitian on YouTube"
                     >
                       <Youtube className="w-4 h-4 text-red-500" /> YouTube
                     </a>
@@ -400,6 +440,7 @@ export const ContactPage: React.FC = () => {
                       rel="noopener noreferrer"
                       onClick={() => trackSocialClick('instagram', 'https://instagram.com/probitian')}
                       className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-pink-50 dark:hover:bg-pink-950/30 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2 transition-all"
+                      aria-label="ProBitian on Instagram"
                     >
                       <Instagram className="w-4 h-4 text-pink-500" /> Instagram
                     </a>
@@ -409,6 +450,7 @@ export const ContactPage: React.FC = () => {
                       rel="noopener noreferrer"
                       onClick={() => trackSocialClick('facebook', 'https://facebook.com/probitian')}
                       className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-950/30 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2 transition-all"
+                      aria-label="ProBitian on Facebook"
                     >
                       <Facebook className="w-4 h-4 text-blue-500" /> Facebook
                     </a>
@@ -418,8 +460,17 @@ export const ContactPage: React.FC = () => {
                       rel="noopener noreferrer"
                       onClick={() => trackSocialClick('github', 'https://github.com/probitian')}
                       className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-purple-50 dark:hover:bg-purple-950/30 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2 transition-all"
+                      aria-label="ProBitian on GitHub"
                     >
                       <Github className="w-4 h-4 text-purple-400" /> GitHub
+                    </a>
+                    <a
+                      href={`mailto:${contactEmail}`}
+                      onClick={() => trackSocialClick('email', `mailto:${contactEmail}`)}
+                      className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2 transition-all"
+                      aria-label="Direct Email ProBitian"
+                    >
+                      <Mail className="w-4 h-4 text-emerald-500" /> Email
                     </a>
                     <a
                       href="https://www.linkedin.com/company/probitian/"
@@ -427,17 +478,19 @@ export const ContactPage: React.FC = () => {
                       rel="noopener noreferrer"
                       onClick={() => trackSocialClick('linkedin', 'https://www.linkedin.com/company/probitian/')}
                       className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-950/30 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2 transition-all"
-                      aria-label="LinkedIn Company Page"
+                      aria-label="ProBitian on LinkedIn"
                     >
                       <Linkedin className="w-4 h-4 text-blue-600 dark:text-blue-400" /> LinkedIn
                     </a>
                     <a
-                      href={`mailto:${contactEmail}`}
-                      onClick={() => trackSocialClick('email', `mailto:${contactEmail}`)}
-                      className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2 transition-all"
-                      aria-label="Direct Email"
+                      href="https://x.com/Probitian"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => trackSocialClick('x', 'https://x.com/Probitian')}
+                      className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700/80 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2 transition-all"
+                      aria-label="ProBitian on X"
                     >
-                      <Mail className="w-4 h-4 text-emerald-500" /> Email
+                      <XIcon className="w-4 h-4 text-slate-900 dark:text-white" /> X
                     </a>
                   </>
                 )}

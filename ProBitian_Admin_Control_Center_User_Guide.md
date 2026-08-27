@@ -1,283 +1,167 @@
-# ProBitian Admin Control Center — Comprehensive User & Operations Guide
+# ProBitian Admin Control Center — User Guide
 
-Official Administrative Management and Operations Manual for Authorized ProBitian Portal Administrators.
+Official Administrative Management Guide for Authorized ProBitian Portal Administrators.
 
-Project Owner: **Shivam Singh**  
-Official Website: [https://probitian.ai.studio/](https://probitian.ai.studio/)  
-Official Contact Email: [probitianofficial@gmail.com](mailto:probitianofficial@gmail.com)  
-Official LinkedIn: [https://www.linkedin.com/company/probitian/](https://www.linkedin.com/company/probitian/)  
-
----
+Project Owner: **Shivam Singh**
+Official Website: https://probitian.ai.studio/
+Official Communication Email: probitianofficial@gmail.com
+Official X: https://x.com/Probitian (@Probitian)
+Official LinkedIn: https://www.linkedin.com/company/probitian/
 
 ## 1. Introduction & Security Guidance
-
-The **ProBitian Admin Control Center** (`#/admin`) is the central management portal for authorized administrators to manage site content, analyze GA4 performance, handle contact inquiries, maintain newsletter subscribers, broadcast marketing campaigns, manage digital assets, maintain the **B2B Lead CRM**, orchestrate **Automated Multi-Step Email Sequences**, and launch **Lead Outreach Campaigns**.
+The ProBitian Admin Control Center (/admin) is a secure management portal for authorized administrators to control website content, analyze GA4 traffic, manage contact inquiries, send email responses, maintain subscribers, broadcast email campaigns, manage media assets, and configure brand settings.
 
 ### Critical Security Instructions
-- **Never Share Credentials**: Protect the Admin Passkey and administrative access tokens.
-- **Server-Side Secret Isolation**: Secret environment variables (`ADMIN_PASSKEY`, `SUPABASE_SECRET_KEY`, `GMAIL_APP_PASSWORD`, `GEMINI_API_KEY`) remain strictly server-side and are never exposed to client browsers.
-- **Service Role Isolation**: Supabase database tables are protected by Row Level Security (RLS). Server-side Express API routes execute operations securely via backend tokens.
-
----
+- **Never Share Credentials**: Do not share the Admin Passkey or login URL.
+- **Server-Side Secret Isolation**: Secret environment variables (ADMIN_PASSKEY, SUPABASE_SECRET_KEY, GMAIL_APP_PASSWORD, GEMINI_API_KEY) must remain strictly server-side.
+- **No Client Secrets**: Never place server secrets in frontend code, git commits, README files, or public documentation.
 
 ## 2. Production Architecture Overview
+ProBitian utilizes a clean, server-side verified architecture:
+- **Database**: Supabase PostgreSQL is the SINGLE authoritative source of truth.
+- **Media Storage**: Supabase Storage (`probitian-media` bucket) stores all uploaded images, PDFs, logos, and banners.
+- **Email Delivery**: Server-side Express engine via **Gmail SMTP** (`probitianofficial@gmail.com`).
+- **Analytics**: Google Analytics 4 (GA4) integration.
+- **Removed / Unused Infrastructure**: Firebase, Cloud SQL, Drizzle, and Resend are NOT used in production.
 
-ProBitian operates on a streamlined, cloud-persisted architecture:
-- **Primary Database**: **Supabase PostgreSQL** is the **SINGLE AUTHORITATIVE SOURCE OF TRUTH**.
-- **Data Persistence Guarantee**: All CRM leads, campaigns, sequence enrollments, courses, blog articles, and inquiries are persisted in Supabase PostgreSQL. Refreshing the browser, clearing local cache, or logging out does not delete or alter production data.
-- **Media Storage**: Supabase Storage (`probitian-media` bucket) stores portfolio visuals, logos, blog covers, video thumbnails, and PDF documentation.
-- **Email Transmission**: Express server engine via **Gmail SMTP** (`probitianofficial@gmail.com`).
-- **Web Analytics**: Real-time Google Analytics 4 (GA4) measurement.
-
----
-
-## 3. Admin Authentication & Navigation
-
-### Accessing the Portal
-1. Navigate to `#/admin` (e.g., `https://probitian.ai.studio/#/admin`).
+## 3. Admin Authentication & Access Control
+### Accessing the Admin Portal
+1. Navigate to the /admin route (e.g., https://probitian.ai.studio/admin).
 2. Enter the authorized **Admin Passkey**.
 3. Click **Unlock Admin Portal**.
-4. The server validates credentials via `POST /api/admin/verify-passkey` and issues an authenticated session token.
+4. The server validates the passkey via `POST /api/admin/verify-passkey` against `process.env.ADMIN_PASSKEY` and issues an authenticated session token.
 
-### Portal Navigation Hierarchy
-The Admin Control Center sidebar organizes tools into 6 logical functional groups:
+### Navigation Controls
+- **Back to Website**: Returns to the public site without terminating the session.
+- **Logout**: Instantly clears the admin session token and redirects to the login screen.
 
-1. **Overview & Analytics**:
-   - `Dashboard Overview`
-   - `GA4 Traffic Analytics`
-2. **Content Management System (CMS)**:
-   - `Home Page Content`
-   - `Projects & Case Studies`
-   - `Technical Blog & Articles`
-   - `Courses & Curriculum`
-   - `YouTube Video Tutorials`
-   - `Media Library & Assets`
-3. **Inquiries & Newsletter**:
-   - `Contact Enquiries Inbox`
-   - `Newsletter Subscribers`
-   - `Newsletter Campaigns`
-4. **Lead Outreach & CRM**:
-   - `B2B Leads CRM`
-   - `Email Sequences`
-   - `Lead Outreach Campaigns`
-5. **Branding & Layout**:
-   - `Website Branding`
-   - `Social Media Links`
-   - `Navigation Menu`
-   - `SEO & Meta Tags`
-6. **System & Security**:
-   - `Global Settings`
-   - `Terms & Privacy Policies`
-   - `Backup & Restore`
+## 4. Comprehensive Admin Modules Guide
+The Admin Portal contains integrated management modules:
 
----
+### 1. Dashboard Overview
+- **Function**: Command center summary and quick launchpad.
+- **Features**: KPI metrics (Active Users Now, Today's Visitors, Pending Inquiries, Total Subscribers), quick shortcuts to core CMS actions, and recent activity logs.
 
-## 4. B2B Lead CRM (`Lead Outreach & CRM` -> `B2B Leads CRM`)
+### 2. GA4 Analytics Command Center
+- **Function**: Real-time traffic, audience engagement, and conversion tracking via Google Analytics 4.
+- **Features**: Active visitors count, date range filters (7D, 30D, 90D, Custom), total page views, average session duration, top pages report, traffic referral sources, device types, and event conversion counters.
 
-The **B2B Leads CRM** module empowers administrators to manage enterprise sales prospects, Power BI consulting inquiries, and corporate training opportunities.
+### 3. Home Page Editor
+- **Function**: Edit hero section, headlines, statistics, and value proposition cards on the public Home page.
+- **Workflow**:
+  - Edit hero headline, subheadline, CTA text, and CTA links.
+  - Modify platform key stats (e.g. "10K+ Learners", "50+ Dashboards").
+  - Update feature cards and value pillars.
+  - Click **Save Changes** -> Persists directly to Supabase PostgreSQL and reflects immediately on the live Home page.
 
-### 4.1 Lead Data Fields
+### 4. Projects Portfolio Manager
+- **Function**: Create, edit, publish, order, and tag portfolio projects.
+- **Workflow**:
+  - Click **Add New Project** or select an existing project to edit.
+  - Set Title, Category, Summary, Full Description, and Tools Used.
+  - Attach Live Demo URL, GitHub Repository, YouTube Tutorial link, and Dataset download link.
+  - Toggle **Featured** to display on the Home page grid.
+  - Click **Save Project** -> Updates Supabase PostgreSQL and reflects instantly on /projects.
 
-| Field Name | Type | Description | Sample Value |
-| :--- | :--- | :--- | :--- |
-| **Company Name** | Text (Required) | Legal or trade name of the business | `Acme Retail Solutions` |
-| **Contact Person** | Text | Primary contact or decision maker | `Sarah Jenkins` |
-| **Email** | Text (Required) | Business email address (Unique identifier) | `sarah.j@acmeretail.com` |
-| **Phone** | Text | Direct phone or mobile number | `+1 (312) 555-0199` |
-| **Industry** | Text | Business vertical / sector | `Supply Chain & Logistics` |
-| **Location** | Text | City, state, or regional location | `Chicago, IL` |
-| **LinkedIn** | Text | Contact or company LinkedIn profile URL | `https://linkedin.com/in/sarahjenkins` |
-| **Power BI Use Case** | Text | Specific BI requirement, pain point, or goal | `Executive Sales Margin & Inventory Dashboard` |
-| **Lead Priority** | Dropdown | Operational urgency (`High`, `Medium`, `Low`) | `High` |
-| **Status** | Dropdown | Sales & outreach lifecycle state | `Not Contacted` |
-| **Follow-up Date** | Date Picker | Scheduled next contact date | `2026-09-15` |
-| **Internal Notes** | Textarea | Memos, conversation history, meeting logs | `Requested demo of supply chain DAX models` |
+### 5. Blog & Articles Manager
+- **Function**: Draft, schedule, publish, or edit technical articles and guides.
+- **Workflow**:
+  - Set Article Title, URL Slug, Category, Read Time, and Tags.
+  - Enter Excerpt and full Markdown content.
+  - Attach Cover Image URL and optional YouTube video walkthrough link.
+  - Set status to **Draft** or **Published**.
+  - Click **Save Article** -> Updates Supabase PostgreSQL and reflects on /blog.
 
-### 4.2 Supported Lead Statuses & Purpose
+### 6. Learn & Courses Manager
+- **Function**: Manage skill paths, course modules, video links, PDFs, and dataset resources.
+- **Workflow**:
+  - Set Course Title, Subtitle, Category (Power BI, SQL, Excel, Python, AI), Skill Level, and Duration.
+  - Attach YouTube Video IDs, PDF Documentation links, and raw dataset download URLs.
+  - Click **Save Course** -> Updates Supabase PostgreSQL and reflects on /learn.
 
-| Status | Category | Purpose & Behavior |
-| :--- | :--- | :--- |
-| **`Not Contacted`** | Inbound / Initial | Prospect has been added or imported but not yet reached out to. |
-| **`Contacted`** | In Progress | Initial outreach email or sequence step has been sent. |
-| **`Opened`** | Engaged | Prospect has opened an outreach email. |
-| **`Replied`** | **Terminal (Stop)** | Prospect replied to outreach. **Automatically terminates any active automated sequences.** |
-| **`Interested`** | **Terminal (Stop)** | Prospect expressed interest in consulting or training. **Automatically halts automated sequences.** |
-| **`Demo Requested`** | **Terminal (Stop)** | Prospect requested a live walkthrough or meeting. **Automatically halts automated sequences.** |
-| **`Proposal Sent`** | Active Deal | Formal statement of work or proposal delivered. |
-| **`Converted`** | **Terminal (Won)** | Closed client. **Automatically terminates automated sequences.** |
-| **`Not Interested`** | **Terminal (Stop)** | Prospect declined. **Automatically terminates automated sequences.** |
-| **`Bounced`** | **Terminal (Error)** | Undeliverable email address. **Excluded from all campaigns and sequences.** |
-| **`Do Not Contact`** | **Terminal (Opt-Out)**| Unsubscribed or requested no contact. **Strictly blocked across the entire system.** |
+### 7. YouTube Showcase Manager
+- **Function**: Organize YouTube video tutorials, playlists, and channel highlights.
+- **Workflow**:
+  - Add Video Title, YouTube URL, Thumbnail URL, Category, Description, and Duration.
+  - Edit or delete existing videos.
+  - Click **Save** -> Updates Supabase PostgreSQL and reflects on /youtube.
 
----
+### 8. Media Library Engine
+- **Function**: Asset manager for site graphics, logos, banners, thumbnails, and PDF files stored in Supabase Storage (`probitian-media` bucket).
+- **Workflow**:
+  - Upload media files (PNG, JPG, SVG, WebP, PDF).
+  - SVG files undergo automated server-side **DOMPurify sanitization** before saving to eliminate script injection.
+  - Preview media items, copy URLs, or **select existing media assets** directly when editing Branding, Projects, Blog, or Courses.
+  - **Asset Reuse**: Re-use existing Media Library items directly from Supabase Storage.
 
-## 5. CSV Lead Import User Guide
+### 9. Contact Messages & Inbox Manager
+- **Function**: Review visitor inquiries, organize status, and send email replies via Gmail SMTP.
+- **Workflow**:
+  - View inbox table with sender Name, Email, Phone, Course Interest, Message, and Timestamp.
+  - Update status badges (**Unread**, **Read**, **Replied**, **Archived**).
+  - Add internal **Admin Notes** for team reference.
+  - Click **Reply via Email**: Sends an email response directly from the portal via server-side **Gmail SMTP** (`probitianofficial@gmail.com`).
 
-Administrators can upload bulk lead lists using the built-in CSV import wizard.
+### 10. Subscribers Manager
+- **Function**: Manage newsletter email subscriptions stored in Supabase PostgreSQL.
+- **Workflow**:
+  - View full subscriber email roster, active/unsubscribed status, and signup timestamps.
+  - Search subscribers by domain or date.
+  - Export subscriber lists to CSV format.
 
-### Step-by-Step Import Process:
-1. Open **B2B Leads CRM** (`#/admin -> Lead Outreach & CRM -> B2B Leads CRM`).
-2. Click **Import CSV** in the top action bar.
-3. Choose or drag-and-drop your `.csv` file.
-4. Select **Duplicate Resolution Mode**:
-   - **Skip Existing Leads**: Leaves existing leads unchanged and imports only new emails.
-   - **Update Existing Leads**: Matches existing records by email and overwrites fields with CSV data.
-5. Review the **Validation Summary** (Valid Rows vs. Invalid Rows).
-6. Click **Confirm & Import Leads**.
-7. The server validates each row and performs atomic upserts to Supabase PostgreSQL.
-8. The CRM table refreshes automatically with the newly imported records.
+### 11. Email Campaign & Newsletter Manager
+- **Function**: Draft, test, and broadcast email newsletters to active subscribers via Gmail SMTP.
+- **Workflow**:
+  - View total active subscribers count and delivery provider status (Gmail SMTP).
+  - Create new email campaigns or edit existing draft campaigns in Supabase (`email_campaigns` table).
+  - Set Campaign Name, Email Subject Line, Preheader Preview Text, and HTML/Formatted Body Content.
+  - Send instant **Test Emails** to any verified email address.
+  - Execute **Bulk Campaign Broadcasts** to all active newsletter subscribers with live status updates logged in `email_campaign_recipients`.
+  - Compliant **Unsubscribe links** allowing recipients to unsubscribe safely.
 
-### Supported Column Aliases
-The parser recognizes variations in CSV header names:
-- `company_name`, `company`, `account`, `organization`, `business`
-- `contact_person`, `contact_name`, `contact`, `person`, `name`, `full_name`
-- `email`, `email_address`, `work_email`, `mail`
-- `phone`, `phone_number`, `telephone`, `mobile`
-- `industry`, `vertical`, `sector`
-- `location`, `city`, `state`, `country`, `address`
-- `linkedin`, `linkedin_url`, `profile_url`
-- `powerbi_use_case`, `use_case`, `bi_needs`, `project_needs`
-- `lead_priority`, `priority`
-- `status`, `lead_status`
-- `follow_up_date`, `followup_date`, `next_followup`
-- `notes`, `internal_notes`, `comments`
+### 12. Website Branding Manager
+- **Function**: Configure site logos, banners, theme colors, and brand identity.
+- **Workflow**:
+  - **Choose Logo & Banner from Media Library** (Supabase Storage) or upload custom assets.
+  - Set Site Name, Tagline, and Theme Accents.
+  - Click **Save Branding** -> Updates Supabase PostgreSQL and updates site branding globally.
 
----
+### 13. Social Links Manager
+- **Function**: Control social profiles displayed across header and footer.
+- **Workflow**:
+  - Manage links for YouTube, Instagram, Facebook, GitHub, X (Twitter), LinkedIn, etc.
+  - Click **Save Social Links** -> Updates Supabase PostgreSQL.
 
-## 6. Lead Outreach Campaigns (`Lead Outreach & CRM` -> `Lead Outreach Campaigns`)
+### 14. Navigation Menu Manager
+- **Function**: Customize top navigation links, paths, icons, and visibility.
+- **Workflow**:
+  - Toggle navigation link visibility and menu order.
+  - Click **Save Navigation** -> Updates Supabase PostgreSQL.
 
-One-time outreach broadcasts allow sending targeted emails to filtered segments of CRM prospects.
+### 15. SEO & Meta Tags Manager
+- **Function**: Configure search engine optimization settings and social share tags.
+- **Workflow**:
+  - Edit Meta Title, Meta Description, Keywords, Canonical URL, Open Graph (OG) fields, and Twitter/X Handle.
+  - Click **Save SEO Settings** -> Updates Supabase PostgreSQL and injects meta tags dynamically.
 
-### Key Capabilities:
-- **Campaign Configuration**: Set Campaign Name, Subject Line, Preheader Text, and HTML Body.
-- **Recipient Filtering**: Select leads by Status or Priority, or launch directly with leads pre-selected from the CRM.
-- **Recipient Safety Controls**: Automatically excludes `Do Not Contact`, `Bounced`, or invalid email leads.
-- **Test Email Verification**: Dispatch a live test message to an authorized admin address before sending to prospects.
-- **Detailed Delivery History**: Tracks individual dispatch outcomes (`sent`, `failed`, `opened`, `replied`) in `public.campaign_leads`.
+### 16. Website Settings & Location
+- **Function**: Manage global site parameters and official physical location details.
+- **Workflow**:
+  - Edit Site Name, Tagline, Official Contact Email (`probitianofficial@gmail.com`), Footer Copyright, and Community Hub location details.
+  - Click **Save Settings** -> Updates Supabase PostgreSQL.
 
----
+### 17. Legal & Policies Manager
+- **Function**: Edit Terms of Service and Privacy Policy pages.
+- **Workflow**:
+  - Edit Terms of Service and Privacy Policy text sections.
+  - Click **Save Legal Settings** -> Updates Supabase PostgreSQL.
 
-## 7. Automated Email Sequences (`Lead Outreach & CRM` -> `Email Sequences`)
-
-Automated Email Sequences automate multi-step drip journeys over configurable day/hour intervals.
-
-### 7.1 Multi-Step Sequence Flow Example:
-- **Step 1 (Delay: 0 Days / Immediate)**: Initial introduction to ProBitian Power BI consulting tailored to `{{powerbi_use_case}}`.
-- **Step 2 (Delay: 3 Days)**: Case study demonstrating quantifiable business impact and DAX optimization in the `{{industry}}` vertical.
-- **Step 3 (Delay: 4 Days)**: Follow-up invite for a 20-minute executive dashboard demo.
-
-### 7.2 Dynamic Personalization Tags
-Use dynamic curly-brace variables inside subjects and email content:
-
-| Dynamic Tag | Alternate Tag | Output Example | Fallback Value |
-| :--- | :--- | :--- | :--- |
-| `{{company_name}}` | `{{Company Name}}` | `Acme Retail Solutions` | `your company` |
-| `{{contact_person}}` | `{{Contact Person}}` | `Sarah Jenkins` | `Valued Partner` |
-| `{{first_name}}` | `{{First Name}}` | `Sarah` | `there` |
-| `{{industry}}` | `{{Industry}}` | `Supply Chain & Logistics` | `your industry` |
-| `{{location}}` | `{{Location}}` | `Chicago, IL` | `your region` |
-| `{{powerbi_use_case}}`| `{{Power BI Use Case}}`| `Executive Sales Margin Dashboard`| `reporting and analytics`|
-| `{{phone}}` | `{{Phone}}` | `+1 (312) 555-0199` | `(blank)` |
-| `{{linkedin}}` | `{{LinkedIn}}` | `https://linkedin.com/in/...` | `(blank)` |
-| `{{lead_priority}}` | `{{Lead Priority}}` | `High` | `Standard` |
-
----
-
-## 8. Selective Lead Enrollment Workflow
-
-Administrators control exactly which prospects enter automated sequences using manual multi-select checkboxes in the CRM:
-
-```
-1. Open B2B Leads CRM.
-2. Select checkboxes next to specific targeted leads (e.g., Company A, C, F).
-3. The selection toolbar shows "[3] selected".
-4. Click [ Start Email Sequence ].
-5. Choose target sequence in the modal and review selected lead list.
-6. Click [ Enroll 3 Leads ].
-7. Sequence enrollments are persisted in Supabase with Step 1 scheduled for delivery.
-8. Background worker checks and dispatches Step 1 within 60 seconds.
-```
-
----
-
-## 9. Background Sequence Worker & Safety Controls
-
-### 9.1 Background Execution
-- An internal background worker runs every **60 seconds** on the server.
-- Evaluates active sequence enrollments where `next_send_at <= now()`.
-- Verifies lead status is not in a terminal state.
-- Dispatches due emails via Gmail SMTP, logs delivery, and schedules the subsequent step (`now + delay_days`).
-- Marks sequence as `Completed` once all steps are sent.
-
-### 9.2 Manual "Process Due Steps Now"
-Administrators can click **Process Due Steps Now** inside the *Email Sequences* module to immediately trigger processing without waiting for the 60-second timer.
-
-### 9.3 Automatic Sequence Termination Rules
-A sequence is **automatically stopped** for any individual lead if their status transitions to:
-- `Replied`
-- `Interested`
-- `Demo Requested`
-- `Converted`
-- `Do Not Contact`
-- `Bounced`
-- `Not Interested`
-
-### 9.4 Lead Drawer Inspection & Manual Stop
-Clicking any lead in the CRM opens the **Lead Details Drawer**:
-- Displays all currently enrolled sequences and current step number.
-- Shows next scheduled send timestamp.
-- Allows administrators to click **Stop** on any active sequence immediately.
-
----
-
-## 10. Step-by-Step Admin Recipes (Quick Reference)
-
-### Recipe 1: Add a Single Lead
-1. Open **B2B Leads CRM**.
-2. Click **Add Lead**.
-3. Enter Company Name, Email, Contact Person, Industry, and Power BI Use Case.
-4. Set Priority (`High`, `Medium`, `Low`) and Status (`Not Contacted`).
-5. Click **Save Lead**.
-
-### Recipe 2: Import Leads via CSV
-1. Prepare a `.csv` file with headers `company_name`, `contact_person`, `email`, `industry`, `location`, `powerbi_use_case`.
-2. Open **B2B Leads CRM** -> Click **Import CSV**.
-3. Upload file, choose Duplicate Mode (**Skip** or **Update**), and click **Confirm & Import**.
-
-### Recipe 3: Launch a One-Time Campaign
-1. Open **Lead Outreach Campaigns** -> Click **New Campaign**.
-2. Fill in Name, Subject, Preheader, and HTML Message.
-3. Filter or select recipients.
-4. Click **Send Test Email** to verify formatting in your inbox.
-5. Click **Send Campaign Now**.
-
-### Recipe 4: Enroll Specific Leads in an Automated Sequence
-1. Open **B2B Leads CRM**.
-2. Check the checkboxes for target leads.
-3. Click **Start Email Sequence** in the action bar.
-4. Select the target sequence (e.g. *Enterprise Power BI Outbound*).
-5. Click **Enroll Leads**.
-
-### Recipe 5: Stop an Active Sequence for a Lead
-1. Open **B2B Leads CRM** and click on the lead's row.
-2. In the **Lead Details Drawer**, find the active sequence under *Automated Email Sequences*.
-3. Click the **Stop** button.
-
----
-
-## 11. Troubleshooting & FAQ
-
-- **Issue: CSV imported successfully, but leads are not visible.**
-  - **Solution**: Refresh the browser page. Verify your status/priority filters are set to "All".
-- **Issue: Sequence email did not send.**
-  - **Solution**: Check that the sequence status is `Active`, the lead is not in a terminal stop status (`Replied`, `Converted`, etc.), and `next_send_at` time has passed. Click **Process Due Steps Now** to trigger immediate evaluation.
-- **Issue: Lead received duplicate emails.**
-  - **Solution**: The system enforces unique step delivery records in `deliveries` and `campaign_leads`. Verify the lead was not enrolled in two separate sequences simultaneously.
-- **Issue: Sequence continues sending after a prospect replied.**
-  - **Solution**: Update the lead's status in the CRM to `Replied` or `Interested`. The worker will automatically mark the sequence as `Stopped`.
-- **Issue: Personalization tags appear raw in emails.**
-  - **Solution**: Ensure tags match supported formats (e.g., `{{company_name}}` or `{{contact_person}}`). Check that the lead record has values for the specified fields.
-
----
-
-*Documentation maintained by Shivam Singh — ProBitian.*
+## 5. Troubleshooting & FAQ
+- **Issue: Changes made in Admin are not appearing on the public site.**
+  - **Solution**: Verify you clicked "Save". Refresh the public page.
+- **Issue: Uploaded image or logo is not displaying.**
+  - **Solution**: Ensure the file was uploaded into the Media Library. Verify the Supabase Storage URL.
+- **Issue: Contact reply email is failing to send.**
+  - **Solution**: Verify server environment variables `GMAIL_USER` and `GMAIL_APP_PASSWORD` are set in the server environment.
+- **Issue: Admin login failed.**
+  - **Solution**: Confirm the passkey entered matches `ADMIN_PASSKEY` configured in the server environment.

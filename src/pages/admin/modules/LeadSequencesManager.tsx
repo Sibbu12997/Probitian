@@ -170,7 +170,7 @@ export const LeadSequencesManager: React.FC<LeadSequencesManagerProps> = ({ onNa
             delay_days: 0,
             subject: 'Power BI Analytics for {{company_name}}',
             preheader: 'Transform manual MIS reports into automated Power BI dashboards',
-            html_content: `<h2>Hello {{contact_person}},</h2>\n<p>I noticed <strong>{{company_name}}</strong> operates in {{industry}}.</p>\n<p>Based on your business scale in {{location}}, a dedicated Power BI dashboard tailored for <strong>{{powerbi_use_case}}</strong> can eliminate manual Excel consolidation and deliver executive clarity in real time.</p>\n<p><a href="https://probitian.ai.studio/#/contact" class="btn-cta">Schedule Power BI Consultation</a></p>\n<p>Best regards,<br/><strong>Shivam Baghel</strong><br/>ProBitian Analytics</p>`,
+            html_content: `<h2>Hello {{contact_person}},</h2>\n<p>I noticed <strong>{{company_name}}</strong> operates in {{industry}}.</p>\n<p>Based on your business scale in {{location}}, a dedicated Power BI dashboard tailored for <strong>{{powerbi_use_case}}</strong> can eliminate manual Excel consolidation and deliver executive clarity in real time.</p>\n<p><a href="https://probitian.ai.studio/contact" class="btn-cta">Schedule Power BI Consultation</a></p>\n<p>Best regards,<br/><strong>Shivam Baghel</strong><br/>ProBitian Analytics</p>`,
             enabled: true
           },
           {
@@ -178,7 +178,7 @@ export const LeadSequencesManager: React.FC<LeadSequencesManagerProps> = ({ onNa
             delay_days: 3,
             subject: 'Following up — Power BI for {{company_name}}',
             preheader: 'Quick follow-up regarding automated analytics for {{company_name}}',
-            html_content: `<h2>Hi {{contact_person}},</h2>\n<p>Following up on my previous note regarding <strong>{{company_name}}</strong>'s analytics workflow in {{location}}.</p>\n<p>We specialize in turning complex multi-source data into real-time Power BI executive dashboards for {{industry}} organizations — specifically around <strong>{{powerbi_use_case}}</strong>.</p>\n<p>Would you have 10 minutes this week for a brief walkthrough of live enterprise dashboards?</p>\n<p><a href="https://probitian.ai.studio/#/projects" class="btn-cta">Explore Live Portfolio</a></p>\n<p>Regards,<br/><strong>Shivam Baghel</strong><br/>ProBitian Analytics</p>`,
+            html_content: `<h2>Hi {{contact_person}},</h2>\n<p>Following up on my previous note regarding <strong>{{company_name}}</strong>'s analytics workflow in {{location}}.</p>\n<p>We specialize in turning complex multi-source data into real-time Power BI executive dashboards for {{industry}} organizations — specifically around <strong>{{powerbi_use_case}}</strong>.</p>\n<p>Would you have 10 minutes this week for a brief walkthrough of live enterprise dashboards?</p>\n<p><a href="https://probitian.ai.studio/projects" class="btn-cta">Explore Live Portfolio</a></p>\n<p>Regards,<br/><strong>Shivam Baghel</strong><br/>ProBitian Analytics</p>`,
             enabled: true
           }
         ]

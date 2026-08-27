@@ -80,6 +80,14 @@ Dynamic JSON-LD scripts are embedded in the document `<head>` on relevant pages:
   "name": "ProBItian",
   "url": "https://probitian.ai.studio",
   "logo": "https://dlaehchzzkjsrarktfsf.supabase.co/storage/v1/object/public/probitian-media/general/1786857432327-d4d5d41a-probitian_logo.svg",
+  "sameAs": [
+    "https://youtube.com/@probitian",
+    "https://instagram.com/probitian",
+    "https://facebook.com/probitian",
+    "https://github.com/probitian",
+    "https://x.com/Probitian",
+    "https://www.linkedin.com/company/probitian/"
+  ],
   "description": "Enterprise Business Intelligence, Power BI, SQL, DAX, and Data Analytics education platform.",
   "founder": {
     "@type": "Person",

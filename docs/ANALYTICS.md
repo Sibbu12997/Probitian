@@ -5,6 +5,7 @@ Official Specification for Visitor Analytics in ProBitian.
 Project Owner: **Shivam Singh**  
 Official Website: [https://probitian.ai.studio/](https://probitian.ai.studio/)  
 Official Communication Email: [probitianofficial@gmail.com](mailto:probitianofficial@gmail.com)  
+Official X: [https://x.com/Probitian](https://x.com/Probitian) (@Probitian)  
 Official LinkedIn: [https://www.linkedin.com/company/probitian/](https://www.linkedin.com/company/probitian/)  
 
 ---
@@ -37,7 +38,7 @@ ProBitian uses **Google Analytics 4 (GA4)** to monitor website traffic, user eng
 
 The frontend application (`src/lib/analytics.ts`) automatically emits standard page view events and custom conversion events to GA4:
 
-- `page_view`: Fired on hash-route page changes (`#/`, `#/learn`, `#/projects`, `#/blog`, `#/contact`).
+- `page_view`: Fired on page changes (`/`, `/learn`, `/projects`, `/blog`, `/contact`).
 - `contact_form_submit`: Fired when a visitor submits an enquiry.
 - `newsletter_subscribe`: Fired when a visitor subscribes to the newsletter.
 - `dataset_download_click`: Fired when a learner clicks to download a sample CSV/XLSX dataset.
@@ -48,7 +49,7 @@ The frontend application (`src/lib/analytics.ts`) automatically emits standard p
 
 ## 4. Admin GA4 Command Center Dashboard
 
-The Admin Control Center (`#/admin`) includes an integrated GA4 Analytics Command Center module (`/api/analytics/status`, `/api/analytics/realtime`, `/api/analytics/report`):
+The Admin Control Center (`/admin`) includes an integrated GA4 Analytics Command Center module (`/api/analytics/status`, `/api/analytics/realtime`, `/api/analytics/report`):
 
 - **Real-Time Active Visitors**: Live active session count.
 - **Audience Metrics**: Total users, new users, sessions, average engagement time, and bounce rate.

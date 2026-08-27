@@ -5,6 +5,7 @@ Official Technical & Operational Workflow Documentation for ProBitian's B2B Lead
 Project Owner: **Shivam Singh**  
 Official Website: [https://probitian.ai.studio/](https://probitian.ai.studio/)  
 Official Communication Email: [probitianofficial@gmail.com](mailto:probitianofficial@gmail.com)  
+Official X: [https://x.com/Probitian](https://x.com/Probitian) (@Probitian)  
 Official LinkedIn: [https://www.linkedin.com/company/probitian/](https://www.linkedin.com/company/probitian/)  
 
 ---
@@ -15,7 +16,7 @@ ProBitian's B2B Lead Outreach & CRM engine is an enterprise-grade, server-side v
 
 ```
 +-----------------------------------------------------------------------------------+
-|                           ADMIN CONTROL CENTER (#/admin)                          |
+|                           ADMIN CONTROL CENTER (/admin)                           |
 |                                                                                   |
 |  [ B2B Leads CRM ]   ──▶   [ Email Sequences ]   ──▶   [ Lead Outreach Campaigns ]|
 +-----------------------------------------------------------------------------------+
@@ -191,7 +192,7 @@ Automated Email Sequences provide hands-free, multi-touch drip outreach campaign
 > 🚨 **CRITICAL DESIGN MANDATE**: The sequence system does **NOT** blindly blast the entire database. Administrators have granular control over exactly which prospects enter automated sequences.
 
 ```
-1. Open B2B Leads CRM (#/admin -> Lead Outreach & CRM -> B2B Leads CRM)
+1. Open B2B Leads CRM (/admin -> Lead Outreach & CRM -> B2B Leads CRM)
        │
 2. Filter & Search targeted prospects (e.g., High Priority in "Financial Services")
        │

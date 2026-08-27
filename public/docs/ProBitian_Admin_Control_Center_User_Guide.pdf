@@ -1,5 +1,5 @@
 %PDF-1.3
-%ï¿½ß¬ï¿½
+%ºß¬à
 3 0 obj
 <</Type /Page
 /Parent 1 0 R
@@ -10,7 +10,7 @@
 endobj
 4 0 obj
 <<
-/Length 5875
+/Length 5741
 >>
 stream
 0.200025 w
@@ -37,7 +37,7 @@ BT
 18.3999999999999986 TL
 0.059 0.09 0.165 rg
 40. 719.8899999999999864 Td
-(ProBitian Admin Control Center ï¿½ User Guide) Tj
+(ProBitian Admin Control Center — User Guide) Tj
 ET
 0.49 0.23 0.93 RG
 1.5 w
@@ -77,21 +77,28 @@ BT
 11.5 TL
 0.2 0.255 0.333 rg
 40. 625.8899999999999864 Td
+(Official X: https://x.com/Probitian \(@Probitian\)) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0.2 0.255 0.333 rg
+40. 610.8899999999999864 Td
 (Official LinkedIn: https://www.linkedin.com/company/probitian/) Tj
 ET
 BT
 /F2 13 Tf
 14.9499999999999993 TL
 0.118 0.161 0.231 rg
-40. 594.8899999999999864 Td
+40. 579.8899999999999864 Td
 (1. Introduction & Security Guidance) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-40. 582.8899999999999864 Td
-(The ProBitian Admin Control Center \(#/admin\) is a secure management portal for authorized administrators to control) Tj
+40. 567.8899999999999864 Td
+(The ProBitian Admin Control Center \(/admin\) is a secure management portal for authorized administrators to control) Tj
 T* (website content, analyze GA4 traffic, manage contact inquiries, send email responses, maintain subscribers,) Tj
 T* (broadcast email campaigns, manage media assets, and configure brand settings.) Tj
 ET
@@ -99,122 +106,122 @@ BT
 /F2 11 Tf
 12.6499999999999986 TL
 0.278 0.333 0.412 rg
-40. 527.8899999999999864 Td
+40. 512.8899999999999864 Td
 (Critical Security Instructions) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 517.8899999999999864 Td
-(ï¿½ **Never Share Credentials**: Do not share the Admin Passkey or login URL.) Tj
+48. 502.8899999999999864 Td
+(• **Never Share Credentials**: Do not share the Admin Passkey or login URL.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 502.8899999999999864 Td
-(ï¿½ **Server-Side Secret Isolation**: Secret environment variables \(ADMIN_PASSKEY, SUPABASE_SECRET_KEY,) Tj
+48. 487.8899999999999864 Td
+(• **Server-Side Secret Isolation**: Secret environment variables \(ADMIN_PASSKEY, SUPABASE_SECRET_KEY,) Tj
 T* (GMAIL_APP_PASSWORD, GEMINI_API_KEY\) must remain strictly server-side.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 474.8899999999999864 Td
-(ï¿½ **No Client Secrets**: Never place server secrets in frontend code, git commits, README files, or public) Tj
+48. 459.8899999999999864 Td
+(• **No Client Secrets**: Never place server secrets in frontend code, git commits, README files, or public) Tj
 T* (documentation.) Tj
 ET
 BT
 /F2 13 Tf
 14.9499999999999993 TL
 0.118 0.161 0.231 rg
-40. 430.8899999999999864 Td
+40. 415.8899999999999864 Td
 (2. Production Architecture Overview) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-40. 418.8899999999999864 Td
+40. 403.8899999999999864 Td
 (ProBitian utilizes a clean, server-side verified architecture:) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 403.8899999999999864 Td
-(ï¿½ **Database**: Supabase PostgreSQL is the SINGLE authoritative source of truth.) Tj
+48. 388.8899999999999864 Td
+(• **Database**: Supabase PostgreSQL is the SINGLE authoritative source of truth.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 388.8899999999999864 Td
-(ï¿½ **Media Storage**: Supabase Storage \(`probitian-media` bucket\) stores all uploaded images, PDFs, logos, and) Tj
+48. 373.8899999999999864 Td
+(• **Media Storage**: Supabase Storage \(`probitian-media` bucket\) stores all uploaded images, PDFs, logos, and) Tj
 T* (banners.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 360.8899999999999864 Td
-(ï¿½ **Email Delivery**: Server-side Express engine via **Gmail SMTP** \(`probitianofficial@gmail.com`\).) Tj
-ET
-BT
-/F1 10 Tf
-11.5 TL
-0.2 0.255 0.333 rg
 48. 345.8899999999999864 Td
-(ï¿½ **Analytics**: Google Analytics 4 \(GA4\) integration.) Tj
+(• **Email Delivery**: Server-side Express engine via **Gmail SMTP** \(`probitianofficial@gmail.com`\).) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
 48. 330.8899999999999864 Td
-(ï¿½ **Removed / Unused Infrastructure**: Firebase, Cloud SQL, Drizzle, and Resend are NOT used in production.) Tj
+(• **Analytics**: Google Analytics 4 \(GA4\) integration.) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0.2 0.255 0.333 rg
+48. 315.8899999999999864 Td
+(• **Removed / Unused Infrastructure**: Firebase, Cloud SQL, Drizzle, and Resend are NOT used in production.) Tj
 ET
 BT
 /F2 13 Tf
 14.9499999999999993 TL
 0.118 0.161 0.231 rg
-40. 299.8899999999999864 Td
+40. 284.8899999999999864 Td
 (3. Admin Authentication & Access Control) Tj
 ET
 BT
 /F2 11 Tf
 12.6499999999999986 TL
 0.278 0.333 0.412 rg
-40. 279.8899999999999864 Td
+40. 264.8899999999999864 Td
 (Accessing the Admin Portal) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 269.8899999999999864 Td
-(1. Append #/admin to the website URL \(e.g., https://probitian.ai.studio/#/admin\).) Tj
-ET
-BT
-/F1 10 Tf
-11.5 TL
-0.2 0.255 0.333 rg
 48. 254.8899999999999864 Td
-(2. Enter the authorized **Admin Passkey**.) Tj
+(1. Navigate to the /admin route \(e.g., https://probitian.ai.studio/admin\).) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
 48. 239.8899999999999864 Td
-(3. Click **Unlock Admin Portal**.) Tj
+(2. Enter the authorized **Admin Passkey**.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
 48. 224.8899999999999864 Td
+(3. Click **Unlock Admin Portal**.) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0.2 0.255 0.333 rg
+48. 209.8899999999999864 Td
 (4. The server validates the passkey via `POST /api/admin/verify-passkey` against) Tj
 T* (`process.env.ADMIN_PASSKEY` and issues an authenticated session token.) Tj
 ET
@@ -222,65 +229,57 @@ BT
 /F2 11 Tf
 12.6499999999999986 TL
 0.278 0.333 0.412 rg
-40. 182.8899999999999864 Td
+40. 167.8899999999999864 Td
 (Navigation Controls) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 172.8899999999999864 Td
-(ï¿½ **Back to Website**: Returns to the public site without terminating the session.) Tj
+48. 157.8899999999999864 Td
+(• **Back to Website**: Returns to the public site without terminating the session.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 157.8899999999999864 Td
-(ï¿½ **Logout**: Instantly clears the admin session token and redirects to the login screen.) Tj
+48. 142.8899999999999864 Td
+(• **Logout**: Instantly clears the admin session token and redirects to the login screen.) Tj
 ET
 BT
 /F2 13 Tf
 14.9499999999999993 TL
 0.118 0.161 0.231 rg
-40. 126.8899999999999864 Td
+40. 111.8899999999999864 Td
 (4. Comprehensive Admin Modules Guide) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-40. 114.8899999999999864 Td
+40. 99.8899999999999864 Td
 (The Admin Portal contains integrated management modules:) Tj
 ET
 BT
 /F2 11 Tf
 12.6499999999999986 TL
 0.278 0.333 0.412 rg
-40. 85.8899999999999864 Td
+40. 70.8899999999999864 Td
 (1. Dashboard Overview) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 75.8899999999999864 Td
-(ï¿½ **Function**: Command center summary and quick launchpad.) Tj
-ET
-BT
-/F1 10 Tf
-11.5 TL
-0.2 0.255 0.333 rg
 48. 60.8899999999999864 Td
-(ï¿½ **Features**: KPI metrics \(Active Users Now, Today's Visitors, Pending Inquiries, Total Subscribers\), quick) Tj
-T* (shortcuts to core CMS actions, and recent activity logs.) Tj
+(• **Function**: Command center summary and quick launchpad.) Tj
 ET
 BT
 /F1 8 Tf
 9.1999999999999993 TL
 0.58 0.639 0.722 rg
 40. 20. Td
-(ProBitian Platform Documentation ï¿½ Official User Guide) Tj
+(ProBitian Platform Documentation — Official User Guide) Tj
 ET
 BT
 /F1 8 Tf
@@ -301,7 +300,7 @@ endobj
 endobj
 6 0 obj
 <<
-/Length 6673
+/Length 6605
 >>
 stream
 1.5 w
@@ -315,318 +314,312 @@ BT
 9.1999999999999993 TL
 0.392 0.455 0.545 rg
 40. 811.8899999999999864 Td
-(ProBitian Admin Control Center ï¿½ Page 2) Tj
+(ProBitian Admin Control Center — Page 2) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0.2 0.255 0.333 rg
+48. 791.8899999999999864 Td
+(• **Features**: KPI metrics \(Active Users Now, Today's Visitors, Pending Inquiries, Total Subscribers\), quick) Tj
+T* (shortcuts to core CMS actions, and recent activity logs.) Tj
 ET
 BT
 /F2 11 Tf
 12.6499999999999986 TL
 0.278 0.333 0.412 rg
-40. 777.8899999999999864 Td
+40. 749.8899999999999864 Td
 (2. GA4 Analytics Command Center) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 767.8899999999999864 Td
-(ï¿½ **Function**: Real-time traffic, audience engagement, and conversion tracking via Google Analytics 4.) Tj
+48. 739.8899999999999864 Td
+(• **Function**: Real-time traffic, audience engagement, and conversion tracking via Google Analytics 4.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 752.8899999999999864 Td
-(ï¿½ **Features**: Active visitors count, date range filters \(7D, 30D, 90D, Custom\), total page views, average session) Tj
+48. 724.8899999999999864 Td
+(• **Features**: Active visitors count, date range filters \(7D, 30D, 90D, Custom\), total page views, average session) Tj
 T* (duration, top pages report, traffic referral sources, device types, and event conversion counters.) Tj
 ET
 BT
 /F2 11 Tf
 12.6499999999999986 TL
 0.278 0.333 0.412 rg
-40. 710.8899999999999864 Td
+40. 682.8899999999999864 Td
 (3. Home Page Editor) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 700.8899999999999864 Td
-(ï¿½ **Function**: Edit hero section, headlines, statistics, and value proposition cards on the public Home page.) Tj
+48. 672.8899999999999864 Td
+(• **Function**: Edit hero section, headlines, statistics, and value proposition cards on the public Home page.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 685.8899999999999864 Td
-(ï¿½ **Workflow**:) Tj
+48. 657.8899999999999864 Td
+(• **Workflow**:) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 670.8899999999999864 Td
-(ï¿½ Edit hero headline, subheadline, CTA text, and CTA links.) Tj
+48. 642.8899999999999864 Td
+(• Edit hero headline, subheadline, CTA text, and CTA links.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 655.8899999999999864 Td
-(ï¿½ Modify platform key stats \(e.g. "10K+ Learners", "50+ Dashboards"\).) Tj
+48. 627.8899999999999864 Td
+(• Modify platform key stats \(e.g. "10K+ Learners", "50+ Dashboards"\).) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 640.8899999999999864 Td
-(ï¿½ Update feature cards and value pillars.) Tj
+48. 612.8899999999999864 Td
+(• Update feature cards and value pillars.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 625.8899999999999864 Td
-(ï¿½ Click **Save Changes** -> Persists directly to Supabase PostgreSQL and reflects immediately on the live Home) Tj
+48. 597.8899999999999864 Td
+(• Click **Save Changes** -> Persists directly to Supabase PostgreSQL and reflects immediately on the live Home) Tj
 T* (page.) Tj
 ET
 BT
 /F2 11 Tf
 12.6499999999999986 TL
 0.278 0.333 0.412 rg
-40. 583.8899999999999864 Td
+40. 555.8899999999999864 Td
 (4. Projects Portfolio Manager) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 573.8899999999999864 Td
-(ï¿½ **Function**: Create, edit, publish, order, and tag portfolio projects.) Tj
+48. 545.8899999999999864 Td
+(• **Function**: Create, edit, publish, order, and tag portfolio projects.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 558.8899999999999864 Td
-(ï¿½ **Workflow**:) Tj
+48. 530.8899999999999864 Td
+(• **Workflow**:) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 543.8899999999999864 Td
-(ï¿½ Click **Add New Project** or select an existing project to edit.) Tj
+48. 515.8899999999999864 Td
+(• Click **Add New Project** or select an existing project to edit.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 528.8899999999999864 Td
-(ï¿½ Set Title, Category, Summary, Full Description, and Tools Used.) Tj
+48. 500.8899999999999864 Td
+(• Set Title, Category, Summary, Full Description, and Tools Used.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 513.8899999999999864 Td
-(ï¿½ Attach Live Demo URL, GitHub Repository, YouTube Tutorial link, and Dataset download link.) Tj
+48. 485.8899999999999864 Td
+(• Attach Live Demo URL, GitHub Repository, YouTube Tutorial link, and Dataset download link.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 498.8899999999999864 Td
-(ï¿½ Toggle **Featured** to display on the Home page grid.) Tj
+48. 470.8899999999999864 Td
+(• Toggle **Featured** to display on the Home page grid.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 483.8899999999999864 Td
-(ï¿½ Click **Save Project** -> Updates Supabase PostgreSQL and reflects instantly on #/projects.) Tj
+48. 455.8899999999999864 Td
+(• Click **Save Project** -> Updates Supabase PostgreSQL and reflects instantly on /projects.) Tj
 ET
 BT
 /F2 11 Tf
 12.6499999999999986 TL
 0.278 0.333 0.412 rg
-40. 454.8899999999999864 Td
+40. 426.8899999999999864 Td
 (5. Blog & Articles Manager) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 444.8899999999999864 Td
-(ï¿½ **Function**: Draft, schedule, publish, or edit technical articles and guides.) Tj
+48. 416.8899999999999864 Td
+(• **Function**: Draft, schedule, publish, or edit technical articles and guides.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 429.8899999999999864 Td
-(ï¿½ **Workflow**:) Tj
+48. 401.8899999999999864 Td
+(• **Workflow**:) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 414.8899999999999864 Td
-(ï¿½ Set Article Title, URL Slug, Category, Read Time, and Tags.) Tj
+48. 386.8899999999999864 Td
+(• Set Article Title, URL Slug, Category, Read Time, and Tags.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 399.8899999999999864 Td
-(ï¿½ Enter Excerpt and full Markdown content.) Tj
+48. 371.8899999999999864 Td
+(• Enter Excerpt and full Markdown content.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 384.8899999999999864 Td
-(ï¿½ Attach Cover Image URL and optional YouTube video walkthrough link.) Tj
+48. 356.8899999999999864 Td
+(• Attach Cover Image URL and optional YouTube video walkthrough link.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 369.8899999999999864 Td
-(ï¿½ Set status to **Draft** or **Published**.) Tj
+48. 341.8899999999999864 Td
+(• Set status to **Draft** or **Published**.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 354.8899999999999864 Td
-(ï¿½ Click **Save Article** -> Updates Supabase PostgreSQL and reflects on #/blog.) Tj
+48. 326.8899999999999864 Td
+(• Click **Save Article** -> Updates Supabase PostgreSQL and reflects on /blog.) Tj
 ET
 BT
 /F2 11 Tf
 12.6499999999999986 TL
 0.278 0.333 0.412 rg
-40. 325.8899999999999864 Td
+40. 297.8899999999999864 Td
 (6. Learn & Courses Manager) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 315.8899999999999864 Td
-(ï¿½ **Function**: Manage skill paths, course modules, video links, PDFs, and dataset resources.) Tj
+48. 287.8899999999999864 Td
+(• **Function**: Manage skill paths, course modules, video links, PDFs, and dataset resources.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 300.8899999999999864 Td
-(ï¿½ **Workflow**:) Tj
+48. 272.8899999999999864 Td
+(• **Workflow**:) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 285.8899999999999864 Td
-(ï¿½ Set Course Title, Subtitle, Category \(Power BI, SQL, Excel, Python, AI\), Skill Level, and Duration.) Tj
+48. 257.8899999999999864 Td
+(• Set Course Title, Subtitle, Category \(Power BI, SQL, Excel, Python, AI\), Skill Level, and Duration.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 270.8899999999999864 Td
-(ï¿½ Attach YouTube Video IDs, PDF Documentation links, and raw dataset download URLs.) Tj
+48. 242.8899999999999864 Td
+(• Attach YouTube Video IDs, PDF Documentation links, and raw dataset download URLs.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 255.8899999999999864 Td
-(ï¿½ Click **Save Course** -> Updates Supabase PostgreSQL and reflects on #/learn.) Tj
+48. 227.8899999999999864 Td
+(• Click **Save Course** -> Updates Supabase PostgreSQL and reflects on /learn.) Tj
 ET
 BT
 /F2 11 Tf
 12.6499999999999986 TL
 0.278 0.333 0.412 rg
-40. 226.8899999999999864 Td
+40. 198.8899999999999864 Td
 (7. YouTube Showcase Manager) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 216.8899999999999864 Td
-(ï¿½ **Function**: Organize YouTube video tutorials, playlists, and channel highlights.) Tj
+48. 188.8899999999999864 Td
+(• **Function**: Organize YouTube video tutorials, playlists, and channel highlights.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 201.8899999999999864 Td
-(ï¿½ **Workflow**:) Tj
+48. 173.8899999999999864 Td
+(• **Workflow**:) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 186.8899999999999864 Td
-(ï¿½ Add Video Title, YouTube URL, Thumbnail URL, Category, Description, and Duration.) Tj
+48. 158.8899999999999864 Td
+(• Add Video Title, YouTube URL, Thumbnail URL, Category, Description, and Duration.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 171.8899999999999864 Td
-(ï¿½ Edit or delete existing videos.) Tj
+48. 143.8899999999999864 Td
+(• Edit or delete existing videos.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 156.8899999999999864 Td
-(ï¿½ Click **Save** -> Updates Supabase PostgreSQL and reflects on #/youtube.) Tj
+48. 128.8899999999999864 Td
+(• Click **Save** -> Updates Supabase PostgreSQL and reflects on /youtube.) Tj
 ET
 BT
 /F2 11 Tf
 12.6499999999999986 TL
 0.278 0.333 0.412 rg
-40. 127.8899999999999864 Td
+40. 99.8899999999999864 Td
 (8. Media Library Engine) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 117.8899999999999864 Td
-(ï¿½ **Function**: Asset manager for site graphics, logos, banners, thumbnails, and PDF files stored in Supabase) Tj
+48. 89.8899999999999864 Td
+(• **Function**: Asset manager for site graphics, logos, banners, thumbnails, and PDF files stored in Supabase) Tj
 T* (Storage \(`probitian-media` bucket\).) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 89.8899999999999864 Td
-(ï¿½ **Workflow**:) Tj
-ET
-BT
-/F1 10 Tf
-11.5 TL
-0.2 0.255 0.333 rg
-48. 74.8899999999999864 Td
-(ï¿½ Upload media files \(PNG, JPG, SVG, WebP, PDF\).) Tj
-ET
-BT
-/F1 10 Tf
-11.5 TL
-0.2 0.255 0.333 rg
-48. 59.8899999999999864 Td
-(ï¿½ SVG files undergo automated server-side **DOMPurify sanitization** before saving to eliminate script injection.) Tj
+48. 61.8899999999999864 Td
+(• **Workflow**:) Tj
 ET
 BT
 /F1 8 Tf
 9.1999999999999993 TL
 0.58 0.639 0.722 rg
 40. 20. Td
-(ProBitian Platform Documentation ï¿½ Official User Guide) Tj
+(ProBitian Platform Documentation — Official User Guide) Tj
 ET
 BT
 /F1 8 Tf
@@ -647,7 +640,7 @@ endobj
 endobj
 8 0 obj
 <<
-/Length 6595
+/Length 6674
 >>
 stream
 1.5 w
@@ -661,318 +654,318 @@ BT
 9.1999999999999993 TL
 0.392 0.455 0.545 rg
 40. 811.8899999999999864 Td
-(ProBitian Admin Control Center ï¿½ Page 3) Tj
+(ProBitian Admin Control Center — Page 3) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
 48. 791.8899999999999864 Td
-(ï¿½ Preview media items, copy URLs, or **select existing media assets** directly when editing Branding, Projects,) Tj
+(• Upload media files \(PNG, JPG, SVG, WebP, PDF\).) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0.2 0.255 0.333 rg
+48. 776.8899999999999864 Td
+(• SVG files undergo automated server-side **DOMPurify sanitization** before saving to eliminate script injection.) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0.2 0.255 0.333 rg
+48. 761.8899999999999864 Td
+(• Preview media items, copy URLs, or **select existing media assets** directly when editing Branding, Projects,) Tj
 T* (Blog, or Courses.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 763.8899999999999864 Td
-(ï¿½ **Asset Reuse**: Re-use existing Media Library items directly from Supabase Storage.) Tj
+48. 733.8899999999999864 Td
+(• **Asset Reuse**: Re-use existing Media Library items directly from Supabase Storage.) Tj
 ET
 BT
 /F2 11 Tf
 12.6499999999999986 TL
 0.278 0.333 0.412 rg
-40. 734.8899999999999864 Td
+40. 704.8899999999999864 Td
 (9. Contact Messages & Inbox Manager) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 724.8899999999999864 Td
-(ï¿½ **Function**: Review visitor inquiries, organize status, and send email replies via Gmail SMTP.) Tj
-ET
-BT
-/F1 10 Tf
-11.5 TL
-0.2 0.255 0.333 rg
-48. 709.8899999999999864 Td
-(ï¿½ **Workflow**:) Tj
-ET
-BT
-/F1 10 Tf
-11.5 TL
-0.2 0.255 0.333 rg
 48. 694.8899999999999864 Td
-(ï¿½ View inbox table with sender Name, Email, Phone, Course Interest, Message, and Timestamp.) Tj
+(• **Function**: Review visitor inquiries, organize status, and send email replies via Gmail SMTP.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
 48. 679.8899999999999864 Td
-(ï¿½ Update status badges \(**Unread**, **Read**, **Replied**, **Archived**\).) Tj
+(• **Workflow**:) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
 48. 664.8899999999999864 Td
-(ï¿½ Add internal **Admin Notes** for team reference.) Tj
+(• View inbox table with sender Name, Email, Phone, Course Interest, Message, and Timestamp.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
 48. 649.8899999999999864 Td
-(ï¿½ Click **Reply via Email**: Sends an email response directly from the portal via server-side **Gmail SMTP**) Tj
+(• Update status badges \(**Unread**, **Read**, **Replied**, **Archived**\).) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0.2 0.255 0.333 rg
+48. 634.8899999999999864 Td
+(• Add internal **Admin Notes** for team reference.) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0.2 0.255 0.333 rg
+48. 619.8899999999999864 Td
+(• Click **Reply via Email**: Sends an email response directly from the portal via server-side **Gmail SMTP**) Tj
 T* (\(`probitianofficial@gmail.com`\).) Tj
 ET
 BT
 /F2 11 Tf
 12.6499999999999986 TL
 0.278 0.333 0.412 rg
-40. 607.8899999999999864 Td
+40. 577.8899999999999864 Td
 (10. Subscribers Manager) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 597.8899999999999864 Td
-(ï¿½ **Function**: Manage newsletter email subscriptions stored in Supabase PostgreSQL.) Tj
-ET
-BT
-/F1 10 Tf
-11.5 TL
-0.2 0.255 0.333 rg
-48. 582.8899999999999864 Td
-(ï¿½ **Workflow**:) Tj
-ET
-BT
-/F1 10 Tf
-11.5 TL
-0.2 0.255 0.333 rg
 48. 567.8899999999999864 Td
-(ï¿½ View full subscriber email roster, active/unsubscribed status, and signup timestamps.) Tj
+(• **Function**: Manage newsletter email subscriptions stored in Supabase PostgreSQL.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
 48. 552.8899999999999864 Td
-(ï¿½ Search subscribers by domain or date.) Tj
+(• **Workflow**:) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
 48. 537.8899999999999864 Td
-(ï¿½ Export subscriber lists to CSV format.) Tj
+(• View full subscriber email roster, active/unsubscribed status, and signup timestamps.) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0.2 0.255 0.333 rg
+48. 522.8899999999999864 Td
+(• Search subscribers by domain or date.) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0.2 0.255 0.333 rg
+48. 507.8899999999999864 Td
+(• Export subscriber lists to CSV format.) Tj
 ET
 BT
 /F2 11 Tf
 12.6499999999999986 TL
 0.278 0.333 0.412 rg
-40. 508.8899999999999864 Td
+40. 478.8899999999999864 Td
 (11. Email Campaign & Newsletter Manager) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 498.8899999999999864 Td
-(ï¿½ **Function**: Draft, test, and broadcast email newsletters to active subscribers via Gmail SMTP.) Tj
-ET
-BT
-/F1 10 Tf
-11.5 TL
-0.2 0.255 0.333 rg
-48. 483.8899999999999864 Td
-(ï¿½ **Workflow**:) Tj
-ET
-BT
-/F1 10 Tf
-11.5 TL
-0.2 0.255 0.333 rg
 48. 468.8899999999999864 Td
-(ï¿½ View total active subscribers count and delivery provider status \(Gmail SMTP\).) Tj
+(• **Function**: Draft, test, and broadcast email newsletters to active subscribers via Gmail SMTP.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
 48. 453.8899999999999864 Td
-(ï¿½ Create new email campaigns or edit existing draft campaigns in Supabase \(`email_campaigns` table\).) Tj
+(• **Workflow**:) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
 48. 438.8899999999999864 Td
-(ï¿½ Set Campaign Name, Email Subject Line, Preheader Preview Text, and HTML/Formatted Body Content.) Tj
+(• View total active subscribers count and delivery provider status \(Gmail SMTP\).) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
 48. 423.8899999999999864 Td
-(ï¿½ Send instant **Test Emails** to any verified email address.) Tj
+(• Create new email campaigns or edit existing draft campaigns in Supabase \(`email_campaigns` table\).) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
 48. 408.8899999999999864 Td
-(ï¿½ Execute **Bulk Campaign Broadcasts** to all active newsletter subscribers with live status updates logged in) Tj
+(• Set Campaign Name, Email Subject Line, Preheader Preview Text, and HTML/Formatted Body Content.) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0.2 0.255 0.333 rg
+48. 393.8899999999999864 Td
+(• Send instant **Test Emails** to any verified email address.) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0.2 0.255 0.333 rg
+48. 378.8899999999999864 Td
+(• Execute **Bulk Campaign Broadcasts** to all active newsletter subscribers with live status updates logged in) Tj
 T* (`email_campaign_recipients`.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 380.8899999999999864 Td
-(ï¿½ Compliant **Unsubscribe links** allowing recipients to unsubscribe safely.) Tj
+48. 350.8899999999999864 Td
+(• Compliant **Unsubscribe links** allowing recipients to unsubscribe safely.) Tj
 ET
 BT
 /F2 11 Tf
 12.6499999999999986 TL
 0.278 0.333 0.412 rg
-40. 351.8899999999999864 Td
+40. 321.8899999999999864 Td
 (12. Website Branding Manager) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 341.8899999999999864 Td
-(ï¿½ **Function**: Configure site logos, banners, theme colors, and brand identity.) Tj
-ET
-BT
-/F1 10 Tf
-11.5 TL
-0.2 0.255 0.333 rg
-48. 326.8899999999999864 Td
-(ï¿½ **Workflow**:) Tj
-ET
-BT
-/F1 10 Tf
-11.5 TL
-0.2 0.255 0.333 rg
 48. 311.8899999999999864 Td
-(ï¿½ **Choose Logo & Banner from Media Library** \(Supabase Storage\) or upload custom assets.) Tj
+(• **Function**: Configure site logos, banners, theme colors, and brand identity.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
 48. 296.8899999999999864 Td
-(ï¿½ Set Site Name, Tagline, and Theme Accents.) Tj
+(• **Workflow**:) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
 48. 281.8899999999999864 Td
-(ï¿½ Click **Save Branding** -> Updates Supabase PostgreSQL and updates site branding globally.) Tj
+(• **Choose Logo & Banner from Media Library** \(Supabase Storage\) or upload custom assets.) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0.2 0.255 0.333 rg
+48. 266.8899999999999864 Td
+(• Set Site Name, Tagline, and Theme Accents.) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0.2 0.255 0.333 rg
+48. 251.8899999999999864 Td
+(• Click **Save Branding** -> Updates Supabase PostgreSQL and updates site branding globally.) Tj
 ET
 BT
 /F2 11 Tf
 12.6499999999999986 TL
 0.278 0.333 0.412 rg
-40. 252.8899999999999864 Td
+40. 222.8899999999999864 Td
 (13. Social Links Manager) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 242.8899999999999864 Td
-(ï¿½ **Function**: Control social profiles displayed across header and footer.) Tj
-ET
-BT
-/F1 10 Tf
-11.5 TL
-0.2 0.255 0.333 rg
-48. 227.8899999999999864 Td
-(ï¿½ **Workflow**:) Tj
-ET
-BT
-/F1 10 Tf
-11.5 TL
-0.2 0.255 0.333 rg
 48. 212.8899999999999864 Td
-(ï¿½ Manage links for YouTube, Instagram, Facebook, GitHub, LinkedIn, etc.) Tj
+(• **Function**: Control social profiles displayed across header and footer.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
 48. 197.8899999999999864 Td
-(ï¿½ Click **Save Social Links** -> Updates Supabase PostgreSQL.) Tj
+(• **Workflow**:) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0.2 0.255 0.333 rg
+48. 182.8899999999999864 Td
+(• Manage links for YouTube, Instagram, Facebook, GitHub, X \(Twitter\), LinkedIn, etc.) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0.2 0.255 0.333 rg
+48. 167.8899999999999864 Td
+(• Click **Save Social Links** -> Updates Supabase PostgreSQL.) Tj
 ET
 BT
 /F2 11 Tf
 12.6499999999999986 TL
 0.278 0.333 0.412 rg
-40. 168.8899999999999864 Td
+40. 138.8899999999999864 Td
 (14. Navigation Menu Manager) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 158.8899999999999864 Td
-(ï¿½ **Function**: Customize top navigation links, paths, icons, and visibility.) Tj
-ET
-BT
-/F1 10 Tf
-11.5 TL
-0.2 0.255 0.333 rg
-48. 143.8899999999999864 Td
-(ï¿½ **Workflow**:) Tj
-ET
-BT
-/F1 10 Tf
-11.5 TL
-0.2 0.255 0.333 rg
 48. 128.8899999999999864 Td
-(ï¿½ Toggle navigation link visibility and menu order.) Tj
+(• **Function**: Customize top navigation links, paths, icons, and visibility.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
 48. 113.8899999999999864 Td
-(ï¿½ Click **Save Navigation** -> Updates Supabase PostgreSQL.) Tj
+(• **Workflow**:) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0.2 0.255 0.333 rg
+48. 98.8899999999999864 Td
+(• Toggle navigation link visibility and menu order.) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0.2 0.255 0.333 rg
+48. 83.8899999999999864 Td
+(• Click **Save Navigation** -> Updates Supabase PostgreSQL.) Tj
 ET
 BT
 /F2 11 Tf
 12.6499999999999986 TL
 0.278 0.333 0.412 rg
-40. 84.8899999999999864 Td
+40. 54.8899999999999864 Td
 (15. SEO & Meta Tags Manager) Tj
-ET
-BT
-/F1 10 Tf
-11.5 TL
-0.2 0.255 0.333 rg
-48. 74.8899999999999864 Td
-(ï¿½ **Function**: Configure search engine optimization settings and social share tags.) Tj
-ET
-BT
-/F1 10 Tf
-11.5 TL
-0.2 0.255 0.333 rg
-48. 59.8899999999999864 Td
-(ï¿½ **Workflow**:) Tj
 ET
 BT
 /F1 8 Tf
 9.1999999999999993 TL
 0.58 0.639 0.722 rg
 40. 20. Td
-(ProBitian Platform Documentation ï¿½ Official User Guide) Tj
+(ProBitian Platform Documentation — Official User Guide) Tj
 ET
 BT
 /F1 8 Tf
@@ -993,7 +986,7 @@ endobj
 endobj
 10 0 obj
 <<
-/Length 3544
+/Length 3799
 >>
 stream
 1.5 w
@@ -1007,163 +1000,177 @@ BT
 9.1999999999999993 TL
 0.392 0.455 0.545 rg
 40. 811.8899999999999864 Td
-(ProBitian Admin Control Center ï¿½ Page 4) Tj
+(ProBitian Admin Control Center — Page 4) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
 48. 791.8899999999999864 Td
-(ï¿½ Edit Meta Title, Meta Description, Keywords, Canonical URL, Open Graph \(OG\) fields, and Twitter Handle.) Tj
+(• **Function**: Configure search engine optimization settings and social share tags.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
 48. 776.8899999999999864 Td
-(ï¿½ Click **Save SEO Settings** -> Updates Supabase PostgreSQL and injects meta tags dynamically.) Tj
+(• **Workflow**:) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0.2 0.255 0.333 rg
+48. 761.8899999999999864 Td
+(• Edit Meta Title, Meta Description, Keywords, Canonical URL, Open Graph \(OG\) fields, and Twitter/X Handle.) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0.2 0.255 0.333 rg
+48. 746.8899999999999864 Td
+(• Click **Save SEO Settings** -> Updates Supabase PostgreSQL and injects meta tags dynamically.) Tj
 ET
 BT
 /F2 11 Tf
 12.6499999999999986 TL
 0.278 0.333 0.412 rg
-40. 747.8899999999999864 Td
+40. 717.8899999999999864 Td
 (16. Website Settings & Location) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 737.8899999999999864 Td
-(ï¿½ **Function**: Manage global site parameters and official physical location details.) Tj
-ET
-BT
-/F1 10 Tf
-11.5 TL
-0.2 0.255 0.333 rg
-48. 722.8899999999999864 Td
-(ï¿½ **Workflow**:) Tj
-ET
-BT
-/F1 10 Tf
-11.5 TL
-0.2 0.255 0.333 rg
 48. 707.8899999999999864 Td
-(ï¿½ Edit Site Name, Tagline, Official Contact Email \(`probitianofficial@gmail.com`\), Footer Copyright, and Community) Tj
+(• **Function**: Manage global site parameters and official physical location details.) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0.2 0.255 0.333 rg
+48. 692.8899999999999864 Td
+(• **Workflow**:) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0.2 0.255 0.333 rg
+48. 677.8899999999999864 Td
+(• Edit Site Name, Tagline, Official Contact Email \(`probitianofficial@gmail.com`\), Footer Copyright, and Community) Tj
 T* (Hub location details.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 679.8899999999999864 Td
-(ï¿½ Click **Save Settings** -> Updates Supabase PostgreSQL.) Tj
+48. 649.8899999999999864 Td
+(• Click **Save Settings** -> Updates Supabase PostgreSQL.) Tj
 ET
 BT
 /F2 11 Tf
 12.6499999999999986 TL
 0.278 0.333 0.412 rg
-40. 650.8899999999999864 Td
+40. 620.8899999999999864 Td
 (17. Legal & Policies Manager) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 640.8899999999999864 Td
-(ï¿½ **Function**: Edit Terms of Service and Privacy Policy pages.) Tj
-ET
-BT
-/F1 10 Tf
-11.5 TL
-0.2 0.255 0.333 rg
-48. 625.8899999999999864 Td
-(ï¿½ **Workflow**:) Tj
-ET
-BT
-/F1 10 Tf
-11.5 TL
-0.2 0.255 0.333 rg
 48. 610.8899999999999864 Td
-(ï¿½ Edit Terms of Service and Privacy Policy text sections.) Tj
+(• **Function**: Edit Terms of Service and Privacy Policy pages.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
 48. 595.8899999999999864 Td
-(ï¿½ Click **Save Legal Settings** -> Updates Supabase PostgreSQL.) Tj
+(• **Workflow**:) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0.2 0.255 0.333 rg
+48. 580.8899999999999864 Td
+(• Edit Terms of Service and Privacy Policy text sections.) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0.2 0.255 0.333 rg
+48. 565.8899999999999864 Td
+(• Click **Save Legal Settings** -> Updates Supabase PostgreSQL.) Tj
 ET
 BT
 /F2 13 Tf
 14.9499999999999993 TL
 0.118 0.161 0.231 rg
-40. 564.8899999999999864 Td
+40. 534.8899999999999864 Td
 (5. Troubleshooting & FAQ) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 552.8899999999999864 Td
-(ï¿½ **Issue: Changes made in Admin are not appearing on the public site.**) Tj
-ET
-BT
-/F1 10 Tf
-11.5 TL
-0.2 0.255 0.333 rg
-48. 537.8899999999999864 Td
-(ï¿½ **Solution**: Verify you clicked "Save". Refresh the public page.) Tj
-ET
-BT
-/F1 10 Tf
-11.5 TL
-0.2 0.255 0.333 rg
 48. 522.8899999999999864 Td
-(ï¿½ **Issue: Uploaded image or logo is not displaying.**) Tj
+(• **Issue: Changes made in Admin are not appearing on the public site.**) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
 48. 507.8899999999999864 Td
-(ï¿½ **Solution**: Ensure the file was uploaded into the Media Library. Verify the Supabase Storage URL.) Tj
+(• **Solution**: Verify you clicked "Save". Refresh the public page.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
 48. 492.8899999999999864 Td
-(ï¿½ **Issue: Contact reply email is failing to send.**) Tj
+(• **Issue: Uploaded image or logo is not displaying.**) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
 48. 477.8899999999999864 Td
-(ï¿½ **Solution**: Verify server environment variables `GMAIL_USER` and `GMAIL_APP_PASSWORD` are set in the) Tj
+(• **Solution**: Ensure the file was uploaded into the Media Library. Verify the Supabase Storage URL.) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0.2 0.255 0.333 rg
+48. 462.8899999999999864 Td
+(• **Issue: Contact reply email is failing to send.**) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0.2 0.255 0.333 rg
+48. 447.8899999999999864 Td
+(• **Solution**: Verify server environment variables `GMAIL_USER` and `GMAIL_APP_PASSWORD` are set in the) Tj
 T* (server environment.) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 449.8899999999999864 Td
-(ï¿½ **Issue: Admin login failed.**) Tj
+48. 419.8899999999999864 Td
+(• **Issue: Admin login failed.**) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.2 0.255 0.333 rg
-48. 434.8899999999999864 Td
-(ï¿½ **Solution**: Confirm the passkey entered matches `ADMIN_PASSKEY` configured in the server environment.) Tj
+48. 404.8899999999999864 Td
+(• **Solution**: Confirm the passkey entered matches `ADMIN_PASSKEY` configured in the server environment.) Tj
 ET
 BT
 /F1 8 Tf
 9.1999999999999993 TL
 0.58 0.639 0.722 rg
 40. 20. Td
-(ProBitian Platform Documentation ï¿½ Official User Guide) Tj
+(ProBitian Platform Documentation — Official User Guide) Tj
 ET
 BT
 /F1 8 Tf
@@ -1344,7 +1351,7 @@ endobj
 25 0 obj
 <<
 /Producer (jsPDF 4.2.1)
-/CreationDate (D:20260816072636-00'00')
+/CreationDate (D:20260827084816-00'00')
 >>
 endobj
 26 0 obj
@@ -1358,39 +1365,39 @@ endobj
 xref
 0 27
 0000000000 65535 f 
-0000023460 00000 n 
-0000025300 00000 n 
+0000023592 00000 n 
+0000025432 00000 n 
 0000000015 00000 n 
 0000000152 00000 n 
-0000006079 00000 n 
-0000006216 00000 n 
-0000012941 00000 n 
-0000013078 00000 n 
-0000019725 00000 n 
-0000019863 00000 n 
-0000023535 00000 n 
-0000023661 00000 n 
-0000023792 00000 n 
-0000023926 00000 n 
-0000024064 00000 n 
-0000024188 00000 n 
-0000024317 00000 n 
+0000005945 00000 n 
+0000006082 00000 n 
+0000012739 00000 n 
+0000012876 00000 n 
+0000019602 00000 n 
+0000019740 00000 n 
+0000023667 00000 n 
+0000023793 00000 n 
+0000023924 00000 n 
+0000024058 00000 n 
+0000024196 00000 n 
+0000024320 00000 n 
 0000024449 00000 n 
-0000024585 00000 n 
-0000024713 00000 n 
-0000024840 00000 n 
-0000024969 00000 n 
-0000025102 00000 n 
-0000025204 00000 n 
-0000025553 00000 n 
-0000025639 00000 n 
+0000024581 00000 n 
+0000024717 00000 n 
+0000024845 00000 n 
+0000024972 00000 n 
+0000025101 00000 n 
+0000025234 00000 n 
+0000025336 00000 n 
+0000025685 00000 n 
+0000025771 00000 n 
 trailer
 <<
 /Size 27
 /Root 26 0 R
 /Info 25 0 R
-/ID [ <F180D1075D9C4FC6005C938BBBA72B4B> <F180D1075D9C4FC6005C938BBBA72B4B> ]
+/ID [ <1B8DABA40AB521D4BF63C05E93CD7B50> <1B8DABA40AB521D4BF63C05E93CD7B50> ]
 >>
 startxref
-25743
+25875
 %%EOF

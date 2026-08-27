@@ -128,6 +128,7 @@ Official User & Learner Guide for the ProBitian Business Intelligence & Data Ana
 Project Owner: **Shivam Singh**
 Official Website: https://probitian.ai.studio/
 Official Communication Email: probitianofficial@gmail.com
+Official X: https://x.com/Probitian (@Probitian)
 Official LinkedIn: https://www.linkedin.com/company/probitian/
 
 ## 1. Introduction & Platform Overview
@@ -140,7 +141,7 @@ ProBitian is a premium, end-to-end Business Intelligence and Data Analytics lear
 - **Direct Engagement**: Connect directly via contact forms and newsletter subscription channels.
 
 ## 2. Getting Started & Website Navigation
-The ProBitian website features a single-page application (SPA) architecture with hash-based route navigation (#/, #/learn, #/projects, etc.) for instantaneous page transitions.
+The ProBitian website features a single-page application (SPA) architecture with clean HTML5 path-based route navigation (/, /learn, /projects, etc.) for instantaneous page transitions.
 
 ### Header Navigation Bar
 - **ProBitian Logo**: Click anytime to return to the Home page.
@@ -149,21 +150,21 @@ The ProBitian website features a single-page application (SPA) architecture with
 - **Responsive Mobile Menu**: On mobile screens (<768px), a hamburger icon opens a full-screen mobile menu.
 
 ### Public Website Pages & Routes
-- **Home (#/)**: Platform overview, hero statistics, core features, top courses, featured portfolio projects, and YouTube highlights.
-- **Learn (#/learn)**: Complete course catalog with filter tabs, skill level badges, video lessons, PDF cheat sheets, and dataset downloads.
-- **Projects (#/projects)**: Portfolio gallery of real-world Power BI & SQL dashboards featuring problem statements, live interactive demos, GitHub repos, and raw sample dataset downloads.
-- **Blog (#/blog)**: Technical articles, DAX optimization guides, and BI career frameworks with code snippets and video walk-throughs.
-- **YouTube (#/youtube)**: Curated repository of video tutorials, playlists, and channel subscription highlights.
-- **About (#/about)**: Project Owner profile (Shivam Singh), platform mission statement, impact metrics, and learning roadmap.
-- **Contact (#/contact)**: Direct message portal for course inquiries, mentorship, or project collaborations, plus official ProBitian Community Hub location.
-- **Terms of Service (#/terms)**: Platform usage terms, intellectual property, and learner guidelines.
-- **Privacy Policy (#/privacy-policy / #/privacy)**: Data handling practices, cookie policies, user rights, and privacy controls.
+- **Home (/)**: Platform overview, hero statistics, core features, top courses, featured portfolio projects, and YouTube highlights.
+- **Learn (/learn)**: Complete course catalog with filter tabs, skill level badges, video lessons, PDF cheat sheets, and dataset downloads.
+- **Projects (/projects)**: Portfolio gallery of real-world Power BI & SQL dashboards featuring problem statements, live interactive demos, GitHub repos, and raw sample dataset downloads.
+- **Blog (/blog)**: Technical articles, DAX optimization guides, and BI career frameworks with code snippets and video walk-throughs.
+- **YouTube (/youtube)**: Curated repository of video tutorials, playlists, and channel subscription highlights.
+- **About (/about)**: Project Owner profile (Shivam Singh), platform mission statement, impact metrics, and learning roadmap.
+- **Contact (/contact)**: Direct message portal for course inquiries, mentorship, or project collaborations, plus official ProBitian Community Hub location.
+- **Terms of Service (/terms)**: Platform usage terms, intellectual property, and learner guidelines.
+- **Privacy Policy (/privacy)**: Data handling practices, cookie policies, user rights, and privacy controls.
 
 ## 3. Home Page Guide
 The Home page serves as the entry point to the ProBitian ecosystem.
 
 ### Key Sections & Interactions
-1. **Hero Banner**: Features primary headline, tagline, "Start Learning" CTA (#/learn), and "Explore Projects" CTA (#/projects).
+1. **Hero Banner**: Features primary headline, tagline, "Start Learning" CTA (/learn), and "Explore Projects" CTA (/projects).
 2. **Value Proposition Cards**: Highlights core skill pillars—Power BI Mastery, SQL Querying, Advanced Excel, and AI Tools for Data Professionals.
 3. **Featured Course Cards**: Direct buttons opening detailed course curriculum modals.
 4. **Featured Project Showcase**: Interactive cards displaying project badges, tools used, and direct modal popups.
@@ -208,7 +209,7 @@ The Blog section contains technical tutorials and industry insights.
 Get in touch with Shivam Singh or the ProBitian support team.
 
 ### How to Submit an Enquiry
-1. Navigate to **Contact** (#/contact).
+1. Navigate to **Contact** (/contact).
 2. Enter your **Full Name**, **Email Address**, and optional **Phone Number**.
 3. Select your **Subject or Interested Course** (e.g., Power BI Mastery, SQL Bootcamp).
 4. Type your message in the text box.
@@ -227,8 +228,8 @@ Get in touch with Shivam Singh or the ProBitian support team.
 - Immediate on-screen confirmation. Subscriptions persist directly to Supabase PostgreSQL and trigger a welcome email via Gmail SMTP.
 
 ## 9. Legal & Policy Pages
-- **Terms of Service (#/terms)**: Outlines user conduct, intellectual property, course access, and liability limits.
-- **Privacy Policy (#/privacy-policy)**: Explains data collection, email communication preferences, and security measures.
+- **Terms of Service (/terms)**: Outlines user conduct, intellectual property, course access, and liability limits.
+- **Privacy Policy (/privacy)**: Explains data collection, email communication preferences, and security measures.
 
 ## 10. Analytics & Privacy
 - Website visits are anonymously measured via Google Analytics 4 (GA4) for site quality and performance optimizations. Users do not need any setup or configuration.
@@ -239,7 +240,7 @@ Get in touch with Shivam Singh or the ProBitian support team.
 - **Q: Are all learning resources free?**
   - **A**: Yes, ProBitian provides free public access to course curriculum guides, video links, and sample datasets.
 - **Q: How do I contact ProBitian directly?**
-  - **A**: Use the Contact page (#/contact) or email probitianofficial@gmail.com.
+  - **A**: Use the Contact page (/contact) or email probitianofficial@gmail.com.
 `;
 
 // Build Guide 2 Content: Admin Control Center User Guide
@@ -250,10 +251,11 @@ Official Administrative Management Guide for Authorized ProBitian Portal Adminis
 Project Owner: **Shivam Singh**
 Official Website: https://probitian.ai.studio/
 Official Communication Email: probitianofficial@gmail.com
+Official X: https://x.com/Probitian (@Probitian)
 Official LinkedIn: https://www.linkedin.com/company/probitian/
 
 ## 1. Introduction & Security Guidance
-The ProBitian Admin Control Center (#/admin) is a secure management portal for authorized administrators to control website content, analyze GA4 traffic, manage contact inquiries, send email responses, maintain subscribers, broadcast email campaigns, manage media assets, and configure brand settings.
+The ProBitian Admin Control Center (/admin) is a secure management portal for authorized administrators to control website content, analyze GA4 traffic, manage contact inquiries, send email responses, maintain subscribers, broadcast email campaigns, manage media assets, and configure brand settings.
 
 ### Critical Security Instructions
 - **Never Share Credentials**: Do not share the Admin Passkey or login URL.
@@ -270,7 +272,7 @@ ProBitian utilizes a clean, server-side verified architecture:
 
 ## 3. Admin Authentication & Access Control
 ### Accessing the Admin Portal
-1. Append #/admin to the website URL (e.g., https://probitian.ai.studio/#/admin).
+1. Navigate to the /admin route (e.g., https://probitian.ai.studio/admin).
 2. Enter the authorized **Admin Passkey**.
 3. Click **Unlock Admin Portal**.
 4. The server validates the passkey via \`POST /api/admin/verify-passkey\` against \`process.env.ADMIN_PASSKEY\` and issues an authenticated session token.
@@ -305,7 +307,7 @@ The Admin Portal contains integrated management modules:
   - Set Title, Category, Summary, Full Description, and Tools Used.
   - Attach Live Demo URL, GitHub Repository, YouTube Tutorial link, and Dataset download link.
   - Toggle **Featured** to display on the Home page grid.
-  - Click **Save Project** -> Updates Supabase PostgreSQL and reflects instantly on #/projects.
+  - Click **Save Project** -> Updates Supabase PostgreSQL and reflects instantly on /projects.
 
 ### 5. Blog & Articles Manager
 - **Function**: Draft, schedule, publish, or edit technical articles and guides.
@@ -314,21 +316,21 @@ The Admin Portal contains integrated management modules:
   - Enter Excerpt and full Markdown content.
   - Attach Cover Image URL and optional YouTube video walkthrough link.
   - Set status to **Draft** or **Published**.
-  - Click **Save Article** -> Updates Supabase PostgreSQL and reflects on #/blog.
+  - Click **Save Article** -> Updates Supabase PostgreSQL and reflects on /blog.
 
 ### 6. Learn & Courses Manager
 - **Function**: Manage skill paths, course modules, video links, PDFs, and dataset resources.
 - **Workflow**:
   - Set Course Title, Subtitle, Category (Power BI, SQL, Excel, Python, AI), Skill Level, and Duration.
   - Attach YouTube Video IDs, PDF Documentation links, and raw dataset download URLs.
-  - Click **Save Course** -> Updates Supabase PostgreSQL and reflects on #/learn.
+  - Click **Save Course** -> Updates Supabase PostgreSQL and reflects on /learn.
 
 ### 7. YouTube Showcase Manager
 - **Function**: Organize YouTube video tutorials, playlists, and channel highlights.
 - **Workflow**:
   - Add Video Title, YouTube URL, Thumbnail URL, Category, Description, and Duration.
   - Edit or delete existing videos.
-  - Click **Save** -> Updates Supabase PostgreSQL and reflects on #/youtube.
+  - Click **Save** -> Updates Supabase PostgreSQL and reflects on /youtube.
 
 ### 8. Media Library Engine
 - **Function**: Asset manager for site graphics, logos, banners, thumbnails, and PDF files stored in Supabase Storage (\`probitian-media\` bucket).
@@ -373,7 +375,7 @@ The Admin Portal contains integrated management modules:
 ### 13. Social Links Manager
 - **Function**: Control social profiles displayed across header and footer.
 - **Workflow**:
-  - Manage links for YouTube, Instagram, Facebook, GitHub, LinkedIn, etc.
+  - Manage links for YouTube, Instagram, Facebook, GitHub, X (Twitter), LinkedIn, etc.
   - Click **Save Social Links** -> Updates Supabase PostgreSQL.
 
 ### 14. Navigation Menu Manager
@@ -385,7 +387,7 @@ The Admin Portal contains integrated management modules:
 ### 15. SEO & Meta Tags Manager
 - **Function**: Configure search engine optimization settings and social share tags.
 - **Workflow**:
-  - Edit Meta Title, Meta Description, Keywords, Canonical URL, Open Graph (OG) fields, and Twitter Handle.
+  - Edit Meta Title, Meta Description, Keywords, Canonical URL, Open Graph (OG) fields, and Twitter/X Handle.
   - Click **Save SEO Settings** -> Updates Supabase PostgreSQL and injects meta tags dynamically.
 
 ### 16. Website Settings & Location

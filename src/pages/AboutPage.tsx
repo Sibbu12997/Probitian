@@ -20,6 +20,7 @@ import {
   Mail, 
   GraduationCap 
 } from 'lucide-react';
+import { XIcon } from '../components/icons/XIcon';
 import { trackSocialClick, trackContactClick } from '../lib/analytics';
 
 interface AboutPageProps {
@@ -227,6 +228,7 @@ export const AboutPage: React.FC<AboutPageProps> = ({ onNavigate }) => {
             rel="noopener noreferrer"
             onClick={() => trackSocialClick('youtube', 'https://youtube.com/@probitian')}
             className="btn-radius px-5 py-2.5 bg-red-600 hover:bg-red-500 text-white text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer shadow-sm"
+            aria-label="ProBitian on YouTube"
           >
             <Youtube className="w-4 h-4" /> YouTube
           </a>
@@ -236,8 +238,19 @@ export const AboutPage: React.FC<AboutPageProps> = ({ onNavigate }) => {
             rel="noopener noreferrer"
             onClick={() => trackSocialClick('instagram', 'https://instagram.com/probitian')}
             className="btn-radius px-5 py-2.5 bg-pink-600 hover:bg-pink-500 text-white text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer shadow-sm"
+            aria-label="ProBitian on Instagram"
           >
             <Instagram className="w-4 h-4" /> Instagram
+          </a>
+          <a
+            href="https://x.com/Probitian"
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => trackSocialClick('x', 'https://x.com/Probitian')}
+            className="btn-radius px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold flex items-center gap-2 border border-slate-700 transition-all cursor-pointer shadow-sm"
+            aria-label="ProBitian on X"
+          >
+            <XIcon className="w-4 h-4" /> X
           </a>
           <a
             href="https://www.linkedin.com/company/probitian/"
@@ -245,7 +258,7 @@ export const AboutPage: React.FC<AboutPageProps> = ({ onNavigate }) => {
             rel="noopener noreferrer"
             onClick={() => trackSocialClick('linkedin', 'https://www.linkedin.com/company/probitian/')}
             className="btn-radius px-5 py-2.5 bg-[#0077b5] hover:bg-[#006396] text-white text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer shadow-sm"
-            aria-label="LinkedIn Company Page"
+            aria-label="ProBitian on LinkedIn"
           >
             <Linkedin className="w-4 h-4" /> LinkedIn
           </a>
@@ -253,6 +266,7 @@ export const AboutPage: React.FC<AboutPageProps> = ({ onNavigate }) => {
             href={`mailto:${contactEmail}`}
             onClick={() => trackContactClick('about_page_email')}
             className="btn-radius px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold flex items-center gap-2 border border-slate-700 transition-all cursor-pointer"
+            aria-label="Direct Email ProBitian"
           >
             <Mail className="w-4 h-4" /> Email Us
           </a>

@@ -12,7 +12,7 @@ assignees: ''
 ## Where Did It Occur?
 <!-- Check or specify the relevant ProBitian area(s): -->
 - [ ] Public Website (Home, Learn, Portfolio, Blog, Videos, Contact)
-- [ ] Admin Control Center (`/#/admin`)
+- [ ] Admin Control Center (`/admin`)
 - [ ] CMS (Content Management for Projects, Blogs, Courses, Videos, Settings)
 - [ ] Authentication / Passkey Verification
 - [ ] Analytics / Google Analytics 4 (GA4) Real-Time & Reporting

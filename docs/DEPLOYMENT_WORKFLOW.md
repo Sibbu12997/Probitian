@@ -5,6 +5,7 @@ Official Deployment Pipeline & Release Procedures for ProBitian.
 Project Owner: **Shivam Singh**  
 Official Website: [https://probitian.ai.studio/](https://probitian.ai.studio/)  
 Official Communication Email: [probitianofficial@gmail.com](mailto:probitianofficial@gmail.com)  
+Official X: [https://x.com/Probitian](https://x.com/Probitian) (@Probitian)  
 Official LinkedIn: [https://www.linkedin.com/company/probitian/](https://www.linkedin.com/company/probitian/)  
 
 ---

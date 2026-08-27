@@ -5,6 +5,7 @@ Official Specification for the Media Asset Management Architecture in ProBitian.
 Project Owner: **Shivam Singh**  
 Official Website: [https://probitian.ai.studio/](https://probitian.ai.studio/)  
 Official Communication Email: [probitianofficial@gmail.com](mailto:probitianofficial@gmail.com)  
+Official X: [https://x.com/Probitian](https://x.com/Probitian) (@Probitian)  
 Official LinkedIn: [https://www.linkedin.com/company/probitian/](https://www.linkedin.com/company/probitian/)  
 
 ---
@@ -35,7 +36,7 @@ Assets in `probitian-media` are organized into categorical subfolders:
 ## 3. Upload Workflow & Security Pipeline
 
 ```
-ADMIN PORTAL (#/admin → Media Library)
+ADMIN PORTAL (/admin → Media Library)
         ↓
 Select File (PNG, JPG, WebP, SVG, PDF)
         ↓
