@@ -1,5 +1,6 @@
 import { getGmailUser, getGmailPass, getTransporter, sanitizeError } from './emailService';
 import { PROBITIAN_LOGO_URL } from '../constants/branding';
+import { sanitizeCmsHtml, escapeHtml, sanitizeUrl } from '../lib/htmlSanitizer';
 
 export const campaignEmailService = {
   isConfigured(): boolean {
@@ -17,8 +18,13 @@ export const campaignEmailService = {
     return `Shivam from ProBitian <${gmailUser}> (via Gmail SMTP)`;
   },
 
-  interpolateLeadVariables(template: string, lead: Record<string, any> = {}): string {
+  interpolateLeadVariables(
+    template: string,
+    lead: Record<string, any> = {},
+    options?: { isHtml?: boolean }
+  ): string {
     if (!template) return '';
+    const isHtml = options?.isHtml !== false;
     let result = template;
 
     const company = lead.company_name || lead.company || lead.companyname || 'your company';
@@ -72,9 +78,10 @@ export const campaignEmailService = {
       followupdate: followUpDate
     };
 
-    for (const [key, val] of Object.entries(mapping)) {
+    for (const [key, rawVal] of Object.entries(mapping)) {
+      const val = isHtml ? escapeHtml(rawVal) : String(rawVal ?? '');
       const regex = new RegExp(`{{\\s*${key}\\s*}}`, 'gi');
-      result = result.replace(regex, String(val ?? ''));
+      result = result.replace(regex, val);
     }
 
     // Clean up any remaining unmatched template variables
@@ -91,6 +98,8 @@ export const campaignEmailService = {
   }): string {
     const gmailUser = getGmailUser();
     const { previewText, contentHtml, unsubscribeUrl } = params;
+    const safeContentHtml = sanitizeCmsHtml(contentHtml);
+    const safeUnsubscribeUrl = sanitizeUrl(unsubscribeUrl, '#');
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -117,7 +126,7 @@ export const campaignEmailService = {
   </style>
 </head>
 <body>
-  ${previewText ? `<div class="preview-text">${previewText}</div>` : ''}
+  ${previewText ? `<div class="preview-text">${escapeHtml(previewText)}</div>` : ''}
   <div class="container">
     <div class="header">
       <div style="text-align: center; margin-bottom: 12px;">
@@ -128,7 +137,7 @@ export const campaignEmailService = {
     </div>
     
     <div class="body-content">
-      ${contentHtml}
+      ${safeContentHtml}
     </div>
 
     <div class="footer">
@@ -137,7 +146,7 @@ export const campaignEmailService = {
       <p style="margin: 4px 0;">Official Support: <a href="mailto:${gmailUser}" style="color: #7c3aed;">${gmailUser}</a></p>
       
       <div class="footer-links">
-        <a href="${unsubscribeUrl}" target="_blank" rel="noopener noreferrer">Unsubscribe from Newsletter</a> &bull; 
+        <a href="${safeUnsubscribeUrl}" target="_blank" rel="noopener noreferrer">Unsubscribe from Newsletter</a> &bull; 
         <a href="https://probitian.ai.studio/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>
       </div>
       <p style="margin-top: 12px; font-size: 11px; color: #94a3b8;">&copy; ${new Date().getFullYear()} ProBitian. All rights reserved.</p>
@@ -155,7 +164,7 @@ export const campaignEmailService = {
   }): string {
     const gmailUser = getGmailUser();
     const { preheader, contentHtml, lead = {} } = params;
-    let interpolatedBody = this.interpolateLeadVariables(contentHtml, lead);
+    let interpolatedBody = this.interpolateLeadVariables(contentHtml, lead, { isHtml: true });
     const hasHtmlTags = /<[a-z][\s\S]*>/i.test(interpolatedBody);
     if (!hasHtmlTags) {
       interpolatedBody = interpolatedBody
@@ -163,7 +172,8 @@ export const campaignEmailService = {
         .map(para => `<p style="margin-top: 0; margin-bottom: 16px;">${para.replace(/\n/g, '<br/>')}</p>`)
         .join('');
     }
-    const interpolatedPreheader = preheader ? this.interpolateLeadVariables(preheader, lead) : '';
+    const safeContentHtml = sanitizeCmsHtml(interpolatedBody);
+    const interpolatedPreheader = preheader ? this.interpolateLeadVariables(preheader, lead, { isHtml: false }) : '';
 
     return `<!DOCTYPE html>
 <html lang="en">
@@ -191,7 +201,7 @@ export const campaignEmailService = {
   </style>
 </head>
 <body>
-  ${interpolatedPreheader ? `<div class="preview-text">${interpolatedPreheader}</div>` : ''}
+  ${interpolatedPreheader ? `<div class="preview-text">${escapeHtml(interpolatedPreheader)}</div>` : ''}
   <div class="container">
     <div class="header">
       <table cellpadding="0" cellspacing="0" border="0" width="100%">
@@ -208,7 +218,7 @@ export const campaignEmailService = {
     </div>
     
     <div class="body-content">
-      ${interpolatedBody}
+      ${safeContentHtml}
     </div>
 
     <div class="footer">
@@ -332,7 +342,7 @@ export const campaignEmailService = {
       lead_priority: 'High'
     };
 
-    const personalizedSubject = this.interpolateLeadVariables(params.subject, leadData);
+    const personalizedSubject = this.interpolateLeadVariables(params.subject, leadData, { isHtml: false });
     const html = this.generateLeadOutreachHtml({
       subject: personalizedSubject,
       preheader: params.preheader,
@@ -378,7 +388,7 @@ export const campaignEmailService = {
   }): Promise<{ success: boolean; messageId?: string; error?: string }> {
     const gmailUser = getGmailUser();
     const gmailPass = getGmailPass();
-    const personalizedSubject = this.interpolateLeadVariables(params.subject, params.lead);
+    const personalizedSubject = this.interpolateLeadVariables(params.subject, params.lead, { isHtml: false });
     const html = this.generateLeadOutreachHtml({
       subject: personalizedSubject,
       preheader: params.preheader,

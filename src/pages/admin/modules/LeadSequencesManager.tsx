@@ -35,6 +35,7 @@ import {
 } from 'lucide-react';
 import { cmsService } from '../../../services/cmsService';
 import { LeadSequence, SequenceStep, SequenceLead, Lead, SequenceStatus } from '../../../types';
+import { sanitizeCmsHtml, escapeHtml } from '../../../lib/htmlSanitizer';
 
 interface LeadSequencesManagerProps {
   onNavigateToLeads?: () => void;
@@ -415,8 +416,10 @@ export const LeadSequencesManager: React.FC<LeadSequencesManagerProps> = ({ onNa
     Object.entries(replacements).forEach(([k, v]) => {
       const reg = new RegExp(k, 'gi');
       subject = subject.replace(reg, v);
-      html = html.replace(reg, v);
+      html = html.replace(reg, escapeHtml(v));
     });
+
+    html = sanitizeCmsHtml(html);
 
     return { subject, html, sampleLead };
   };

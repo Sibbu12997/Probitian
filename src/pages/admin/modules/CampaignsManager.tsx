@@ -30,21 +30,10 @@ import {
 } from 'lucide-react';
 import { EmailCampaign, MediaItem } from '../../../types';
 import { cmsService } from '../../../services/cmsService';
+import { sanitizeCmsHtml } from '../../../lib/htmlSanitizer';
 
 function sanitizePreviewHtml(rawHtml?: string): string {
-  if (!rawHtml) return '<p class="text-slate-400 italic">No body content written yet.</p>';
-  let clean = rawHtml;
-  // Remove script tags and contents
-  clean = clean.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
-  // Remove iframe, object, embed, applet, base, meta, form, link tags
-  clean = clean.replace(/<\/?(?:iframe|object|embed|applet|base|meta|form|link)\b[^>]*>/gi, '');
-  // Remove inline on* event handlers
-  clean = clean.replace(/\s*on[a-zA-Z]+\s*=\s*(['"])[^'"]*\1/gi, '');
-  clean = clean.replace(/\s*on[a-zA-Z]+\s*=\s*[^>\s]+/gi, '');
-  // Neutralize dangerous URI protocols in href and src
-  clean = clean.replace(/href\s*=\s*(['"])\s*(?:javascript|vbscript|data(?!\:image)):[^'"]*\1/gi, 'href="#"');
-  clean = clean.replace(/src\s*=\s*(['"])\s*(?:javascript|vbscript):[^'"]*\1/gi, 'src=""');
-  return clean;
+  return sanitizeCmsHtml(rawHtml);
 }
 
 export const CampaignsManager: React.FC = () => {

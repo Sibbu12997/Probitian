@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import { PROBITIAN_LOGO_URL } from '../constants/branding';
+import { escapeHtml, sanitizeUrl } from '../lib/htmlSanitizer';
 
 export function getGmailUser(): string {
   return (process.env.GMAIL_USER || 'probitianofficial@gmail.com').trim();
@@ -86,20 +87,21 @@ export const emailService = {
   async sendWelcomeEmail(email: string, unsubscribeUrl?: string): Promise<{ success: boolean; message?: string }> {
     const user = getGmailUser();
     const pass = getGmailPass();
+    const cleanEmail = email.trim().toLowerCase();
     if (!pass) {
-      console.log(`[EMAIL INFO] Welcome email recorded for ${email}. Set GMAIL_APP_PASSWORD in environment to enable live SMTP delivery.`);
+      console.log(`[EMAIL INFO] Welcome email recorded for ${cleanEmail}. Set GMAIL_APP_PASSWORD in environment to enable live SMTP delivery.`);
       return { success: true, message: 'Welcome email queued.' };
     }
 
     const unsubFooter = unsubscribeUrl
-      ? `<br/><a href="${unsubscribeUrl}" style="color: #94a3b8; text-decoration: underline;">Unsubscribe</a>`
+      ? `<br/><a href="${sanitizeUrl(unsubscribeUrl)}" style="color: #94a3b8; text-decoration: underline;">Unsubscribe</a>`
       : '';
 
     try {
       const transporter = getTransporter();
       await transporter.sendMail({
         from: `"ProBitian" <${user}>`,
-        to: email,
+        to: cleanEmail,
         subject: 'Welcome to ProBitian! | Master Business Intelligence',
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #1e293b; line-height: 1.6;">
@@ -118,7 +120,7 @@ export const emailService = {
           </div>
         `
       });
-      console.log(`[EMAIL SUCCESS] Welcome email delivered to ${email}`);
+      console.log(`[EMAIL SUCCESS] Welcome email delivered to ${cleanEmail}`);
       return { success: true, message: 'Welcome email sent successfully.' };
     } catch (error: any) {
       const sanitized = sanitizeError(error);
@@ -130,16 +132,19 @@ export const emailService = {
   async sendAdminReply(email: string, subject: string, replyMessage: string): Promise<{ success: boolean; message?: string }> {
     const user = getGmailUser();
     const pass = getGmailPass();
+    const cleanEmail = email.trim().toLowerCase();
     if (!pass) {
-      console.log(`[EMAIL INFO] Reply recorded for ${email}. Set GMAIL_APP_PASSWORD in environment to enable live SMTP dispatch.`);
+      console.log(`[EMAIL INFO] Reply recorded for ${cleanEmail}. Set GMAIL_APP_PASSWORD in environment to enable live SMTP dispatch.`);
       return { success: true, message: 'Reply saved in database.' };
     }
+
+    const safeReplyHtml = escapeHtml(replyMessage).replace(/\n/g, '<br/>');
 
     try {
       const transporter = getTransporter();
       await transporter.sendMail({
         from: `"ProBitian Support" <${user}>`,
-        to: email,
+        to: cleanEmail,
         subject: subject.startsWith('Re:') ? subject : `Re: ${subject}`,
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #1e293b; line-height: 1.6;">
@@ -156,7 +161,7 @@ export const emailService = {
               </table>
             </div>
             <div style="background-color: #f8fafc; padding: 16px; border-radius: 12px; border: 1px solid #e2e8f0; white-space: pre-line;">
-              ${replyMessage.replace(/\n/g, '<br/>')}
+              ${safeReplyHtml}
             </div>
             <br/>
             <p>Best regards,<br/><strong>Shivam Singh</strong><br/><span style="color: #64748b; font-size: 12px;">Founder & BI Specialist, ProBitian</span></p>
@@ -167,7 +172,7 @@ export const emailService = {
           </div>
         `
       });
-      console.log(`[EMAIL SUCCESS] Admin reply delivered to ${email}`);
+      console.log(`[EMAIL SUCCESS] Admin reply delivered to ${cleanEmail}`);
       return { success: true, message: 'Reply sent successfully via email.' };
     } catch (error: any) {
       const sanitized = sanitizeError(error);
@@ -191,6 +196,13 @@ export const emailService = {
       return { success: true, message: 'Contact enquiry recorded.' };
     }
 
+    const safeName = escapeHtml(params.name);
+    const safeEmail = escapeHtml(params.email);
+    const safePhone = escapeHtml(params.phone || 'N/A');
+    const safeInterest = escapeHtml(params.course_interested || 'General');
+    const safeSubject = escapeHtml(params.subject || 'N/A');
+    const safeMessageHtml = escapeHtml(params.message).replace(/\n/g, '<br/>');
+
     try {
       const transporter = getTransporter();
       await transporter.sendMail({
@@ -213,15 +225,15 @@ export const emailService = {
               </table>
             </div>
             <table style="width: 100%; text-align: left; border-collapse: collapse; margin-bottom: 20px;">
-              <tr><td style="padding: 8px 0; font-weight: bold; width: 140px;">Name:</td><td>${params.name}</td></tr>
-              <tr><td style="padding: 8px 0; font-weight: bold;">Email:</td><td><a href="mailto:${params.email}">${params.email}</a></td></tr>
-              <tr><td style="padding: 8px 0; font-weight: bold;">Phone:</td><td>${params.phone || 'N/A'}</td></tr>
-              <tr><td style="padding: 8px 0; font-weight: bold;">Interest:</td><td>${params.course_interested || 'General'}</td></tr>
-              <tr><td style="padding: 8px 0; font-weight: bold;">Subject:</td><td>${params.subject || 'N/A'}</td></tr>
+              <tr><td style="padding: 8px 0; font-weight: bold; width: 140px;">Name:</td><td>${safeName}</td></tr>
+              <tr><td style="padding: 8px 0; font-weight: bold;">Email:</td><td><a href="mailto:${safeEmail}">${safeEmail}</a></td></tr>
+              <tr><td style="padding: 8px 0; font-weight: bold;">Phone:</td><td>${safePhone}</td></tr>
+              <tr><td style="padding: 8px 0; font-weight: bold;">Interest:</td><td>${safeInterest}</td></tr>
+              <tr><td style="padding: 8px 0; font-weight: bold;">Subject:</td><td>${safeSubject}</td></tr>
             </table>
             <div style="background-color: #f8fafc; padding: 16px; border-radius: 12px; border: 1px solid #e2e8f0; white-space: pre-line;">
               <strong>Message:</strong><br/>
-              ${params.message.replace(/\n/g, '<br/>')}
+              ${safeMessageHtml}
             </div>
             <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;" />
             <p style="font-size: 12px; color: #94a3b8; text-align: center;">

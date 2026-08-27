@@ -40,17 +40,10 @@ import {
 import { LeadCampaign, Lead, CampaignLead, MediaItem } from '../../../types';
 import { cmsService } from '../../../services/cmsService';
 import { MediaPicker } from '../../../components/admin/MediaPicker';
+import { sanitizeCmsHtml, escapeHtml } from '../../../lib/htmlSanitizer';
 
 function sanitizePreviewHtml(rawHtml?: string): string {
-  if (!rawHtml) return '<p class="text-slate-400 italic">No body content written yet.</p>';
-  let clean = rawHtml;
-  clean = clean.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
-  clean = clean.replace(/<\/?(?:iframe|object|embed|applet|base|meta|form|link)\b[^>]*>/gi, '');
-  clean = clean.replace(/\s*on[a-zA-Z]+\s*=\s*(['"])[^'"]*\1/gi, '');
-  clean = clean.replace(/\s*on[a-zA-Z]+\s*=\s*[^>\s]+/gi, '');
-  clean = clean.replace(/href\s*=\s*(['"])\s*(?:javascript|vbscript|data(?!\:image)):[^'"]*\1/gi, 'href="#"');
-  clean = clean.replace(/src\s*=\s*(['"])\s*(?:javascript|vbscript):[^'"]*\1/gi, 'src=""');
-  return clean;
+  return sanitizeCmsHtml(rawHtml);
 }
 
 const OUTREACH_TEMPLATES = [
@@ -504,7 +497,7 @@ export const LeadCampaignsManager: React.FC<LeadCampaignsManagerProps> = ({ init
     lead_priority: 'High'
   };
 
-  const interpolatePreviewText = (text: string): string => {
+  const interpolatePreviewText = (text: string, isHtml: boolean = false): string => {
     if (!text) return '';
     let res = text;
     const company = sampleLead.company_name || 'Tata Motors Commercial';
@@ -517,7 +510,7 @@ export const LeadCampaignsManager: React.FC<LeadCampaignsManagerProps> = ({ init
     const priority = sampleLead.lead_priority || 'High';
     const email = sampleLead.email || 'amit.deshmukh@tatamotors.com';
 
-    const mapping: Record<string, string> = {
+    const rawMapping: Record<string, string> = {
       company_name: company,
       company: company,
       companyname: company,
@@ -549,7 +542,8 @@ export const LeadCampaignsManager: React.FC<LeadCampaignsManagerProps> = ({ init
       email: email
     };
 
-    for (const [key, val] of Object.entries(mapping)) {
+    for (const [key, rawVal] of Object.entries(rawMapping)) {
+      const val = isHtml ? escapeHtml(rawVal) : rawVal;
       const regex = new RegExp(`{{\\s*${key}\\s*}}`, 'gi');
       res = res.replace(regex, val);
     }
@@ -558,12 +552,12 @@ export const LeadCampaignsManager: React.FC<LeadCampaignsManagerProps> = ({ init
 
   const getPersonalizedPreviewHtml = (): string => {
     const raw = editingCampaign.html_content || '';
-    const interpolated = interpolatePreviewText(raw);
+    const interpolated = interpolatePreviewText(raw, true);
     return sanitizePreviewHtml(interpolated);
   };
 
   const getPersonalizedSubject = (): string => {
-    return interpolatePreviewText(editingCampaign.subject || '');
+    return interpolatePreviewText(editingCampaign.subject || '', false);
   };
 
   // Filtered campaigns for table

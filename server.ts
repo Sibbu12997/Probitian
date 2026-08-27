@@ -8,6 +8,11 @@ import { createServer as createViteServer } from 'vite';
 import { createClient } from '@supabase/supabase-js';
 import { emailService } from './src/services/emailService';
 import { campaignEmailService } from './src/services/campaignEmailService';
+import { 
+  DistributedRateLimitStore, 
+  createRateLimiter as createDistributedRateLimiter, 
+  SharedStoreProvider 
+} from './src/lib/rateLimiter';
 
 dotenv.config();
 
@@ -343,73 +348,16 @@ function requireAdmin(req: express.Request, res: express.Response, next: express
   next();
 }
 
-// ==================== RATE LIMITING MIDDLEWARE ====================
-interface RateLimitOptions {
-  windowMs: number;
-  max: number;
-  message?: string;
-}
+// ==================== DISTRIBUTED RATE LIMITING ====================
+const globalDistributedRateLimitStore = new DistributedRateLimitStore();
 
-function createRateLimiter(options: RateLimitOptions) {
-  const requests = new Map<string, { count: number; resetTime: number }>();
-  const MAX_ENTRIES = 10000;
-
-  setInterval(() => {
-    const now = Date.now();
-    for (const [ip, data] of requests.entries()) {
-      if (now > data.resetTime) requests.delete(ip);
-    }
-  }, 5 * 60 * 1000);
-
-  return (req: express.Request, res: express.Response, next: express.NextFunction) => {
-    // Express with 'trust proxy' configured securely resolves req.ip from trusted upstream headers.
-    const ip = (req.ip || (req.socket && req.socket.remoteAddress) || 'unknown').trim();
-    const now = Date.now();
-
-    // Prevent unbounded memory growth under distributed scanning
-    if (requests.size > MAX_ENTRIES) {
-      for (const [key, val] of requests.entries()) {
-        if (now > val.resetTime) requests.delete(key);
-      }
-    }
-
-    let record = requests.get(ip);
-
-    if (!record || now > record.resetTime) {
-      record = { count: 1, resetTime: now + options.windowMs };
-      requests.set(ip, record);
-      res.setHeader('RateLimit-Limit', options.max);
-      res.setHeader('RateLimit-Remaining', Math.max(0, options.max - 1));
-      res.setHeader('RateLimit-Reset', Math.ceil(record.resetTime / 1000));
-      return next();
-    }
-
-    if (record.count >= options.max) {
-      const retryAfterSec = Math.max(1, Math.ceil((record.resetTime - now) / 1000));
-      res.setHeader('RateLimit-Limit', options.max);
-      res.setHeader('RateLimit-Remaining', 0);
-      res.setHeader('RateLimit-Reset', Math.ceil(record.resetTime / 1000));
-      res.setHeader('Retry-After', retryAfterSec);
-      return res.status(429).json({
-        error: options.message || 'Too many requests. Please try again later.'
-      });
-    }
-
-    record.count += 1;
-    res.setHeader('RateLimit-Limit', options.max);
-    res.setHeader('RateLimit-Remaining', Math.max(0, options.max - record.count));
-    res.setHeader('RateLimit-Reset', Math.ceil(record.resetTime / 1000));
-    next();
-  };
-}
-
-const loginLimiter = createRateLimiter({ windowMs: 15 * 60 * 1000, max: 10, message: 'Too many login attempts. Please try again in 15 minutes.' });
-const newsletterLimiter = createRateLimiter({ windowMs: 15 * 60 * 1000, max: 10, message: 'Too many subscription attempts. Please try again later.' });
-const unsubscribeLimiter = createRateLimiter({ windowMs: 15 * 60 * 1000, max: 20, message: 'Too many unsubscribe requests. Please try again later.' });
-const contactLimiter = createRateLimiter({ windowMs: 15 * 60 * 1000, max: 10, message: 'Too many contact messages sent. Please try again later.' });
-const uploadLimiter = createRateLimiter({ windowMs: 15 * 60 * 1000, max: 30, message: 'Too many upload requests. Please try again later.' });
-const emailTestLimiter = createRateLimiter({ windowMs: 15 * 60 * 1000, max: 10, message: 'Too many test emails sent. Please try again later.' });
-const emailSendLimiter = createRateLimiter({ windowMs: 15 * 60 * 1000, max: 5, message: 'Too many campaign broadcasts requested. Please try again later.' });
+const loginLimiter = createDistributedRateLimiter({ windowMs: 15 * 60 * 1000, max: 10, prefix: 'login', message: 'Too many login attempts. Please try again in 15 minutes.' }, globalDistributedRateLimitStore);
+const newsletterLimiter = createDistributedRateLimiter({ windowMs: 15 * 60 * 1000, max: 10, prefix: 'newsletter', message: 'Too many subscription attempts. Please try again later.' }, globalDistributedRateLimitStore);
+const unsubscribeLimiter = createDistributedRateLimiter({ windowMs: 15 * 60 * 1000, max: 20, prefix: 'unsub', message: 'Too many unsubscribe requests. Please try again later.' }, globalDistributedRateLimitStore);
+const contactLimiter = createDistributedRateLimiter({ windowMs: 15 * 60 * 1000, max: 10, prefix: 'contact', message: 'Too many contact messages sent. Please try again later.' }, globalDistributedRateLimitStore);
+const uploadLimiter = createDistributedRateLimiter({ windowMs: 15 * 60 * 1000, max: 30, prefix: 'upload', message: 'Too many upload requests. Please try again later.' }, globalDistributedRateLimitStore);
+const emailTestLimiter = createDistributedRateLimiter({ windowMs: 15 * 60 * 1000, max: 10, prefix: 'email-test', message: 'Too many test emails sent. Please try again later.' }, globalDistributedRateLimitStore);
+const emailSendLimiter = createDistributedRateLimiter({ windowMs: 15 * 60 * 1000, max: 5, prefix: 'email-send', message: 'Too many campaign broadcasts requested. Please try again later.' }, globalDistributedRateLimitStore);
 
 // ==================== SIGNED UNSUBSCRIBE TOKENS ====================
 function getUnsubscribeSecret(): string {
@@ -481,6 +429,42 @@ const isServerSupabaseConfigured = (): boolean => {
 const serverSupabase = isServerSupabaseConfigured()
   ? createClient(supabaseUrl, serverSecretKey, { auth: { persistSession: false } })
   : null;
+
+// Initialize distributed rate limiting provider backed by Supabase with fail-safe fallback
+if (serverSupabase) {
+  const supabaseRateLimitProvider: SharedStoreProvider = {
+    async getRecord(key: string) {
+      try {
+        const { data, error } = await serverSupabase
+          .from('rate_limits')
+          .select('count, reset_time')
+          .eq('key', key)
+          .maybeSingle();
+        if (error) {
+          if (error.code === '42P01' || error.message?.includes('relation "rate_limits" does not exist')) {
+            throw new Error('rate_limits table not present in Supabase');
+          }
+          throw error;
+        }
+        return data ? { count: data.count, reset_time: Number(data.reset_time) } : null;
+      } catch (e) {
+        throw e;
+      }
+    },
+    async setRecord(key: string, count: number, reset_time: number) {
+      const { error } = await serverSupabase
+        .from('rate_limits')
+        .upsert({
+          key,
+          count,
+          reset_time,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'key' });
+      if (error) throw error;
+    }
+  };
+  globalDistributedRateLimitStore.setProvider(supabaseRateLimitProvider);
+}
 
 const PROBITIAN_MEDIA_BUCKET = 'probitian-media';
 

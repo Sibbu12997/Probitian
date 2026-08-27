@@ -23,6 +23,7 @@ import { XIcon } from '../components/icons/XIcon';
 import { cmsService } from '../services/cmsService';
 import { trackContactFormSubmit, trackSocialClick } from '../lib/analytics';
 import { SocialLinkItem } from '../types';
+import { sanitizeUrl } from '../lib/htmlSanitizer';
 
 export const ContactPage: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -411,7 +412,7 @@ export const ContactPage: React.FC = () => {
                   socialLinks.map((link) => (
                     <a
                       key={link.id}
-                      href={link.url}
+                      href={sanitizeUrl(link.url, '#')}
                       target="_blank"
                       rel="noopener noreferrer"
                       onClick={() => trackSocialClick(link.platform, link.url)}
@@ -522,7 +523,7 @@ export const ContactPage: React.FC = () => {
             </div>
 
             <a
-              href={hubSettings.url || 'https://maps.app.goo.gl/T4426JADcNHHFPqb7'}
+              href={sanitizeUrl(hubSettings.url, 'https://maps.app.goo.gl/T4426JADcNHHFPqb7')}
               target="_blank"
               rel="noopener noreferrer"
               onClick={() => trackSocialClick('google_maps', hubSettings.url)}
