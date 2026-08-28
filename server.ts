@@ -433,6 +433,37 @@ const serverSupabase = isServerSupabaseConfigured()
 // Initialize distributed rate limiting provider backed by Supabase with fail-safe fallback
 if (serverSupabase) {
   const supabaseRateLimitProvider: SharedStoreProvider = {
+    async incrementAtomic(key: string, windowMs: number, max: number) {
+      const { data, error } = await serverSupabase.rpc('increment_rate_limit', {
+        p_key: key,
+        p_window_ms: windowMs,
+        p_max: max
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      if (Array.isArray(data) && data.length > 0) {
+        const row = data[0];
+        return {
+          count: Number(row.count),
+          resetTime: Number(row.reset_time),
+          allowed: Boolean(row.allowed),
+          remaining: Number(row.remaining)
+        };
+      } else if (data && typeof data === 'object') {
+        const row = data as any;
+        return {
+          count: Number(row.count),
+          resetTime: Number(row.reset_time),
+          allowed: Boolean(row.allowed),
+          remaining: Number(row.remaining)
+        };
+      }
+
+      throw new Error('Unexpected return signature from increment_rate_limit RPC');
+    },
     async getRecord(key: string) {
       try {
         const { data, error } = await serverSupabase

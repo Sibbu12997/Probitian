@@ -126,15 +126,21 @@ export class MemoryRateLimitStore implements RateLimitStore {
 }
 
 export type SharedStoreProvider = {
-  getRecord: (key: string) => Promise<{ count: number; reset_time: number } | null>;
-  setRecord: (key: string, count: number, reset_time: number, ttlMs: number) => Promise<void>;
+  /**
+   * Atomic increment operation performed directly in the shared store / database
+   * to eliminate race conditions across concurrent multi-instance requests.
+   */
+  incrementAtomic?: (key: string, windowMs: number, max: number) => Promise<RateLimitResult>;
+  getRecord?: (key: string) => Promise<{ count: number; reset_time: number } | null>;
+  setRecord?: (key: string, count: number, reset_time: number, ttlMs?: number) => Promise<void>;
 };
 
 /**
  * Distributed Rate Limit Store with Fail-Safe In-Memory Fallback.
  * Synchronizes request limits across multiple backend instances (Cloud Run / clustered containers).
+ * Uses atomic DB RPC / transaction operations when available to prevent race conditions.
  * If the shared backend store encounters an outage or error, it fails safe to the local memory store
- * so security-sensitive endpoints remain protected and legitimate traffic is not brought down with 500s.
+ * so security-sensitive endpoints remain protected and legitimate traffic is not brought down.
  */
 export class DistributedRateLimitStore implements RateLimitStore {
   private memoryFallback: MemoryRateLimitStore;
@@ -154,43 +160,58 @@ export class DistributedRateLimitStore implements RateLimitStore {
   public async increment(key: string, windowMs: number, max: number): Promise<RateLimitResult> {
     if (this.sharedProvider) {
       try {
-        const now = Date.now();
-        const existing = await this.sharedProvider.getRecord(key);
+        // 1. Prefer atomic shared store increment (PostgreSQL function / RPC)
+        if (typeof this.sharedProvider.incrementAtomic === 'function') {
+          const atomicResult = await this.sharedProvider.incrementAtomic(key, windowMs, max);
+          this.isAvailable = true;
+          // Keep local memory fallback synced
+          try {
+            await this.memoryFallback.increment(key, windowMs, max);
+          } catch {
+            // Ignore memory sync errors
+          }
+          return atomicResult;
+        }
 
-        if (!existing || now > existing.reset_time) {
-          const resetTime = now + windowMs;
-          await this.sharedProvider.setRecord(key, 1, resetTime, windowMs);
-          // Also sync local fallback
+        // 2. Legacy fallback if provider only provides getRecord / setRecord
+        if (this.sharedProvider.getRecord && this.sharedProvider.setRecord) {
+          const now = Date.now();
+          const existing = await this.sharedProvider.getRecord(key);
+
+          if (!existing || now > existing.reset_time) {
+            const resetTime = now + windowMs;
+            await this.sharedProvider.setRecord(key, 1, resetTime, windowMs);
+            await this.memoryFallback.increment(key, windowMs, max);
+            this.isAvailable = true;
+            return {
+              count: 1,
+              resetTime,
+              allowed: true,
+              remaining: Math.max(0, max - 1)
+            };
+          }
+
+          if (existing.count >= max) {
+            this.isAvailable = true;
+            return {
+              count: existing.count,
+              resetTime: existing.reset_time,
+              allowed: false,
+              remaining: 0
+            };
+          }
+
+          const newCount = existing.count + 1;
+          await this.sharedProvider.setRecord(key, newCount, existing.reset_time, Math.max(1000, existing.reset_time - now));
           await this.memoryFallback.increment(key, windowMs, max);
           this.isAvailable = true;
           return {
-            count: 1,
-            resetTime,
-            allowed: true,
-            remaining: Math.max(0, max - 1)
-          };
-        }
-
-        if (existing.count >= max) {
-          this.isAvailable = true;
-          return {
-            count: existing.count,
+            count: newCount,
             resetTime: existing.reset_time,
-            allowed: false,
-            remaining: 0
+            allowed: true,
+            remaining: Math.max(0, max - newCount)
           };
         }
-
-        const newCount = existing.count + 1;
-        await this.sharedProvider.setRecord(key, newCount, existing.reset_time, Math.max(1000, existing.reset_time - now));
-        await this.memoryFallback.increment(key, windowMs, max);
-        this.isAvailable = true;
-        return {
-          count: newCount,
-          resetTime: existing.reset_time,
-          allowed: true,
-          remaining: Math.max(0, max - newCount)
-        };
       } catch (err: any) {
         // Fail-safe behavior: log warning once per 30s and use memory fallback
         const now = Date.now();
@@ -208,7 +229,7 @@ export class DistributedRateLimitStore implements RateLimitStore {
   }
 
   public async get(key: string): Promise<RateLimitResult | null> {
-    if (this.sharedProvider) {
+    if (this.sharedProvider && this.sharedProvider.getRecord) {
       try {
         const record = await this.sharedProvider.getRecord(key);
         if (!record) return null;
@@ -228,7 +249,7 @@ export class DistributedRateLimitStore implements RateLimitStore {
   }
 
   public async reset(key: string): Promise<void> {
-    if (this.sharedProvider) {
+    if (this.sharedProvider && this.sharedProvider.setRecord) {
       try {
         await this.sharedProvider.setRecord(key, 0, 0, 0);
       } catch {
@@ -245,17 +266,20 @@ export class DistributedRateLimitStore implements RateLimitStore {
 
 /**
  * Creates an Express middleware enforcing distributed rate limits on routes.
+ * Employs a bounded fail-safe memory limiter if the primary store encounters an unexpected failure,
+ * ensuring security-sensitive endpoints (login, uploads, contact, newsletter) cannot be bypassed.
  */
 export function createRateLimiter(options: RateLimitOptions, store?: RateLimitStore) {
   const activeStore = store || new MemoryRateLimitStore();
   const prefix = options.prefix || 'rl';
+  const emergencyFallback = new MemoryRateLimitStore(5000);
 
   return async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const ip = getClientIp(req);
-      const key = `${prefix}:${ip}`;
-      const now = Date.now();
+    const ip = getClientIp(req);
+    const key = `${prefix}:${ip}`;
+    const now = Date.now();
 
+    try {
       const result = await activeStore.increment(key, options.windowMs, options.max);
 
       // Set standard RFC / RateLimit HTTP Headers
@@ -273,9 +297,29 @@ export function createRateLimiter(options: RateLimitOptions, store?: RateLimitSt
 
       next();
     } catch (err) {
-      console.error('[RateLimiter Middleware Error]', err);
-      // Fail open for unexpected middleware crash to avoid breaking server pipeline
-      next();
+      console.error('[RateLimiter Middleware Error - Activating Fail-Safe Protection]', err);
+      // Bounded Fail-Safe: Enforce emergency local memory rate limiting instead of silently failing open
+      try {
+        const fallbackResult = await emergencyFallback.increment(key, options.windowMs, options.max);
+        res.setHeader('RateLimit-Limit', options.max);
+        res.setHeader('RateLimit-Remaining', fallbackResult.remaining);
+        res.setHeader('RateLimit-Reset', Math.ceil(fallbackResult.resetTime / 1000));
+
+        if (!fallbackResult.allowed) {
+          const retryAfterSec = Math.max(1, Math.ceil((fallbackResult.resetTime - now) / 1000));
+          res.setHeader('Retry-After', retryAfterSec);
+          return res.status(429).json({
+            error: options.message || 'Too many requests. Please try again later.'
+          });
+        }
+        next();
+      } catch (catastrophicErr) {
+        console.error('[RateLimiter Catastrophic Error]', catastrophicErr);
+        res.setHeader('Retry-After', 60);
+        return res.status(429).json({
+          error: 'Rate limit service unavailable. Please retry in a few moments.'
+        });
+      }
     }
   };
 }

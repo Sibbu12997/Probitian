@@ -60,22 +60,25 @@ Probitian is designed with a defense-in-depth, zero-trust security architecture 
 
 ---
 
-## 4. Rate Limiting & DoS Protection
+## 4. Rate Limiting, Concurrency & Distributed DoS Protection
 
-Rate limiters protect critical endpoints from brute force and resource exhaustion:
+Rate limiters protect critical endpoints from brute force, distributed scanning, and resource exhaustion using an atomic distributed architecture backed by Supabase PostgreSQL and bounded in-memory fail-safe stores:
 
 | Limiter | Window | Max Requests | Target Routes |
 |---|---|---|---|
-| `apiLimiter` | 15 min | 300 | General API endpoints |
-| `loginLimiter` | 15 min | 5 | `/api/admin/verify-*` |
+| `loginLimiter` | 15 min | 10 | `/api/admin/login`, `/api/admin/verify-*` |
 | `contactLimiter` | 15 min | 10 | `/api/messages` |
 | `newsletterLimiter` | 15 min | 10 | `/api/newsletter` |
-| `emailSendLimiter` | 15 min | 10 | Campaign bulk dispatches |
-| `emailTestLimiter` | 15 min | 20 | Test email triggers |
+| `unsubscribeLimiter` | 15 min | 20 | `/api/newsletter/unsubscribe` |
+| `emailSendLimiter` | 15 min | 5 | Campaign bulk dispatches |
+| `emailTestLimiter` | 15 min | 10 | Test email triggers |
 | `uploadLimiter` | 15 min | 30 | Media file uploads |
 
-- **Bounded Memory:** Rate limiters maintain internal maps capped at 10,000 entries with automatic expired entry pruning to prevent memory exhaustion under distributed scanning.
-- **Standard Headers:** Responses include standard `RateLimit-Limit`, `RateLimit-Remaining`, `RateLimit-Reset`, and `Retry-After` headers.
+- **Atomic Shared-Store Operations:** Distributed rate limiting utilizes the database stored procedure `public.increment_rate_limit()` executing an atomic `INSERT ... ON CONFLICT (key) DO UPDATE` with row-level serialization. This guarantees that concurrent multi-instance requests cannot exploit race conditions (e.g. GET-then-SET timing windows) to bypass configured thresholds.
+- **Fail-Safe Bounded Fallback:** If the shared database or Supabase RPC becomes unreachable, `DistributedRateLimitStore` transparently fails over to a bounded local `MemoryRateLimitStore`. Security-sensitive endpoints remain protected and are never left open to unlimited requests.
+- **Middleware Failure Resilience:** Outer middleware error handlers wrap active store executions with an emergency local fallback limiter. Under catastrophic store exceptions, excess requests are rejected with HTTP 429 rather than silently failing open.
+- **Proxy-Aware Client Identification:** Configured with Express `trust proxy: 1` corresponding to Cloud Run / Nginx single-hop ingress. Client IPs are normalized, stripping IPv4-mapped IPv6 prefixes (`::ffff:192.0.2.1` -> `192.0.2.1`) and ignoring spoofed client-supplied `X-Forwarded-For`, `X-Real-IP`, or `Forwarded` headers from untrusted origins.
+- **Standard RFC Headers:** Responses include standard `RateLimit-Limit`, `RateLimit-Remaining`, `RateLimit-Reset`, and `Retry-After` headers.
 
 ---
 

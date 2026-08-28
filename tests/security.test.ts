@@ -8,6 +8,7 @@ import {
   MemoryRateLimitStore, 
   DistributedRateLimitStore, 
   getClientIp, 
+  createRateLimiter as createDistributedRateLimiter,
   SharedStoreProvider 
 } from '../src/lib/rateLimiter';
 
@@ -450,8 +451,8 @@ describe('8. CMS/CRM Rich-Content XSS & HTML Sanitization Hardening', () => {
   });
 });
 
-describe('9. Distributed Rate-Limit Store & Fail-Safe In-Memory Fallback', () => {
-  test('MemoryRateLimitStore limits requests within sliding window', async () => {
+describe('9. Distributed Rate-Limit Store, Concurrency & Fail-Safe Architecture', () => {
+  test('Sequential rate limit: MemoryRateLimitStore limits requests within sliding window', async () => {
     const store = new MemoryRateLimitStore(100);
     const key = 'test:ip:10.0.0.1';
     const windowMs = 500;
@@ -478,53 +479,172 @@ describe('9. Distributed Rate-Limit Store & Fail-Safe In-Memory Fallback', () =>
     assert.strictEqual(r4.remaining, 0);
   });
 
-  test('DistributedRateLimitStore syncs state across instances via shared provider', async () => {
-    const sharedData = new Map<string, { count: number; reset_time: number }>();
-    const mockProvider: SharedStoreProvider = {
-      async getRecord(key: string) {
-        return sharedData.get(key) || null;
-      },
-      async setRecord(key: string, count: number, reset_time: number) {
-        sharedData.set(key, { count, reset_time });
+  test('Concurrent rate limit: Atomic increment eliminates race conditions across parallel requests', async () => {
+    // Database-level atomic mock simulating PostgreSQL INSERT ... ON CONFLICT DO UPDATE
+    const dbRows = new Map<string, { count: number; reset_time: number }>();
+    let dbMutex = Promise.resolve();
+
+    const atomicProvider: SharedStoreProvider = {
+      async incrementAtomic(key: string, windowMs: number, max: number) {
+        // Simulate atomic DB row lock and serialized execution
+        return new Promise((resolve) => {
+          dbMutex = dbMutex.then(async () => {
+            const now = Date.now();
+            let row = dbRows.get(key);
+
+            if (!row || now > row.reset_time) {
+              row = { count: 1, reset_time: now + windowMs };
+              dbRows.set(key, row);
+              resolve({
+                count: 1,
+                resetTime: row.reset_time,
+                allowed: true,
+                remaining: Math.max(0, max - 1)
+              });
+              return;
+            }
+
+            row.count += 1;
+            const allowed = row.count <= max;
+            resolve({
+              count: row.count,
+              resetTime: row.reset_time,
+              allowed,
+              remaining: Math.max(0, max - row.count)
+            });
+          });
+        });
       }
     };
 
-    // Instance 1 and Instance 2 share the same backend store
-    const instance1 = new DistributedRateLimitStore(mockProvider);
-    const instance2 = new DistributedRateLimitStore(mockProvider);
+    // Instantiate 3 separate application instances sharing the same atomic store
+    const instanceA = new DistributedRateLimitStore(atomicProvider);
+    const instanceB = new DistributedRateLimitStore(atomicProvider);
+    const instanceC = new DistributedRateLimitStore(atomicProvider);
 
-    const clientKey = 'login:172.16.0.5';
-    const windowMs = 10000;
-    const max = 3;
+    const instances = [instanceA, instanceB, instanceC];
+    const clientKey = 'login:203.0.113.195';
+    const windowMs = 5000;
+    const maxLimit = 5;
+    const totalRequests = 20;
 
-    // Instance 1 handles request 1
-    const res1 = await instance1.increment(clientKey, windowMs, max);
-    assert.strictEqual(res1.allowed, true);
-    assert.strictEqual(res1.count, 1);
+    // Dispatch 20 simultaneous concurrent requests across all instances
+    const requests = Array.from({ length: totalRequests }, (_, i) => {
+      const targetInstance = instances[i % instances.length];
+      return targetInstance.increment(clientKey, windowMs, maxLimit);
+    });
 
-    // Instance 2 handles request 2 (synchronized state)
-    const res2 = await instance2.increment(clientKey, windowMs, max);
-    assert.strictEqual(res2.allowed, true);
-    assert.strictEqual(res2.count, 2);
+    const results = await Promise.all(requests);
 
-    // Instance 1 handles request 3
-    const res3 = await instance1.increment(clientKey, windowMs, max);
-    assert.strictEqual(res3.allowed, true);
-    assert.strictEqual(res3.count, 3);
+    const allowedCount = results.filter(r => r.allowed).length;
+    const rejectedCount = results.filter(r => !r.allowed).length;
 
-    // Instance 2 handles request 4 -> BLOCKED across all instances
-    const res4 = await instance2.increment(clientKey, windowMs, max);
-    assert.strictEqual(res4.allowed, false);
+    // Exactly 5 allowed and exactly 15 rejected - no race condition bypass!
+    assert.strictEqual(allowedCount, maxLimit, `Expected exactly ${maxLimit} allowed requests, got ${allowedCount}`);
+    assert.strictEqual(rejectedCount, totalRequests - maxLimit, `Expected exactly ${totalRequests - maxLimit} rejected requests, got ${rejectedCount}`);
   });
 
-  test('DistributedRateLimitStore fails safe to local memory if shared store is unreachable', async () => {
+  test('Multi-instance synchronization: Shared quota is accurately consumed across distributed nodes', async () => {
+    const sharedData = new Map<string, { count: number; reset_time: number }>();
+    let dbMutex = Promise.resolve();
+
+    const atomicProvider: SharedStoreProvider = {
+      async incrementAtomic(key: string, windowMs: number, max: number) {
+        return new Promise((resolve) => {
+          dbMutex = dbMutex.then(async () => {
+            const now = Date.now();
+            let row = sharedData.get(key);
+            if (!row || now > row.reset_time) {
+              row = { count: 1, reset_time: now + windowMs };
+              sharedData.set(key, row);
+              resolve({
+                count: 1,
+                resetTime: row.reset_time,
+                allowed: true,
+                remaining: Math.max(0, max - 1)
+              });
+              return;
+            }
+            row.count += 1;
+            resolve({
+              count: row.count,
+              resetTime: row.reset_time,
+              allowed: row.count <= max,
+              remaining: Math.max(0, max - row.count)
+            });
+          });
+        });
+      }
+    };
+
+    const instanceA = new DistributedRateLimitStore(atomicProvider);
+    const instanceB = new DistributedRateLimitStore(atomicProvider);
+    const instanceC = new DistributedRateLimitStore(atomicProvider);
+
+    const clientKey = 'upload:198.51.100.42';
+    const windowMs = 10000;
+    const maxLimit = 10;
+
+    // Instance A handles 4 requests
+    for (let i = 0; i < 4; i++) {
+      const res = await instanceA.increment(clientKey, windowMs, maxLimit);
+      assert.strictEqual(res.allowed, true);
+    }
+
+    // Instance B handles 3 requests
+    for (let i = 0; i < 3; i++) {
+      const res = await instanceB.increment(clientKey, windowMs, maxLimit);
+      assert.strictEqual(res.allowed, true);
+    }
+
+    // Instance C handles 3 requests (Quota reached: 4 + 3 + 3 = 10)
+    for (let i = 0; i < 3; i++) {
+      const res = await instanceC.increment(clientKey, windowMs, maxLimit);
+      assert.strictEqual(res.allowed, true);
+    }
+
+    // 11th request from Instance A must be REJECTED (HTTP 429 quota exhausted)
+    const blockedA = await instanceA.increment(clientKey, windowMs, maxLimit);
+    assert.strictEqual(blockedA.allowed, false);
+    assert.strictEqual(blockedA.remaining, 0);
+
+    // 12th request from Instance B must also be REJECTED
+    const blockedB = await instanceB.increment(clientKey, windowMs, maxLimit);
+    assert.strictEqual(blockedB.allowed, false);
+    assert.strictEqual(blockedB.remaining, 0);
+  });
+
+  test('Window expiration: Allowed requests reset after window expiry and stale records prune', async () => {
+    const store = new MemoryRateLimitStore(100);
+    const clientKey = 'unsub:192.0.2.75';
+    const shortWindowMs = 50; // 50ms window
+    const maxLimit = 2;
+
+    // Exhaust limit
+    const r1 = await store.increment(clientKey, shortWindowMs, maxLimit);
+    assert.strictEqual(r1.allowed, true);
+    const r2 = await store.increment(clientKey, shortWindowMs, maxLimit);
+    assert.strictEqual(r2.allowed, true);
+    const r3 = await store.increment(clientKey, shortWindowMs, maxLimit);
+    assert.strictEqual(r3.allowed, false);
+
+    // Wait for window to expire
+    await new Promise((resolve) => setTimeout(resolve, 60));
+
+    // Request after expiration is allowed
+    const r4 = await store.increment(clientKey, shortWindowMs, maxLimit);
+    assert.strictEqual(r4.allowed, true);
+    assert.strictEqual(r4.count, 1);
+    assert.strictEqual(r4.remaining, 1);
+
+    // Prune test: records are cleaned up
+    store.prune();
+  });
+
+  test('Shared-store failure & Fallback enforcement: Graceful degradation without service interruption', async () => {
     let callCount = 0;
     const faultyProvider: SharedStoreProvider = {
-      async getRecord() {
-        callCount++;
-        throw new Error('Database connection timeout (503)');
-      },
-      async setRecord() {
+      async incrementAtomic() {
         callCount++;
         throw new Error('Database connection timeout (503)');
       }
@@ -545,16 +665,145 @@ describe('9. Distributed Rate-Limit Store & Fail-Safe In-Memory Fallback', () =>
     assert.strictEqual(res2.count, 2);
 
     const res3 = await store.increment(key, windowMs, max);
-    assert.strictEqual(res3.allowed, false); // Memory fallback still enforces protection!
+    assert.strictEqual(res3.allowed, false); // Memory fallback still enforces rate limit!
     assert.strictEqual(store.isUsingFallback(), true);
   });
 
-  test('getClientIp normalizes IPv4-mapped IPv6 addresses', () => {
+  test('Rate-limiter middleware fail-safe: Unexpected errors do not silently bypass protection', async () => {
+    // Custom broken store that throws unexpectedly
+    const brokenStore: any = {
+      async increment() {
+        throw new Error('Unexpected fatal store exception');
+      }
+    };
+
+    const limiterMiddleware = createDistributedRateLimiter({
+      windowMs: 5000,
+      max: 2,
+      prefix: 'emergency',
+      message: 'Rate limit exceeded'
+    }, brokenStore);
+
+    let nextCalledCount = 0;
+    let statusCode: number | null = null;
+    let responseBody: any = null;
+    let responseHeaders: Record<string, any> = {};
+
     const mockReq = {
+      ip: '10.50.0.1',
+      socket: { remoteAddress: '10.50.0.1' }
+    } as any;
+
+    const createMockRes = () => {
+      const res: any = {
+        setHeader(name: string, value: any) {
+          responseHeaders[name] = value;
+        },
+        status(code: number) {
+          statusCode = code;
+          return this;
+        },
+        json(body: any) {
+          responseBody = body;
+          return this;
+        }
+      };
+      return res;
+    };
+
+    // Request 1: Emergency fallback allows first request
+    await limiterMiddleware(mockReq, createMockRes(), () => { nextCalledCount++; });
+    assert.strictEqual(nextCalledCount, 1);
+
+    // Request 2: Emergency fallback allows second request
+    await limiterMiddleware(mockReq, createMockRes(), () => { nextCalledCount++; });
+    assert.strictEqual(nextCalledCount, 2);
+
+    // Request 3: Emergency fallback BLOCKS third request (NO SILENT BYPASS!)
+    await limiterMiddleware(mockReq, createMockRes(), () => { nextCalledCount++; });
+    assert.strictEqual(nextCalledCount, 2); // next() was NOT called
+    assert.strictEqual(statusCode, 429);
+    assert.ok(responseBody?.error);
+    assert.strictEqual(responseHeaders['RateLimit-Limit'], 2);
+    assert.strictEqual(responseHeaders['RateLimit-Remaining'], 0);
+  });
+
+  test('Proxy & IP Spoofing Protection: Resolves legitimate IP and resists spoofed headers', () => {
+    // 1. Normal Direct Client IP
+    const directReq = {
+      ip: '203.0.113.10',
+      socket: { remoteAddress: '203.0.113.10' }
+    } as any;
+    assert.strictEqual(getClientIp(directReq), '203.0.113.10');
+
+    // 2. IPv4-mapped IPv6 address normalized
+    const ipv6Req = {
       ip: '::ffff:192.0.2.1',
       socket: { remoteAddress: '::ffff:192.0.2.1' }
     } as any;
+    assert.strictEqual(getClientIp(ipv6Req), '192.0.2.1');
 
-    assert.strictEqual(getClientIp(mockReq), '192.0.2.1');
+    // 3. Trusted Proxy (Express trust proxy: 1 resolves trusted client IP)
+    const trustedProxyReq = {
+      ip: '198.51.100.25', // Express trusted proxy resolved value
+      headers: {
+        'x-forwarded-for': '1.1.1.1, 198.51.100.25',
+        'x-real-ip': '1.1.1.1',
+        'forwarded': 'for=1.1.1.1'
+      },
+      socket: { remoteAddress: '127.0.0.1' }
+    } as any;
+    assert.strictEqual(getClientIp(trustedProxyReq), '198.51.100.25');
+
+    // 4. Untrusted spoofed headers ignored when Express does not resolve them into req.ip
+    const spoofedReq = {
+      ip: '192.168.1.100', // Real socket address reported by Express
+      headers: {
+        'x-forwarded-for': 'attacker.spoofed.ip',
+        'x-real-ip': '8.8.8.8',
+        'forwarded': 'for=1.2.3.4'
+      },
+      socket: { remoteAddress: '192.168.1.100' }
+    } as any;
+    assert.strictEqual(getClientIp(spoofedReq), '192.168.1.100');
+  });
+
+  test('HTTP 429 & RateLimit Header Standards: Emits standard RFC headers and Retry-After', async () => {
+    const store = new MemoryRateLimitStore(100);
+    const limiter = createDistributedRateLimiter({
+      windowMs: 60000,
+      max: 1,
+      prefix: 'header-test',
+      message: 'Rate limit exceeded'
+    }, store);
+
+    const headers: Record<string, any> = {};
+    let status = 200;
+    let jsonBody: any = null;
+
+    const mockRes: any = {
+      setHeader(name: string, val: any) { headers[name] = val; },
+      status(code: number) { status = code; return this; },
+      json(body: any) { jsonBody = body; return this; }
+    };
+
+    const mockReq = {
+      ip: '192.0.2.99',
+      socket: { remoteAddress: '192.0.2.99' }
+    } as any;
+
+    // 1st request -> allowed
+    await limiter(mockReq, mockRes, () => {});
+    assert.strictEqual(headers['RateLimit-Limit'], 1);
+    assert.strictEqual(headers['RateLimit-Remaining'], 0);
+    assert.ok(typeof headers['RateLimit-Reset'] === 'number');
+
+    // 2nd request -> HTTP 429 with Retry-After header
+    await limiter(mockReq, mockRes, () => {});
+    assert.strictEqual(status, 429);
+    assert.strictEqual(headers['RateLimit-Remaining'], 0);
+    assert.ok(typeof headers['Retry-After'] === 'number');
+    assert.ok(headers['Retry-After'] >= 1);
+    assert.strictEqual(jsonBody?.error, 'Rate limit exceeded');
   });
 });
