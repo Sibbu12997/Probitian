@@ -413,17 +413,14 @@ The Admin Portal contains integrated management modules:
   - **Solution**: Confirm the passkey entered matches \`ADMIN_PASSKEY\` configured in the server environment.
 `;
 
-// Save Markdown files in public/docs, docs, and root
+// Save Markdown files in public/docs and docs directories (not root)
 fs.writeFileSync(path.join(docsDir, 'ProBitian_Website_User_Guide.md'), websiteGuideMd);
 fs.writeFileSync(path.join(docsDir, 'ProBitian_Admin_Control_Center_User_Guide.md'), adminGuideMd);
-
-fs.writeFileSync(path.join(process.cwd(), 'ProBitian_Website_User_Guide.md'), websiteGuideMd);
-fs.writeFileSync(path.join(process.cwd(), 'ProBitian_Admin_Control_Center_User_Guide.md'), adminGuideMd);
 
 fs.writeFileSync(path.join(process.cwd(), 'docs', 'PROBITIAN_USER_GUIDE.md'), websiteGuideMd);
 fs.writeFileSync(path.join(process.cwd(), 'docs', 'PROBITIAN_ADMIN_CONTROL_CENTER_USER_GUIDE.md'), adminGuideMd);
 
-console.log('Saved Markdown files successfully.');
+console.log('Saved Markdown files successfully in public/docs/ and docs/.');
 
 // Generate PDFs in public/docs
 createPdfFromMarkdown(

@@ -203,14 +203,22 @@ export const SEO: React.FC<SEOProps> = ({
 
   // 4. Article Schema (for blog articles)
   if (article && page === 'blog') {
-    schemas.push({
+    const parseIsoDate = (val?: string | null): string | undefined => {
+      if (!val || typeof val !== 'string' || !val.trim()) return undefined;
+      const parsed = new Date(val);
+      if (isNaN(parsed.getTime())) return undefined;
+      return parsed.toISOString();
+    };
+
+    const datePublished = parseIsoDate(article.date) || parseIsoDate(article.created_at);
+    const dateModified = parseIsoDate((article as any).updated_at) || datePublished;
+
+    const blogPostingSchema: any = {
       '@context': 'https://schema.org',
       '@type': 'BlogPosting',
       headline: article.title || finalTitle,
       description: article.excerpt || article.metaDescription || finalDesc,
       image: article.imageUrl || finalOgImage,
-      datePublished: article.date || '2026-08-15',
-      dateModified: article.date || '2026-08-15',
       author: {
         '@type': 'Person',
         name: article.author || 'Shivam Singh',
@@ -229,7 +237,12 @@ export const SEO: React.FC<SEOProps> = ({
         '@id': canonicalUrl,
       },
       keywords: article.category ? `${article.category}, ${article.tags?.join(', ') || 'Business Intelligence'}` : undefined,
-    });
+    };
+
+    if (datePublished) blogPostingSchema.datePublished = datePublished;
+    if (dateModified) blogPostingSchema.dateModified = dateModified;
+
+    schemas.push(blogPostingSchema);
   }
 
   return (
