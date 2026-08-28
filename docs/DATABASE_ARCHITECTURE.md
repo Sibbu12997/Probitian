@@ -62,6 +62,7 @@ The Supabase PostgreSQL database schema comprises 15 primary tables:
 | **`media`** | Uploaded media metadata inventory | `id`, `filename`, `original_filename`, `storage_path`, `public_url`, `file_size`, `mime_type`, `category`, `uploaded_at` |
 | **`email_campaigns`** | Email newsletter campaigns | `id`, `name`, `subject`, `preview_text`, `content`, `status`, `scheduled_at`, `sent_at`, `total_recipients`, `successful_count`, `failed_count`, `created_at` |
 | **`email_campaign_recipients`**| Newsletter delivery log per recipient | `id`, `campaign_id`, `subscriber_id`, `email`, `status`, `provider_message_id`, `error_message`, `sent_at` |
+| **`rate_limits`** | Distributed atomic rate limit counters | `key`, `count`, `reset_time`, `updated_at` |
 
 ---
 

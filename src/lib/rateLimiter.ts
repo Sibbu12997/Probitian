@@ -130,15 +130,13 @@ export type SharedStoreProvider = {
    * Atomic increment operation performed directly in the shared store / database
    * to eliminate race conditions across concurrent multi-instance requests.
    */
-  incrementAtomic?: (key: string, windowMs: number, max: number) => Promise<RateLimitResult>;
-  getRecord?: (key: string) => Promise<{ count: number; reset_time: number } | null>;
-  setRecord?: (key: string, count: number, reset_time: number, ttlMs?: number) => Promise<void>;
+  incrementAtomic: (key: string, windowMs: number, max: number) => Promise<RateLimitResult>;
 };
 
 /**
  * Distributed Rate Limit Store with Fail-Safe In-Memory Fallback.
  * Synchronizes request limits across multiple backend instances (Cloud Run / clustered containers).
- * Uses atomic DB RPC / transaction operations when available to prevent race conditions.
+ * Uses atomic DB RPC / transaction operations exclusively to prevent race conditions.
  * If the shared backend store encounters an outage or error, it fails safe to the local memory store
  * so security-sensitive endpoints remain protected and legitimate traffic is not brought down.
  */
@@ -160,58 +158,15 @@ export class DistributedRateLimitStore implements RateLimitStore {
   public async increment(key: string, windowMs: number, max: number): Promise<RateLimitResult> {
     if (this.sharedProvider) {
       try {
-        // 1. Prefer atomic shared store increment (PostgreSQL function / RPC)
-        if (typeof this.sharedProvider.incrementAtomic === 'function') {
-          const atomicResult = await this.sharedProvider.incrementAtomic(key, windowMs, max);
-          this.isAvailable = true;
-          // Keep local memory fallback synced
-          try {
-            await this.memoryFallback.increment(key, windowMs, max);
-          } catch {
-            // Ignore memory sync errors
-          }
-          return atomicResult;
-        }
-
-        // 2. Legacy fallback if provider only provides getRecord / setRecord
-        if (this.sharedProvider.getRecord && this.sharedProvider.setRecord) {
-          const now = Date.now();
-          const existing = await this.sharedProvider.getRecord(key);
-
-          if (!existing || now > existing.reset_time) {
-            const resetTime = now + windowMs;
-            await this.sharedProvider.setRecord(key, 1, resetTime, windowMs);
-            await this.memoryFallback.increment(key, windowMs, max);
-            this.isAvailable = true;
-            return {
-              count: 1,
-              resetTime,
-              allowed: true,
-              remaining: Math.max(0, max - 1)
-            };
-          }
-
-          if (existing.count >= max) {
-            this.isAvailable = true;
-            return {
-              count: existing.count,
-              resetTime: existing.reset_time,
-              allowed: false,
-              remaining: 0
-            };
-          }
-
-          const newCount = existing.count + 1;
-          await this.sharedProvider.setRecord(key, newCount, existing.reset_time, Math.max(1000, existing.reset_time - now));
+        const atomicResult = await this.sharedProvider.incrementAtomic(key, windowMs, max);
+        this.isAvailable = true;
+        // Keep local memory fallback synced
+        try {
           await this.memoryFallback.increment(key, windowMs, max);
-          this.isAvailable = true;
-          return {
-            count: newCount,
-            resetTime: existing.reset_time,
-            allowed: true,
-            remaining: Math.max(0, max - newCount)
-          };
+        } catch {
+          // Ignore memory sync errors
         }
+        return atomicResult;
       } catch (err: any) {
         // Fail-safe behavior: log warning once per 30s and use memory fallback
         const now = Date.now();
@@ -229,33 +184,10 @@ export class DistributedRateLimitStore implements RateLimitStore {
   }
 
   public async get(key: string): Promise<RateLimitResult | null> {
-    if (this.sharedProvider && this.sharedProvider.getRecord) {
-      try {
-        const record = await this.sharedProvider.getRecord(key);
-        if (!record) return null;
-        const now = Date.now();
-        if (now > record.reset_time) return null;
-        return {
-          count: record.count,
-          resetTime: record.reset_time,
-          allowed: true,
-          remaining: 0
-        };
-      } catch {
-        return this.memoryFallback.get(key);
-      }
-    }
     return this.memoryFallback.get(key);
   }
 
   public async reset(key: string): Promise<void> {
-    if (this.sharedProvider && this.sharedProvider.setRecord) {
-      try {
-        await this.sharedProvider.setRecord(key, 0, 0, 0);
-      } catch {
-        // Ignore reset error in shared store
-      }
-    }
     await this.memoryFallback.reset(key);
   }
 

@@ -480,7 +480,9 @@ describe('9. Distributed Rate-Limit Store, Concurrency & Fail-Safe Architecture'
   });
 
   test('Concurrent rate limit: Atomic increment eliminates race conditions across parallel requests', async () => {
-    // Database-level atomic mock simulating PostgreSQL INSERT ... ON CONFLICT DO UPDATE
+    // Database-level atomic mock simulating PostgreSQL row-level locks in public.increment_rate_limit
+    // (Note: In unit tests this verifies the serialized atomic contract across multiple DistributedRateLimitStore instances;
+    // full end-to-end database lock testing against live Supabase occurs in production staging)
     const dbRows = new Map<string, { count: number; reset_time: number }>();
     let dbMutex = Promise.resolve();
 
@@ -517,18 +519,15 @@ describe('9. Distributed Rate-Limit Store, Concurrency & Fail-Safe Architecture'
       }
     };
 
-    // Instantiate 3 separate application instances sharing the same atomic store
-    const instanceA = new DistributedRateLimitStore(atomicProvider);
-    const instanceB = new DistributedRateLimitStore(atomicProvider);
-    const instanceC = new DistributedRateLimitStore(atomicProvider);
+    // Instantiate 5 separate application instances sharing the same atomic store
+    const instances = Array.from({ length: 5 }, () => new DistributedRateLimitStore(atomicProvider));
 
-    const instances = [instanceA, instanceB, instanceC];
     const clientKey = 'login:203.0.113.195';
     const windowMs = 5000;
-    const maxLimit = 5;
-    const totalRequests = 20;
+    const maxLimit = 10;
+    const totalRequests = 50;
 
-    // Dispatch 20 simultaneous concurrent requests across all instances
+    // Dispatch 50 simultaneous concurrent requests across all 5 instances using Promise.all
     const requests = Array.from({ length: totalRequests }, (_, i) => {
       const targetInstance = instances[i % instances.length];
       return targetInstance.increment(clientKey, windowMs, maxLimit);
@@ -539,7 +538,7 @@ describe('9. Distributed Rate-Limit Store, Concurrency & Fail-Safe Architecture'
     const allowedCount = results.filter(r => r.allowed).length;
     const rejectedCount = results.filter(r => !r.allowed).length;
 
-    // Exactly 5 allowed and exactly 15 rejected - no race condition bypass!
+    // Exactly 10 allowed and exactly 40 rejected - no race condition bypass!
     assert.strictEqual(allowedCount, maxLimit, `Expected exactly ${maxLimit} allowed requests, got ${allowedCount}`);
     assert.strictEqual(rejectedCount, totalRequests - maxLimit, `Expected exactly ${totalRequests - maxLimit} rejected requests, got ${rejectedCount}`);
   });

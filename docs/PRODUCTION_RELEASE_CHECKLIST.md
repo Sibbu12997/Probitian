@@ -17,7 +17,7 @@ Prior to releasing a new deployment or major update, ensure every item below is 
 ### 1. Database & Infrastructure
 - [x] **Supabase Project Verified**: Target reference `dlaehchzzkjsrarktfsf.supabase.co` online.
 - [x] **Supabase Credentials Configured**: `SUPABASE_SECRET_KEY` configured in server environment; `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` configured in client.
-- [x] **Database Schema Verified**: All 12 tables (`projects`, `blogs`, `courses`, `videos`, `categories`, `pages`, `settings`, `messages`, `newsletter`, `media`, `email_campaigns`, `email_campaign_recipients`) present in Supabase PostgreSQL.
+- [x] **Database Schema Verified**: All 16 primary tables (`projects`, `blogs`, `courses`, `videos`, `categories`, `pages`, `settings`, `messages`, `newsletter`, `media`, `email_campaigns`, `email_campaign_recipients`, `leads`, `lead_campaigns`, `campaign_leads`, `rate_limits`) present in Supabase PostgreSQL.
 - [x] **RLS Verified**: Row Level Security enabled on all tables; direct public postgREST access blocked (HTTP 403).
 - [x] **Backend CMS Permissions Verified**: Service role grants executed strictly for backend Express API (`GRANT ALL ON ALL TABLES IN SCHEMA public TO service_role;`).
 - [x] **Firebase Absent**: Zero active code, imports, or dependencies on Firebase in production.
@@ -75,7 +75,7 @@ Prior to releasing a new deployment or major update, ensure every item below is 
 ### 6. CI/CD, Quality & Security Automation
 - [x] **Dependency Lockfile Synchronized**: `package-lock.json` and `package.json` synchronized; `npm ci` installs cleanly.
 - [x] **Typecheck Passed**: `npm run lint` (`tsc --noEmit`) exits with code 0.
-- [x] **Security & Regression Test Suite Passed**: `npm test` runs 7 suites / 19 tests with 0 failures.
+- [x] **Security & Regression Test Suite Passed**: `npm test` runs 10 suites / 36 tests with 0 failures.
 - [x] **Dependency Audit Clean**: `npm audit --audit-level=high` reports 0 vulnerabilities.
 - [x] **Production Build Passed**: `npm run build` completes with zero errors.
 - [x] **Custom CodeQL SAST Configured**: `.github/workflows/codeql.yml` configured with `security-extended,security-and-quality`.

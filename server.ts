@@ -463,35 +463,6 @@ if (serverSupabase) {
       }
 
       throw new Error('Unexpected return signature from increment_rate_limit RPC');
-    },
-    async getRecord(key: string) {
-      try {
-        const { data, error } = await serverSupabase
-          .from('rate_limits')
-          .select('count, reset_time')
-          .eq('key', key)
-          .maybeSingle();
-        if (error) {
-          if (error.code === '42P01' || error.message?.includes('relation "rate_limits" does not exist')) {
-            throw new Error('rate_limits table not present in Supabase');
-          }
-          throw error;
-        }
-        return data ? { count: data.count, reset_time: Number(data.reset_time) } : null;
-      } catch (e) {
-        throw e;
-      }
-    },
-    async setRecord(key: string, count: number, reset_time: number) {
-      const { error } = await serverSupabase
-        .from('rate_limits')
-        .upsert({
-          key,
-          count,
-          reset_time,
-          updated_at: new Date().toISOString()
-        }, { onConflict: 'key' });
-      if (error) throw error;
     }
   };
   globalDistributedRateLimitStore.setProvider(supabaseRateLimitProvider);

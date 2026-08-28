@@ -337,4 +337,13 @@ Official LinkedIn: [https://www.linkedin.com/company/probitian/](https://www.lin
 
 ---
 
+### 33. HTTP 429 Too Many Requests (Rate Limit Triggered)
+- **Problem**: Endpoint requests (such as `/api/admin/verify-passkey`, `/api/newsletter`, `/api/messages`, or `/api/cms/media/upload`) return `HTTP 429` with JSON error and `Retry-After` header.
+- **Cause**: Request frequency exceeded configured rate-limit quotas within the 15-minute sliding window.
+- **How to Verify**: Inspect response headers for `RateLimit-Limit`, `RateLimit-Remaining: 0`, and `Retry-After: <seconds>`.
+- **Solution**: Wait for the duration indicated by `Retry-After` before re-attempting. For automated jobs, implement exponential backoff respecting the `Retry-After` header.
+- **Architecture Note**: ProBitian uses atomic PostgreSQL RPC rate limiting (`public.increment_rate_limit`) with automatic fail-safe in-memory fallback. If the database is temporarily unreachable, local memory rate limiting continues to enforce protection.
+
+---
+
 *Documentation maintained by Shivam Singh — ProBitian.*

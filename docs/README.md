@@ -24,7 +24,7 @@ Official LinkedIn: [https://www.linkedin.com/company/probitian/](https://www.lin
 - 🏛 **[Database Architecture Specification](DATABASE_ARCHITECTURE.md)**  
   Detailed specification of Supabase PostgreSQL as the single authoritative production database, table schema references (`leads`, `lead_campaigns`, `campaign_leads`), and RLS policies.
 - 🔄 **[Database Migrations & Schema Management](DATABASE_MIGRATIONS.md)**  
-  Sequential migration log (`0001` to `0010`), non-destructive schema rules, and migration execution procedures.
+  Sequential migration log (`0001` to `0013`), non-destructive schema rules, and migration execution procedures.
 - 🖼 **[Media Library & Supabase Storage Specification](MEDIA_LIBRARY.md)**  
   Supabase Storage (`probitian-media` bucket) architecture, folder organization, upload API, and SVG DOMPurify sanitization.
 
