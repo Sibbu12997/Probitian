@@ -9,6 +9,7 @@
     "start": "node dist/server.cjs",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
+    "docs:generate": "node generate_docs.js",
     "lint": "tsc --noEmit",
     "test": "tsx --test tests/**/*.test.ts"
   },
