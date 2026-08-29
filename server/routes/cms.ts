@@ -1,5 +1,6 @@
 import express from 'express';
 import crypto from 'crypto';
+import path from 'path';
 import { requireAuth, requirePermission } from '../auth/rbac';
 import { Permission } from '../auth/types';
 import { isValidId, isValidUuid, PROBITIAN_MEDIA_BUCKET } from '../config/constants';
@@ -1129,38 +1130,60 @@ router.post('/cms/settings', requireAuth, requirePermission(Permission.MANAGE_SY
 
 // ==================== MEDIA UPLOADS ====================
 
+const MAX_UPLOAD_BYTES = 15 * 1024 * 1024; // 15MB
+
 const handleUpload = async (req: express.Request, res: express.Response) => {
   const { fileData, fileName, filename, contentType, mimeType, category, folder, altText } = req.body;
   const rawFileName = fileName || filename;
-  const rawContentType = contentType || mimeType || 'image/png';
+  const rawContentType = contentType || mimeType;
 
   if (!fileData || !rawFileName) {
     return res.status(400).json({ error: 'fileData (base64) and fileName are required' });
   }
 
   try {
-    const rawBuffer = Buffer.from(fileData.replace(/^data:[^;]+;base64,/, ''), 'base64');
+    const rawBuffer = Buffer.from(String(fileData).replace(/^data:[^;]+;base64,/, ''), 'base64');
+    
+    // 1. Enforce upload size limit
+    if (rawBuffer.length > MAX_UPLOAD_BYTES) {
+      return res.status(413).json({ error: `File size exceeds the maximum limit of ${MAX_UPLOAD_BYTES / (1024 * 1024)}MB.` });
+    }
+
+    if (rawBuffer.length === 0) {
+      return res.status(400).json({ error: 'Uploaded file payload is empty.' });
+    }
+
+    // 2. Normalize and sanitize filename against path traversal
+    const safeBaseName = path.basename(String(rawFileName)).trim();
+    const ext = path.extname(safeBaseName).toLowerCase();
+    const cleanName = safeBaseName.replace(/[^a-zA-Z0-9._-]/g, '_') || 'upload';
+
+    // 3. Binary & content signature validation
+    const validation = validateFileSignature(rawBuffer, rawContentType || '', ext);
+    if (!validation.valid) {
+      return res.status(400).json({ error: validation.error || 'File signature validation failed.' });
+    }
+
+    const effectiveMime = validation.detectedMime || rawContentType || 'image/png';
     let bufferToUpload = rawBuffer;
 
-    if (rawContentType === 'image/svg+xml') {
+    // 4. SVG sanitization & validation
+    if (effectiveMime === 'image/svg+xml' || ext === '.svg') {
       const cleanSvg = sanitizeSvgString(rawBuffer.toString('utf-8'));
-      bufferToUpload = Buffer.from(cleanSvg, 'utf-8');
-    } else {
-      const validation = validateFileSignature(rawBuffer, rawContentType);
-      if (!validation.valid) {
-        return res.status(400).json({ error: validation.error || 'File validation failed' });
+      if (!cleanSvg || !cleanSvg.toLowerCase().includes('<svg') || (!cleanSvg.toLowerCase().includes('</svg>') && !cleanSvg.includes('/>'))) {
+        return res.status(400).json({ error: 'SVG content is invalid or was stripped of prohibited active markup.' });
       }
+      bufferToUpload = Buffer.from(cleanSvg, 'utf-8');
     }
 
     let publicUrl = '';
-    const cleanName = rawFileName.replace(/[^a-zA-Z0-9._-]/g, '_');
     const uniquePath = `uploads/${Date.now()}_${crypto.randomBytes(4).toString('hex')}_${cleanName}`;
 
     if (serverSupabase) {
       const { data: uploadData, error: uploadErr } = await serverSupabase.storage
         .from(PROBITIAN_MEDIA_BUCKET)
         .upload(uniquePath, bufferToUpload, {
-          contentType: rawContentType,
+          contentType: effectiveMime,
           cacheControl: '3600',
           upsert: true
         });
@@ -1175,19 +1198,19 @@ const handleUpload = async (req: express.Request, res: express.Response) => {
 
       publicUrl = publicUrlData.publicUrl;
     } else {
-      publicUrl = `data:${rawContentType};base64,${bufferToUpload.toString('base64')}`;
+      publicUrl = `data:${effectiveMime};base64,${bufferToUpload.toString('base64')}`;
     }
 
     const mediaItem = {
       id: crypto.randomUUID(),
       filename: cleanName,
-      original_filename: rawFileName,
+      original_filename: safeBaseName,
       storage_path: uniquePath,
       public_url: publicUrl,
       url: publicUrl,
       size_bytes: bufferToUpload.length,
       file_size: bufferToUpload.length,
-      mime_type: rawContentType,
+      mime_type: effectiveMime,
       alt_text: altText || cleanName,
       category: category || folder || 'general',
       folder: folder || category || 'general',
