@@ -25,8 +25,12 @@ router.get('/cms/projects', async (req, res) => {
       return res.status(503).json({ error: 'Database service unavailable' });
     }
   }
-  const data = readCmsData();
-  return res.json(data.projects || []);
+  try {
+    const data = readCmsData();
+    return res.json(data.projects || []);
+  } catch {
+    return res.json([]);
+  }
 });
 
 // POST /api/cms/projects (Protected: Editor / Admin)
@@ -133,8 +137,12 @@ router.get('/cms/blogs', async (req, res) => {
       return res.status(503).json({ error: 'Database service unavailable' });
     }
   }
-  const data = readCmsData();
-  return res.json(data.blogs || []);
+  try {
+    const data = readCmsData();
+    return res.json(data.blogs || []);
+  } catch {
+    return res.json([]);
+  }
 });
 
 // POST /api/cms/blogs (Protected: Editor / Admin)
@@ -240,8 +248,12 @@ router.get('/cms/courses', async (req, res) => {
       return res.status(503).json({ error: 'Database service unavailable' });
     }
   }
-  const data = readCmsData();
-  return res.json(data.courses || []);
+  try {
+    const data = readCmsData();
+    return res.json(data.courses || []);
+  } catch {
+    return res.json([]);
+  }
 });
 
 // POST /api/cms/courses (Protected: Editor / Admin)
@@ -349,8 +361,12 @@ router.get('/cms/videos', async (req, res) => {
       return res.status(503).json({ error: 'Database service unavailable' });
     }
   }
-  const data = readCmsData();
-  return res.json(data.videos || []);
+  try {
+    const data = readCmsData();
+    return res.json(data.videos || []);
+  } catch {
+    return res.json([]);
+  }
 });
 
 // POST /api/cms/videos (Protected: Editor / Admin)
@@ -453,8 +469,12 @@ router.get('/cms/categories', async (req, res) => {
       return res.status(503).json({ error: 'Database service unavailable' });
     }
   }
-  const data = readCmsData();
-  return res.json(data.categories || []);
+  try {
+    const data = readCmsData();
+    return res.json(data.categories || []);
+  } catch {
+    return res.json([]);
+  }
 });
 
 // POST /api/cms/categories (Protected: Editor / Admin)
@@ -532,8 +552,12 @@ router.get('/cms/messages', requireAuth, requirePermission(Permission.VIEW_ANALY
       return res.status(503).json({ error: 'Database service unavailable' });
     }
   }
-  const data = readCmsData();
-  return res.json(data.messages || []);
+  try {
+    const data = readCmsData();
+    return res.json(data.messages || []);
+  } catch {
+    return res.json([]);
+  }
 });
 
 // POST /api/cms/messages (Public Contact Form)
@@ -717,8 +741,12 @@ router.get('/cms/subscribers', requireAuth, requirePermission(Permission.VIEW_AN
       return res.status(503).json({ error: 'Database service unavailable' });
     }
   }
-  const data = readCmsData();
-  return res.json(data.subscribers || []);
+  try {
+    const data = readCmsData();
+    return res.json(data.subscribers || []);
+  } catch {
+    return res.json([]);
+  }
 });
 
 // DELETE /api/cms/subscribers/:id (Protected: Admin)
@@ -752,17 +780,36 @@ router.delete('/cms/subscribers/:id', requireAuth, requirePermission(Permission.
 router.get('/cms/social', async (req, res) => {
   if (serverSupabase) {
     try {
-      const { data, error } = await serverSupabase.from('settings').select('value').eq('key', 'social_links').maybeSingle();
-      if (!error && data && Array.isArray(data.value)) {
-        return res.json(data.value);
+      // 1. Try settings table with key 'social_links'
+      const { data: settingRow, error: settingErr } = await serverSupabase.from('settings').select('value').eq('key', 'social_links').maybeSingle();
+      if (!settingErr && settingRow && Array.isArray(settingRow.value) && settingRow.value.length > 0) {
+        return res.json(settingRow.value);
       }
-    } catch (e) {
-      // Fallback
+
+      // 2. Try dedicated social_links table
+      const { data: links, error: linksErr } = await serverSupabase.from('social_links').select('*').order('display_order', { ascending: true });
+      if (!linksErr && Array.isArray(links) && links.length > 0) {
+        return res.json(links);
+      }
+
+      // 3. If settings row exists or queries succeeded without DB connection failure
+      if (!settingErr || !linksErr) {
+        return res.json(Array.isArray(settingRow?.value) ? settingRow.value : []);
+      }
+
+      return res.status(503).json({ error: 'Database service unavailable' });
+    } catch (err: any) {
+      return res.status(503).json({ error: 'Database service unavailable' });
     }
   }
-  const data = readCmsData();
-  const social = data.social || data.social_links || (data.settings && data.settings.social_links) || [];
-  return res.json(Array.isArray(social) ? social : []);
+
+  try {
+    const data = readCmsData();
+    const social = data.social || data.social_links || (data.settings && data.settings.social_links) || [];
+    return res.json(Array.isArray(social) ? social : []);
+  } catch {
+    return res.json([]);
+  }
 });
 
 // POST /api/cms/social (Protected: Admin)
@@ -798,17 +845,36 @@ router.post('/cms/social', requireAuth, requirePermission(Permission.MANAGE_SYST
 router.get('/cms/navigation', async (req, res) => {
   if (serverSupabase) {
     try {
-      const { data, error } = await serverSupabase.from('settings').select('value').eq('key', 'navigation_items').maybeSingle();
-      if (!error && data && Array.isArray(data.value)) {
-        return res.json(data.value);
+      // 1. Try settings table with key 'navigation_items'
+      const { data: settingRow, error: settingErr } = await serverSupabase.from('settings').select('value').eq('key', 'navigation_items').maybeSingle();
+      if (!settingErr && settingRow && Array.isArray(settingRow.value) && settingRow.value.length > 0) {
+        return res.json(settingRow.value);
       }
-    } catch (e) {
-      // Fallback
+
+      // 2. Try dedicated navigation table
+      const { data: navItems, error: navErr } = await serverSupabase.from('navigation').select('*').order('display_order', { ascending: true });
+      if (!navErr && Array.isArray(navItems) && navItems.length > 0) {
+        return res.json(navItems);
+      }
+
+      // 3. If settings row exists or queries succeeded without DB connection failure
+      if (!settingErr || !navErr) {
+        return res.json(Array.isArray(settingRow?.value) ? settingRow.value : []);
+      }
+
+      return res.status(503).json({ error: 'Database service unavailable' });
+    } catch (err: any) {
+      return res.status(503).json({ error: 'Database service unavailable' });
     }
   }
-  const data = readCmsData();
-  const nav = data.navigation || (data.settings && data.settings.navigation_items) || [];
-  return res.json(Array.isArray(nav) ? nav : []);
+
+  try {
+    const data = readCmsData();
+    const nav = data.navigation || (data.settings && data.settings.navigation_items) || [];
+    return res.json(Array.isArray(nav) ? nav : []);
+  } catch {
+    return res.json([]);
+  }
 });
 
 // POST /api/cms/navigation (Protected: Admin)
@@ -845,15 +911,21 @@ router.get('/cms/media', async (req, res) => {
   if (serverSupabase) {
     try {
       const { data, error } = await serverSupabase.from('media').select('*').order('created_at', { ascending: false });
-      if (!error && Array.isArray(data)) {
-        return res.json(data);
+      if (error) {
+        return res.status(503).json({ error: 'Database service unavailable' });
       }
-    } catch (e) {
-      // Fallback
+      return res.json(Array.isArray(data) ? data : []);
+    } catch (err: any) {
+      return res.status(503).json({ error: 'Database service unavailable' });
     }
   }
-  const data = readCmsData();
-  return res.json(data.media || []);
+
+  try {
+    const data = readCmsData();
+    return res.json(data.media || []);
+  } catch {
+    return res.json([]);
+  }
 });
 
 // POST /api/cms/media (Protected: Editor / Admin)
@@ -939,18 +1011,22 @@ router.get('/cms/settings/:key', async (req, res) => {
     }
   }
 
-  const data = readCmsData();
-  const settings = data.settings;
-  if (settings && typeof settings === 'object') {
-    if (!Array.isArray(settings) && settings[key] !== undefined) {
-      return res.json(settings[key]);
+  try {
+    const data = readCmsData();
+    const settings = data.settings;
+    if (settings && typeof settings === 'object') {
+      if (!Array.isArray(settings) && settings[key] !== undefined) {
+        return res.json(settings[key]);
+      }
+      if (Array.isArray(settings)) {
+        const match = settings.find((s: any) => s.key === key);
+        return res.json(match ? (match.value !== undefined ? match.value : match) : null);
+      }
     }
-    if (Array.isArray(settings)) {
-      const match = settings.find((s: any) => s.key === key);
-      return res.json(match ? (match.value !== undefined ? match.value : match) : null);
-    }
+    return res.json(null);
+  } catch {
+    return res.json(null);
   }
-  return res.json(null);
 });
 
 // POST /api/cms/settings/:key (Protected: Admin only)
@@ -1004,8 +1080,12 @@ router.get('/cms/settings', async (req, res) => {
       return res.status(503).json({ error: 'Database service unavailable' });
     }
   }
-  const data = readCmsData();
-  return res.json(data.settings || []);
+  try {
+    const data = readCmsData();
+    return res.json(data.settings || []);
+  } catch {
+    return res.json([]);
+  }
 });
 
 // POST /api/cms/settings (Protected: Admin only)
