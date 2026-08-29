@@ -71,17 +71,21 @@ export async function generateSitemapXml(supabase: SupabaseClient | null): Promi
   }
 
   if (dynamicUrls.length === 0) {
-    const cmsData = readCmsData();
-    const fallbackBlogs = (cmsData.blogs || []).filter((b: any) => b.status === 'published' || !b.status);
-    for (const blog of fallbackBlogs) {
-      const slug = blog.slug || blog.id;
-      const lastmod = blog.updated_at || blog.created_at || blog.date;
-      dynamicUrls.push({
-        loc: `${SITE_URL}/blog/${slug}`,
-        lastmod: lastmod ? new Date(lastmod).toISOString().split('T')[0] : undefined,
-        changefreq: 'weekly',
-        priority: '0.8'
-      });
+    try {
+      const cmsData = readCmsData();
+      const fallbackBlogs = (cmsData.blogs || []).filter((b: any) => b.status === 'published' || !b.status);
+      for (const blog of fallbackBlogs) {
+        const slug = blog.slug || blog.id;
+        const lastmod = blog.updated_at || blog.created_at || blog.date;
+        dynamicUrls.push({
+          loc: `${SITE_URL}/blog/${slug}`,
+          lastmod: lastmod ? new Date(lastmod).toISOString().split('T')[0] : undefined,
+          changefreq: 'weekly',
+          priority: '0.8'
+        });
+      }
+    } catch {
+      // In production where local JSON fallback is disabled and Supabase has no blogs yet, serve static URLs
     }
   }
 

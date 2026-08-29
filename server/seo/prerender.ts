@@ -73,10 +73,14 @@ export async function getRouteSeo(
     }
 
     if (!blogArticle) {
-      const cmsData = readCmsData();
-      blogArticle = (cmsData.blogs || []).find((b: any) => 
-        (b.slug === slug || b.id === slug) && (b.status === 'published' || !b.status)
-      );
+      try {
+        const cmsData = readCmsData();
+        blogArticle = (cmsData.blogs || []).find((b: any) => 
+          (b.slug === slug || b.id === slug) && (b.status === 'published' || !b.status)
+        );
+      } catch {
+        // In production where local fallback is disabled, blogArticle remains null (triggers 404 response)
+      }
     }
 
     if (blogArticle) {
