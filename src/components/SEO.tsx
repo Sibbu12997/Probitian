@@ -210,8 +210,8 @@ export const SEO: React.FC<SEOProps> = ({
       return parsed.toISOString();
     };
 
-    const datePublished = parseIsoDate(article.date) || parseIsoDate(article.created_at);
-    const dateModified = parseIsoDate((article as any).updated_at) || datePublished;
+    const datePublished = parseIsoDate((article as any).published_at) || parseIsoDate(article.created_at) || parseIsoDate(article.date);
+    const dateModified = parseIsoDate((article as any).updated_at);
 
     const blogPostingSchema: any = {
       '@context': 'https://schema.org',

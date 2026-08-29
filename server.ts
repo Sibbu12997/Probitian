@@ -55,17 +55,17 @@ app.use(apiErrorHandler);
 
 // Frontend SPA & Dynamic Server-Side Prerendering Handler
 async function setupFrontend() {
-  if (process.env.NODE_ENV !== 'production') {
+  if (process.env.NODE_ENV !== 'production' && process.env.NODE_ENV !== 'test') {
     const vite = await createViteServer({
       server: { middlewareMode: true },
-      appType: 'spa',
+      appType: 'custom',
     });
 
     // Vite development asset middleware
     app.use(vite.middlewares);
 
     // Dynamic SEO HTML prerender during development
-    app.use('*', async (req, res, next) => {
+    app.get('*', async (req, res, next) => {
       const url = req.originalUrl;
       try {
         const indexHtmlPath = path.resolve(process.cwd(), 'index.html');
@@ -88,34 +88,41 @@ async function setupFrontend() {
     // Static asset serving with caching
     app.use(express.static(distPath, { index: false }));
 
-    // Dynamic SEO HTML prerendering for all public SPA routes
-    app.get('*all', async (req, res) => {
+    // Dynamic SEO HTML prerendering for all public SPA routes (Express 4 compatible)
+    app.get('*', async (req, res, next) => {
       try {
         const url = req.originalUrl;
         const seo = await getRouteSeo(url, serverSupabase);
+        const status = seo.httpStatus || 200;
 
         if (fs.existsSync(indexHtmlPath)) {
           const rawHtml = fs.readFileSync(indexHtmlPath, 'utf-8');
           const html = injectSeoIntoHtml(rawHtml, seo);
-          return res.status(seo.httpStatus || 200).set({ 'Content-Type': 'text/html; charset=utf-8' }).send(html);
+          return res.status(status).set({ 'Content-Type': 'text/html; charset=utf-8' }).send(html);
         }
 
-        return res.status(200).sendFile(indexHtmlPath);
+        return res.status(status).sendFile(indexHtmlPath);
       } catch (err) {
         console.error('[Production SSR Error]', err);
-        return res.sendFile(indexHtmlPath);
+        return next(err);
       }
     });
   }
 }
 
-setupFrontend().then(() => {
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`[ProBitian Server] Running at http://0.0.0.0:${PORT} (env: ${process.env.NODE_ENV || 'development'})`);
-  });
+export const serverReady = setupFrontend().then(() => {
+  if (process.env.NODE_ENV !== 'test') {
+    const serverInstance = app.listen(PORT, '0.0.0.0', () => {
+      console.log(`[ProBitian Server] Running at http://0.0.0.0:${PORT} (env: ${process.env.NODE_ENV || 'development'})`);
+    });
+    return serverInstance;
+  }
 }).catch((err) => {
   console.error('[Server Startup Fatal Error]', err);
-  process.exit(1);
+  if (process.env.NODE_ENV !== 'test') {
+    process.exit(1);
+  }
+  throw err;
 });
 
 export default app;

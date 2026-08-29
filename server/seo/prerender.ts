@@ -20,6 +20,15 @@ const SITE_URL = 'https://probitian.ai.studio';
 const DEFAULT_OG_IMAGE = 'https://raw.githubusercontent.com/ShivamSinghPro/probitian/main/public/branding/probitian-banner.png';
 const DEFAULT_LOGO = 'https://raw.githubusercontent.com/ShivamSinghPro/probitian/main/public/branding/probitian-logo.png';
 
+export function parseValidIsoDate(val: any): string | undefined {
+  if (!val || (typeof val !== 'string' && !(val instanceof Date))) return undefined;
+  const str = typeof val === 'string' ? val.trim() : val.toISOString();
+  if (!str) return undefined;
+  const parsed = new Date(str);
+  if (isNaN(parsed.getTime())) return undefined;
+  return parsed.toISOString();
+}
+
 export async function getRouteSeo(
   urlPath: string,
   supabase: SupabaseClient | null
@@ -75,17 +84,17 @@ export async function getRouteSeo(
       const description = blogArticle.excerpt || blogArticle.meta_description || 'Master Business Intelligence, DAX, Power BI, and SQL analytics with in-depth technical guides from ProBitian.';
       const articleUrl = `${SITE_URL}/blog/${blogArticle.slug || blogArticle.id}`;
       const imageUrl = blogArticle.image_url || blogArticle.imageUrl || DEFAULT_OG_IMAGE;
-      const datePublished = blogArticle.created_at || blogArticle.date || new Date().toISOString();
-      const dateModified = blogArticle.updated_at || blogArticle.created_at || datePublished;
+      const rawPublishedDate = blogArticle.published_at || blogArticle.created_at || blogArticle.date;
+      const datePublished = parseValidIsoDate(rawPublishedDate);
+      const rawModifiedDate = blogArticle.updated_at;
+      const dateModified = parseValidIsoDate(rawModifiedDate);
 
-      const jsonLd = {
+      const jsonLd: Record<string, any> = {
         '@context': 'https://schema.org',
         '@type': 'BlogPosting',
         'headline': blogArticle.title,
         'description': description,
         'image': [imageUrl],
-        'datePublished': datePublished,
-        'dateModified': dateModified,
         'author': {
           '@type': 'Person',
           'name': blogArticle.author || 'Shivam Singh',
@@ -105,6 +114,18 @@ export async function getRouteSeo(
         }
       };
 
+      if (datePublished) {
+        jsonLd.datePublished = datePublished;
+      }
+
+      if (dateModified) {
+        jsonLd.dateModified = dateModified;
+      }
+
+      const timeTag = datePublished
+        ? `<time datetime="${escapeHtml(datePublished)}">${escapeHtml(new Date(datePublished).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }))}</time> • `
+        : '';
+
       const preRenderedHtml = `
         <article class="probitian-article">
           <header>
@@ -112,8 +133,7 @@ export async function getRouteSeo(
             <h1>${escapeHtml(blogArticle.title)}</h1>
             <div class="article-meta">
               <span>By ${escapeHtml(blogArticle.author || 'Shivam Singh')}</span> • 
-              <time datetime="${escapeHtml(datePublished)}">${escapeHtml(new Date(datePublished).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }))}</time> • 
-              <span>${escapeHtml(blogArticle.read_time || blogArticle.readTime || '5 min read')}</span>
+              ${timeTag}<span>${escapeHtml(blogArticle.read_time || blogArticle.readTime || '5 min read')}</span>
             </div>
           </header>
           <div class="article-excerpt">

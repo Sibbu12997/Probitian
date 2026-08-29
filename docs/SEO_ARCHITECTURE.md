@@ -121,22 +121,31 @@ Generates structured breadcrumb trails for sub-pages (`Home > Blog > Article Nam
   "@type": "BlogPosting",
   "headline": "Mastering Advanced DAX Calculation Groups in Power BI Desktop",
   "description": "Step-by-step tutorial on creating DAX calculation groups...",
-  "image": "https://images.unsplash.com/...",
+  "image": ["https://raw.githubusercontent.com/ShivamSinghPro/probitian/main/public/branding/probitian-banner.png"],
   "author": {
     "@type": "Person",
-    "name": "Shivam Singh"
+    "name": "Shivam Singh",
+    "url": "https://probitian.ai.studio/about"
   },
   "publisher": {
     "@type": "Organization",
-    "name": "ProBItian"
+    "name": "ProBitian",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "https://raw.githubusercontent.com/ShivamSinghPro/probitian/main/public/branding/probitian-logo.png"
+    }
   },
-  "datePublished": "2026-08-15",
   "mainEntityOfPage": {
     "@type": "WebPage",
     "@id": "https://probitian.ai.studio/blog/mastering-advanced-dax-calculation-groups"
-  }
+  },
+  "datePublished": "2026-08-15T00:00:00.000Z"
 }
 ```
+
+#### Authoritative Publication Date Rules:
+1. **`datePublished`**: Derived strictly from valid article metadata (`published_at`, `created_at`, or `date`). If no valid date is provided by the CMS or database, the `datePublished` property is **completely omitted** from the JSON-LD schema. Synthetic timestamps (`new Date().toISOString()`) or invented dates are strictly forbidden.
+2. **`dateModified`**: Included **only** when an authoritative modification timestamp (`updated_at`) exists. It is **never** populated by falling back to `datePublished` or synthetic timestamps; if unavailable, it is omitted.
 
 ---
 

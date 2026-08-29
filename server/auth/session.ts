@@ -167,7 +167,7 @@ export function invalidateAdminSession(token: string): void {
 export const revokeSession = invalidateAdminSession;
 
 // Expired session cleanup interval (every 15 minutes)
-setInterval(() => {
+const sessionCleanupTimer = setInterval(() => {
   const now = Date.now();
   for (const [token, session] of adminSessions.entries()) {
     if (now > session.expiresAt) {
@@ -175,3 +175,7 @@ setInterval(() => {
     }
   }
 }, 15 * 60 * 1000);
+
+if (sessionCleanupTimer && typeof sessionCleanupTimer.unref === 'function') {
+  sessionCleanupTimer.unref();
+}
