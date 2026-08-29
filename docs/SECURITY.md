@@ -96,7 +96,7 @@ Rate limiters protect critical endpoints from brute force, distributed scanning,
 The continuous integration pipeline validates code quality, type safety, regression suites, dependency integrity, and production build readiness on every push and pull request:
 1. **Clean Installation:** `npm ci` (verifies synchronized dependency tree in `package-lock.json`).
 2. **Typecheck & Static Analysis:** `npm run lint` (`tsc --noEmit`).
-3. **Security & Regression Tests:** `npm test` (`tsx --test tests/**/*.test.ts` across all 10 security suites and 36 assertions).
+3. **Security & Regression Tests:** `npm test` (`tsx --test tests/**/*.test.ts` across all 18 test suites and 83 automated assertions).
 4. **Vulnerability Audit:** `npm audit --audit-level=high` (verifies zero high/critical severity dependency advisories).
 5. **Production Build:** `npm run build` (compiles Vite React SPA and bundles `server.ts` with `esbuild`).
 

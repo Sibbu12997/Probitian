@@ -113,7 +113,7 @@ Accessible at `/admin`, the Admin Control Center provides 20 comprehensive admin
 
 ---
 
-## 5. Email, Outreach & Automated Sequence System
+## 6. Email, Outreach & Automated Sequence System
 
 Email services run server-side using **Nodemailer** over **Gmail SMTP**:
 - **Official Sender**: `probitianofficial@gmail.com`
@@ -132,7 +132,7 @@ Email services run server-side using **Nodemailer** over **Gmail SMTP**:
 
 ---
 
-## 6. Media Library
+## 7. Media Library
 
 - **Storage Engine**: Supabase Storage (`probitian-media` bucket).
 - **Categories / Folders**: `logos/`, `banners/`, `blog/`, `projects/`, `courses/`, `youtube/`, `general/`.
@@ -141,7 +141,7 @@ Email services run server-side using **Nodemailer** over **Gmail SMTP**:
 
 ---
 
-## 7. Analytics
+## 8. Analytics
 
 - **Platform**: Google Analytics 4 (GA4).
 - **Measurement ID**: Configured via `VITE_GA4_MEASUREMENT_ID`.
@@ -149,27 +149,35 @@ Email services run server-side using **Nodemailer** over **Gmail SMTP**:
 
 ---
 
-## 8. Database Architecture
+## 9. Database Architecture
 
 - **Authoritative Engine**: **Supabase PostgreSQL**.
-- **CMS Tables**:
-  - `projects`
-  - `blogs`
-  - `courses`
-  - `videos`
-  - `categories`
-  - `pages`
-  - `settings`
-  - `messages`
-  - `newsletter`
-  - `media`
-  - `email_campaigns`
-  - `email_campaign_recipients`
+- **CMS & Production Tables**:
+  - `leads` (B2B CRM prospects & customer accounts)
+  - `lead_campaigns` (Outreach broadcast campaigns)
+  - `campaign_leads` (Outreach & sequence delivery audit log)
+  - `projects` (Portfolio projects and dashboards)
+  - `blogs` (Technical articles and tutorials)
+  - `courses` (Curriculum paths and lesson modules)
+  - `videos` (YouTube video tutorials showcase)
+  - `categories` (Taxonomy categories across content)
+  - `pages` (Dynamic legal and platform content)
+  - `settings` (Global platform settings & branding)
+  - `messages` (Visitor contact form enquiries)
+  - `newsletter` (Newsletter subscribers)
+  - `media` (Media library metadata inventory)
+  - `email_campaigns` (Newsletter email campaigns)
+  - `email_campaign_recipients` (Newsletter recipient delivery log)
+  - `rate_limits` (Distributed atomic rate limit store)
+  - `crm_sequences` (Automated drip sequence definitions)
+  - `crm_sequence_steps` (Multi-step sequence definitions)
+  - `crm_sequence_leads` (Active sequence enrollments)
+  - `crm_sequence_logs` (Step execution logs)
 - **Strict Data Policy**: All production reads and writes communicate directly with Supabase PostgreSQL. There are **no production fallbacks** to local JSON files, localStorage, or mock data.
 
 ---
 
-## 9. Security Architecture
+## 10. Security Architecture
 
 - **Secret Isolation**: All sensitive credentials (`SUPABASE_SECRET_KEY`, `GMAIL_APP_PASSWORD`, `ADMIN_PASSKEY`, `GEMINI_API_KEY`) reside exclusively in the server environment and are never exposed in client bundles or public code.
 - **Passkey Verification**: Admin login requires server-side passkey verification (`/api/admin/verify-passkey`) issuing time-limited session tokens.
@@ -178,7 +186,7 @@ Email services run server-side using **Nodemailer** over **Gmail SMTP**:
 
 ---
 
-## 10. Production Infrastructure
+## 11. Production Infrastructure
 
 ```
 PROBITIAN WEBSITE / ADMIN PORTAL
@@ -204,7 +212,7 @@ WEBSITE → GOOGLE ANALYTICS 4
 
 ---
 
-## 11. Environment Variables
+## 12. Environment Variables
 
 Define required variables in `.env` (refer to `.env.example`):
 
@@ -243,7 +251,7 @@ GMAIL_APP_PASSWORD="<configured in server environment>"
 
 ---
 
-## 12. Local Development
+## 13. Local Development
 
 ```bash
 # Install dependencies
@@ -255,6 +263,9 @@ npm run dev
 # Run TypeScript type check
 npm run lint
 
+# Run automated tests
+npm test
+
 # Build production assets and bundle server
 npm run build
 
@@ -264,7 +275,7 @@ npm start
 
 ---
 
-## 13. Database Migration Workflow
+## 14. Database Migration Workflow
 
 1. Create a timestamped SQL migration file in `supabase/migrations/`.
 2. Review migration SQL for destructive actions.
@@ -278,7 +289,7 @@ npm start
 
 ---
 
-## 14. Deployment Workflow
+## 15. Deployment Workflow
 
 1. Perform local typecheck (`npm run lint`).
 2. Run local build (`npm run build`).
@@ -289,7 +300,7 @@ npm start
 
 ---
 
-## 15. Backup / Recovery
+## 16. Backup / Recovery
 
 - **Database Backups**: Download full JSON backups directly from the Admin Portal (**Backup & Restore** module).
 - **Supabase Cloud Snapshots**: Automatic daily PostgreSQL backups managed within the Supabase Cloud dashboard.
@@ -297,15 +308,10 @@ npm start
 
 ---
 
-## 16. User Documentation
+## 17. User & Admin Documentation
 
 - **Website User Guide (Markdown)**: `docs/PROBITIAN_USER_GUIDE.md`
 - **Website User Guide (PDF)**: `public/docs/ProBitian_Website_User_Guide.pdf`
-
----
-
-## 17. Admin Documentation
-
 - **Admin User Guide (Markdown)**: `docs/PROBITIAN_ADMIN_CONTROL_CENTER_USER_GUIDE.md`
 - **Admin User Guide (PDF)**: `public/docs/ProBitian_Admin_Control_Center_User_Guide.pdf`
 
@@ -320,12 +326,15 @@ npm start
 │   ├── PROBITIAN_USER_GUIDE.md             # Website Learner Guide
 │   ├── PROBITIAN_ADMIN_CONTROL_CENTER_USER_GUIDE.md # Admin Manual
 │   ├── DATABASE_ARCHITECTURE.md            # Supabase PostgreSQL Architecture
-│   ├── DATABASE_MIGRATIONS.md               # Migration Log & Procedure
+│   ├── DATABASE_MIGRATIONS.md               # Migration Log & Procedure (0001 - 0013)
 │   ├── NEWSLETTER_WORKFLOW.md               # Subscription & Welcome Email Pipeline
 │   ├── EMAIL_CAMPAIGN_WORKFLOW.md           # Email Campaign Broadcast Engine
+│   ├── LEAD_OUTREACH_AND_SEQUENCES_WORKFLOW.md # B2B Outreach & Automated Drip Sequences
 │   ├── EMAIL_CONFIGURATION.md              # Gmail SMTP Setup & Security
 │   ├── MEDIA_LIBRARY.md                     # Supabase Storage Asset Management
 │   ├── ANALYTICS.md                         # GA4 Integration Specification
+│   ├── SEO_ARCHITECTURE.md                 # SEO Routing, Prerender & Canonical Specs
+│   ├── SEO_UAT.md                           # SEO Test Matrix & Verification
 │   ├── SECURITY.md                          # Secret Isolation & RLS Security
 │   ├── DEPLOYMENT_WORKFLOW.md               # Deployment Pipeline
 │   ├── PRODUCTION_RELEASE_CHECKLIST.md      # Production Audit Checklist
@@ -343,7 +352,7 @@ npm start
 │   ├── App.tsx                              # Main Application Router
 │   └── main.tsx                             # Entry Point
 ├── supabase/                                # Supabase Schema & Migrations
-│   └── migrations/                          # Sequential Migration Scripts
+│   └── migrations/                          # Sequential Migration Scripts (0001 - 0013)
 ├── generate_docs.js                         # Documentation & PDF Generator Script
 ├── metadata.json                            # Platform Capabilities Config
 ├── package.json                             # Dependencies & Build Scripts
@@ -369,7 +378,7 @@ ProBitian maintains a zero-compromise automated CI/CD and security testing pipel
 ### CI Validation Pipeline (`.github/workflows/ci.yml`)
 - `npm ci`: Ensures clean, reproducible dependency installation from a synchronized `package-lock.json`.
 - `npm run lint`: Validates TypeScript strict type checking (`tsc --noEmit`).
-- `npm test`: Runs automated security, authorization, origin defense, upload sanitization, and cryptographic session regression tests (`tsx --test`).
+- `npm test`: Runs automated security, authorization, origin defense, upload sanitization, SEO, CRM, routing, and cryptographic session regression tests (`tsx --test` across 18 test suites and 83 assertions).
 - `npm audit --audit-level=high`: Enforces zero high or critical dependency vulnerabilities.
 - `npm run build`: Validates production compilation of the React SPA (Vite) and backend server bundle (esbuild).
 
@@ -383,7 +392,7 @@ ProBitian maintains a zero-compromise automated CI/CD and security testing pipel
 ## 21. Production Checklist
 
 - [x] Supabase PostgreSQL project provisioned and configured.
-- [x] All 6 migration files applied (`0001` through `0006`).
+- [x] All 13 migration files applied (`0001` through `0013`).
 - [x] Table grants verified for `service_role`.
 - [x] RLS enabled and direct public postgREST access blocked.
 - [x] Supabase Storage bucket `probitian-media` created and public.
@@ -422,7 +431,7 @@ Please make sure to use the appropriate issue template in `.github/ISSUE_TEMPLAT
 
 ---
 
-## 22. Project Owner
+## 23. Project Owner
 
 - **Name**: Shivam Singh
 - **Project**: ProBitian
@@ -433,7 +442,7 @@ Please make sure to use the appropriate issue template in `.github/ISSUE_TEMPLAT
 
 ---
 
-## 23. License
+## 24. License
 
 The software source code of ProBitian is licensed under the [MIT License](LICENSE).
 

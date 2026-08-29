@@ -76,7 +76,7 @@ Automated email sequence metadata, multi-step configs, and lead enrollments are 
 
 ---
 
-## 4. Connection & Authentication Security
+## 5. Connection & Authentication Security
 
 - Server-side Express handlers connect to Supabase using `@supabase/supabase-js` initialized with `process.env.SUPABASE_SECRET_KEY` (or `SUPABASE_SERVICE_ROLE_KEY`).
 - Row Level Security (RLS) is enabled on all tables. Direct client-side postgREST queries using the public anonymous key are restricted (`HTTP 403 Permission Denied`), ensuring all database reads and writes are securely handled server-side.

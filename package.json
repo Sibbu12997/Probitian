@@ -11,7 +11,7 @@
     "clean": "rm -rf dist server.js",
     "docs:generate": "node generate_docs.js",
     "lint": "tsc --noEmit",
-    "test": "tsx --test tests/**/*.test.ts"
+    "test": "NODE_ENV=test tsx --test tests/**/*.test.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

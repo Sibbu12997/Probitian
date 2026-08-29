@@ -111,7 +111,7 @@ async function setupFrontend() {
 }
 
 export const serverReady = setupFrontend().then(() => {
-  if (process.env.NODE_ENV !== 'test') {
+  if (process.env.NODE_ENV !== 'test' && !process.argv.some(arg => arg.includes('--test') || arg.includes('test'))) {
     const serverInstance = app.listen(PORT, '0.0.0.0', () => {
       console.log(`[ProBitian Server] Running at http://0.0.0.0:${PORT} (env: ${process.env.NODE_ENV || 'development'})`);
     });
@@ -119,7 +119,7 @@ export const serverReady = setupFrontend().then(() => {
   }
 }).catch((err) => {
   console.error('[Server Startup Fatal Error]', err);
-  if (process.env.NODE_ENV !== 'test') {
+  if (process.env.NODE_ENV !== 'test' && !process.argv.some(arg => arg.includes('--test') || arg.includes('test'))) {
     process.exit(1);
   }
   throw err;
