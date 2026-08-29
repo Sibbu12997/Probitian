@@ -121,7 +121,7 @@ Generates structured breadcrumb trails for sub-pages (`Home > Blog > Article Nam
   "@type": "BlogPosting",
   "headline": "Mastering Advanced DAX Calculation Groups in Power BI Desktop",
   "description": "Step-by-step tutorial on creating DAX calculation groups...",
-  "image": ["https://raw.githubusercontent.com/ShivamSinghPro/probitian/main/public/branding/probitian-banner.png"],
+  "image": ["https://probitian.ai.studio/banner.svg"],
   "author": {
     "@type": "Person",
     "name": "Shivam Singh",
@@ -132,7 +132,7 @@ Generates structured breadcrumb trails for sub-pages (`Home > Blog > Article Nam
     "name": "ProBitian",
     "logo": {
       "@type": "ImageObject",
-      "url": "https://raw.githubusercontent.com/ShivamSinghPro/probitian/main/public/branding/probitian-logo.png"
+      "url": "https://probitian.ai.studio/logo.svg"
     }
   },
   "mainEntityOfPage": {

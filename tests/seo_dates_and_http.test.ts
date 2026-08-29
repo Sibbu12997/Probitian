@@ -398,4 +398,28 @@ describe('14. Express 4 HTTP Regression & Routing Verification', () => {
     const html = await res.text();
     assert.ok(html.includes('robots" content="noindex, nofollow"'));
   });
+
+  test('GET /banner.svg and /logo.svg return HTTP 200 image/svg+xml and serve canonical branding assets', async () => {
+    const bannerRes = await fetch(`${baseUrl}/banner.svg`);
+    assert.strictEqual(bannerRes.status, 200);
+    assert.ok(bannerRes.headers.get('content-type')?.includes('image/svg+xml'));
+    const bannerBuf = await bannerRes.arrayBuffer();
+    assert.ok(bannerBuf.byteLength > 0);
+
+    const logoRes = await fetch(`${baseUrl}/logo.svg`);
+    assert.strictEqual(logoRes.status, 200);
+    assert.ok(logoRes.headers.get('content-type')?.includes('image/svg+xml'));
+    const logoBuf = await logoRes.arrayBuffer();
+    assert.ok(logoBuf.byteLength > 0);
+  });
+
+  test('HTML routes inject canonical og:image and twitter:image referencing https://probitian.ai.studio/banner.svg', async () => {
+    const res = await fetch(`${baseUrl}/`);
+    assert.strictEqual(res.status, 200);
+    const html = await res.text();
+    assert.ok(html.includes('property="og:image" content="https://probitian.ai.studio/banner.svg"'));
+    assert.ok(html.includes('name="twitter:image" content="https://probitian.ai.studio/banner.svg"'));
+    assert.ok(!html.includes('probitian-banner.png'));
+    assert.ok(!html.includes('raw.githubusercontent.com/ShivamSinghPro'));
+  });
 });

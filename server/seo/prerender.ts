@@ -17,8 +17,8 @@ export interface SeoMetadata {
 }
 
 const SITE_URL = 'https://probitian.ai.studio';
-const DEFAULT_OG_IMAGE = 'https://raw.githubusercontent.com/ShivamSinghPro/probitian/main/public/branding/probitian-banner.png';
-const DEFAULT_LOGO = 'https://raw.githubusercontent.com/ShivamSinghPro/probitian/main/public/branding/probitian-logo.png';
+const DEFAULT_OG_IMAGE = `${SITE_URL}/banner.svg`;
+const DEFAULT_LOGO = `${SITE_URL}/logo.svg`;
 
 export function parseValidIsoDate(val: any): string | undefined {
   if (!val || (typeof val !== 'string' && !(val instanceof Date))) return undefined;
