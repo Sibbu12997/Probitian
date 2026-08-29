@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import express from 'express';
 import http from 'node:http';
 import cmsRouter from '../server/routes/cms';
+import { createSignedSessionToken } from '../server/auth/session';
+import { UserRole } from '../server/auth/types';
 
 describe('Public CMS Endpoints Resiliency & Production Regression Tests', () => {
   const app = express();
@@ -99,5 +101,67 @@ describe('Public CMS Endpoints Resiliency & Production Regression Tests', () => 
     assert.match(res.headers.get('content-type') || '', /application\/json/);
     const data = await res.json();
     assert.ok(data !== undefined);
+  });
+
+  test('Unauthenticated POST /api/cms/media/upload is blocked with HTTP 401', async () => {
+    const res = await fetch(`${baseUrl}/api/cms/media/upload`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        fileName: 'malicious.png',
+        fileData: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
+      })
+    });
+    assert.strictEqual(res.status, 401);
+    const body = await res.json();
+    assert.match(body.error, /Unauthorized/i);
+  });
+
+  test('Unauthenticated POST /api/cms/upload is blocked with HTTP 401', async () => {
+    const res = await fetch(`${baseUrl}/api/cms/upload`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        fileName: 'malicious.png',
+        fileData: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
+      })
+    });
+    assert.strictEqual(res.status, 401);
+    const body = await res.json();
+    assert.match(body.error, /Unauthorized/i);
+  });
+
+  test('Authenticated user with standard USER role is blocked with HTTP 403 Forbidden', async () => {
+    const userToken = createSignedSessionToken('regularuser@probitian.com', UserRole.USER);
+    const res = await fetch(`${baseUrl}/api/cms/media/upload`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${userToken}`
+      },
+      body: JSON.stringify({
+        fileName: 'image.png',
+        fileData: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
+      })
+    });
+    assert.strictEqual(res.status, 403);
+    const body = await res.json();
+    assert.match(body.error, /Forbidden: Insufficient permissions/i);
+  });
+
+  test('Authenticated EDITOR passes authorization check on POST /api/cms/media/upload', async () => {
+    const editorToken = createSignedSessionToken('editor@probitian.com', UserRole.EDITOR);
+    const res = await fetch(`${baseUrl}/api/cms/media/upload`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${editorToken}`
+      },
+      body: JSON.stringify({}) // Missing required fields -> hits body validation in handleUpload
+    });
+    // Should pass auth/RBAC and reach handleUpload, returning 400 Bad Request
+    assert.strictEqual(res.status, 400);
+    const body = await res.json();
+    assert.match(body.error, /fileData.*required/i);
   });
 });
