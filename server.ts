@@ -85,11 +85,13 @@ async function setupFrontend() {
       }
     });
   } else {
+    const publicPath = path.resolve(process.cwd(), 'public');
     const distPath = path.resolve(process.cwd(), 'dist');
     const indexHtmlPath = path.join(distPath, 'index.html');
 
-    // Static asset serving with caching
+    // Static asset serving with caching (dist build artifacts and public root assets)
     app.use(express.static(distPath, { index: false }));
+    app.use(express.static(publicPath, { index: false }));
 
     // Dynamic SEO HTML prerendering for all public SPA routes (Express 4 compatible)
     app.get('*', async (req, res, next) => {
