@@ -9,6 +9,7 @@ import {
   createAdminSession, 
   getAdminSession, 
   invalidateAdminSession, 
+  invalidateUserSessions,
   getAdminCookieHeader,
   parseCookies 
 } from '../auth/session';
@@ -215,6 +216,9 @@ router.post('/admin/roles/assign', requireAuth, requireRole(UserRole.ADMIN), asy
         return res.status(500).json({ error: 'Failed to update user role in database' });
       }
 
+      // Immediately invalidate any active sessions belonging to the modified user
+      invalidateUserSessions({ userId: data?.id || userId, email: data?.email || email });
+
       return res.json({ success: true, profile: data });
     } catch (err: any) {
       console.error('[Role Assignment Exception]', err);
@@ -222,6 +226,8 @@ router.post('/admin/roles/assign', requireAuth, requireRole(UserRole.ADMIN), asy
     }
   }
 
+  // Fallback mode: invalidate any active in-memory sessions for this user
+  invalidateUserSessions({ userId, email });
   return res.json({ success: true, message: `Role ${role} simulated for ${userId || email}` });
 });
 

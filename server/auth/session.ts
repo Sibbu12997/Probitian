@@ -5,6 +5,7 @@ import { AdminSession, SessionTokenPayload, UserRole } from './types';
 
 export const adminSessions = new Map<string, AdminSession>();
 export const revokedSessions = new Set<string>();
+export const userRevocationTimestamps = new Map<string, number>();
 
 export function parseCookies(req: express.Request): Record<string, string> {
   const list: Record<string, string> = {};
@@ -67,6 +68,7 @@ export function createAdminSession(
 
 export function verifySignedSessionToken(token: string): AdminSession | null {
   if (!token || typeof token !== 'string' || !token.includes('.')) return null;
+  if (revokedSessions.has(token)) return null;
   const parts = token.split('.');
   if (parts.length !== 2) return null;
   const [payloadStr, sig] = parts;
@@ -87,6 +89,16 @@ export function verifySignedSessionToken(token: string): AdminSession | null {
     if (!payload || !payload.email || !payload.expiresAt) return null;
     if (Date.now() > payload.expiresAt) return null;
 
+    const cleanEmail = payload.email.toLowerCase().trim();
+    const emailRevokedAt = userRevocationTimestamps.get(cleanEmail);
+    const userRevokedAt = payload.userId ? userRevocationTimestamps.get(payload.userId) : undefined;
+    const createdAt = payload.createdAt || Date.now();
+
+    if ((emailRevokedAt && createdAt <= emailRevokedAt) || (userRevokedAt && createdAt <= userRevokedAt)) {
+      revokedSessions.add(token);
+      return null;
+    }
+
     const validatedRole: UserRole = payload.role === UserRole.ADMIN || payload.role === UserRole.EDITOR ? payload.role : UserRole.USER;
 
     return {
@@ -94,7 +106,7 @@ export function verifySignedSessionToken(token: string): AdminSession | null {
       email: payload.email,
       role: validatedRole,
       userId: payload.userId,
-      createdAt: payload.createdAt || Date.now(),
+      createdAt,
       expiresAt: payload.expiresAt
     };
   } catch (e) {
@@ -146,6 +158,16 @@ export function getAdminSession(req: express.Request): AdminSession | null {
       adminSessions.delete(token);
       return null;
     }
+
+    const cleanEmail = session.email.toLowerCase().trim();
+    const emailRevokedAt = userRevocationTimestamps.get(cleanEmail);
+    const userRevokedAt = session.userId ? userRevocationTimestamps.get(session.userId) : undefined;
+    if ((emailRevokedAt && session.createdAt <= emailRevokedAt) || (userRevokedAt && session.createdAt <= userRevokedAt)) {
+      adminSessions.delete(token);
+      revokedSessions.add(token);
+      return null;
+    }
+
     return session;
   }
 
@@ -162,6 +184,28 @@ export function getAdminSession(req: express.Request): AdminSession | null {
 export function invalidateAdminSession(token: string): void {
   revokedSessions.add(token);
   adminSessions.delete(token);
+}
+
+export function invalidateUserSessions(identifier: { email?: string; userId?: string }): void {
+  const now = Date.now();
+  const cleanEmail = identifier.email ? identifier.email.toLowerCase().trim() : undefined;
+  const userId = identifier.userId ? identifier.userId.trim() : undefined;
+
+  if (cleanEmail) {
+    userRevocationTimestamps.set(cleanEmail, now);
+  }
+  if (userId) {
+    userRevocationTimestamps.set(userId, now);
+  }
+
+  for (const [token, session] of adminSessions.entries()) {
+    const matchEmail = cleanEmail && session.email.toLowerCase().trim() === cleanEmail;
+    const matchUser = userId && session.userId === userId;
+    if (matchEmail || matchUser) {
+      revokedSessions.add(token);
+      adminSessions.delete(token);
+    }
+  }
 }
 
 export const revokeSession = invalidateAdminSession;

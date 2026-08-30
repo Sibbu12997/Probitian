@@ -6,6 +6,24 @@ import { sanitizeSvgContent } from '../src/lib/svgSanitizer';
 import { sanitizeCmsHtml, escapeHtml, sanitizeUrl } from '../src/lib/htmlSanitizer';
 import { csrfDefenseMiddleware } from '../server/security/csrf';
 import { 
+  createAdminSession as createServerAdminSession,
+  createSignedSessionToken as createServerSignedSessionToken,
+  getAdminSession as getServerAdminSession,
+  invalidateAdminSession as invalidateServerAdminSession,
+  invalidateUserSessions as invalidateServerUserSessions,
+  adminSessions as serverAdminSessions,
+  revokedSessions as serverRevokedSessions,
+  userRevocationTimestamps as serverUserRevocationTimestamps
+} from '../server/auth/session';
+import { 
+  requireAuth as serverRequireAuth, 
+  requireRole as serverRequireRole, 
+  requirePermission as serverRequirePermission,
+  hasPermission as serverHasPermission,
+  ROLE_PERMISSIONS as SERVER_ROLE_PERMISSIONS
+} from '../server/auth/rbac';
+import { UserRole as ServerUserRole, Permission as ServerPermission } from '../server/auth/types';
+import { 
   MemoryRateLimitStore, 
   DistributedRateLimitStore, 
   getClientIp, 
@@ -918,5 +936,208 @@ describe('9. Distributed Rate-Limit Store, Concurrency & Fail-Safe Architecture'
     assert.ok(typeof headers['Retry-After'] === 'number');
     assert.ok(headers['Retry-After'] >= 1);
     assert.strictEqual(jsonBody?.error, 'Rate limit exceeded');
+  });
+});
+
+describe('10. Server RBAC, Authentication & Session Hardening Verification', () => {
+  function createMockRequest(headers: Record<string, string> = {}) {
+    return {
+      headers: { ...headers },
+      cookies: {},
+      get: (headerName: string) => headers[headerName.toLowerCase()]
+    } as any;
+  }
+
+  function createMockResponse() {
+    let statusCode = 200;
+    let jsonBody: any = null;
+    let headersSet: Record<string, string> = {};
+
+    return {
+      status(code: number) {
+        statusCode = code;
+        return this;
+      },
+      json(data: any) {
+        jsonBody = data;
+        return this;
+      },
+      setHeader(k: string, v: string) {
+        headersSet[k] = v;
+      },
+      getStatus: () => statusCode,
+      getBody: () => jsonBody
+    };
+  }
+
+  test('1. Unauthenticated request -> 401', () => {
+    const req = createMockRequest();
+    const res = createMockResponse();
+    let nextCalled = false;
+
+    serverRequireAuth(req, res as any, () => { nextCalled = true; });
+
+    assert.strictEqual(res.getStatus(), 401);
+    assert.strictEqual(nextCalled, false);
+    assert.ok(res.getBody()?.error?.includes('Unauthorized'));
+  });
+
+  test('2. USER accessing admin endpoint -> 403', () => {
+    const userSession = createServerAdminSession('normaluser@example.com', ServerUserRole.USER, 'user-id-123');
+    const req = createMockRequest({ authorization: `Bearer ${userSession.token}` });
+    const res = createMockResponse();
+    let nextCalled = false;
+
+    const adminMiddleware = serverRequireRole(ServerUserRole.ADMIN);
+    adminMiddleware(req, res as any, () => { nextCalled = true; });
+
+    assert.strictEqual(res.getStatus(), 403);
+    assert.strictEqual(nextCalled, false);
+    assert.ok(res.getBody()?.error?.includes('Administrator privilege required'));
+  });
+
+  test('3. EDITOR accessing admin-only endpoint -> 403', () => {
+    const editorSession = createServerAdminSession('editoruser@example.com', ServerUserRole.EDITOR, 'editor-id-456');
+    const req = createMockRequest({ authorization: `Bearer ${editorSession.token}` });
+    const res = createMockResponse();
+    let nextCalled = false;
+
+    const adminMiddleware = serverRequireRole(ServerUserRole.ADMIN);
+    adminMiddleware(req, res as any, () => { nextCalled = true; });
+
+    assert.strictEqual(res.getStatus(), 403);
+    assert.strictEqual(nextCalled, false);
+    assert.ok(res.getBody()?.error?.includes('Administrator privilege required'));
+  });
+
+  test('4. ADMIN accessing admin endpoint -> success (calls next)', () => {
+    const adminSession = createServerAdminSession('adminuser@example.com', ServerUserRole.ADMIN, 'admin-id-789');
+    const req = createMockRequest({ authorization: `Bearer ${adminSession.token}` });
+    const res = createMockResponse();
+    let nextCalled = false;
+
+    const adminMiddleware = serverRequireRole(ServerUserRole.ADMIN);
+    adminMiddleware(req, res as any, () => { nextCalled = true; });
+
+    assert.strictEqual(nextCalled, true);
+    assert.strictEqual((req as any).userRole, ServerUserRole.ADMIN);
+  });
+
+  test('5. Role downgrade invalidates/rejects elevated access immediately', () => {
+    const testEmail = 'downgrade-test@probitian.com';
+    const testUserId = 'downgrade-user-uuid-999';
+
+    // Step 1: Create session as ADMIN
+    const activeAdminSession = createServerAdminSession(testEmail, ServerUserRole.ADMIN, testUserId);
+    const initialToken = activeAdminSession.token;
+
+    // Step 2: Confirm admin-only access works
+    const req1 = createMockRequest({ authorization: `Bearer ${initialToken}` });
+    const res1 = createMockResponse();
+    let nextCalled1 = false;
+    serverRequireRole(ServerUserRole.ADMIN)(req1, res1 as any, () => { nextCalled1 = true; });
+    assert.strictEqual(nextCalled1, true);
+
+    // Step 3: Authoritative role downgrade happens (e.g. demoted to USER)
+    // Server invalidates active user sessions for this email/userId
+    invalidateServerUserSessions({ userId: testUserId, email: testEmail });
+
+    // Step 4: Reuse the SAME existing session token
+    const req2 = createMockRequest({ authorization: `Bearer ${initialToken}` });
+    const res2 = createMockResponse();
+    let nextCalled2 = false;
+    serverRequireRole(ServerUserRole.ADMIN)(req2, res2 as any, () => { nextCalled2 = true; });
+
+    // Step 5: Old session is rejected immediately with 401 Unauthorized
+    assert.strictEqual(res2.getStatus(), 401);
+    assert.strictEqual(nextCalled2, false);
+
+    // Clean up test state
+    serverRevokedSessions.delete(initialToken);
+    serverUserRevocationTimestamps.delete(testEmail);
+    serverUserRevocationTimestamps.delete(testUserId);
+  });
+
+  test('6. Tampered session -> 401', () => {
+    const legitSession = createServerAdminSession('tamper-test@probitian.com', ServerUserRole.ADMIN);
+    const [payloadStr, sig] = legitSession.token.split('.');
+    const decoded = JSON.parse(Buffer.from(payloadStr, 'base64url').toString('utf-8'));
+    decoded.email = 'attacker@evil.com';
+    const tamperedPayload = Buffer.from(JSON.stringify(decoded)).toString('base64url');
+    const tamperedToken = `${tamperedPayload}.${sig}`;
+
+    const req = createMockRequest({ authorization: `Bearer ${tamperedToken}` });
+    const res = createMockResponse();
+    let nextCalled = false;
+
+    serverRequireAuth(req, res as any, () => { nextCalled = true; });
+    assert.strictEqual(res.getStatus(), 401);
+    assert.strictEqual(nextCalled, false);
+  });
+
+  test('7. Expired session -> 401', () => {
+    // Mint token with negative maxAge (expired in the past)
+    const expiredToken = createServerSignedSessionToken('expired-user@probitian.com', ServerUserRole.ADMIN, 'exp-id', -10000);
+    const req = createMockRequest({ authorization: `Bearer ${expiredToken}` });
+    const res = createMockResponse();
+    let nextCalled = false;
+
+    serverRequireAuth(req, res as any, () => { nextCalled = true; });
+    assert.strictEqual(res.getStatus(), 401);
+    assert.strictEqual(nextCalled, false);
+  });
+
+  test('8. Logged-out session -> 401', () => {
+    const session = createServerAdminSession('logout-test@probitian.com', ServerUserRole.ADMIN);
+    const token = session.token;
+
+    // User logs out -> invalidate session token
+    invalidateServerAdminSession(token);
+
+    const req = createMockRequest({ authorization: `Bearer ${token}` });
+    const res = createMockResponse();
+    let nextCalled = false;
+
+    serverRequireAuth(req, res as any, () => { nextCalled = true; });
+    assert.strictEqual(res.getStatus(), 401);
+    assert.strictEqual(nextCalled, false);
+  });
+
+  test('9. Revoked session -> 401', () => {
+    const session = createServerAdminSession('revoked-test@probitian.com', ServerUserRole.ADMIN);
+    const token = session.token;
+
+    serverRevokedSessions.add(token);
+
+    const req = createMockRequest({ authorization: `Bearer ${token}` });
+    const res = createMockResponse();
+    let nextCalled = false;
+
+    serverRequireRole(ServerUserRole.ADMIN)(req, res as any, () => { nextCalled = true; });
+    assert.strictEqual(res.getStatus(), 401);
+    assert.strictEqual(nextCalled, false);
+
+    // Clean up
+    serverRevokedSessions.delete(token);
+  });
+
+  test('10. Existing security middleware and role-permission matrices remain active', () => {
+    // Verify admin has all system permissions
+    assert.strictEqual(serverHasPermission(ServerUserRole.ADMIN, ServerPermission.MANAGE_SYSTEM), true);
+    assert.strictEqual(serverHasPermission(ServerUserRole.ADMIN, ServerPermission.MANAGE_CRM), true);
+    assert.strictEqual(serverHasPermission(ServerUserRole.ADMIN, ServerPermission.PUBLISH_CONTENT), true);
+    assert.strictEqual(serverHasPermission(ServerUserRole.ADMIN, ServerPermission.MEDIA_UPLOAD), true);
+
+    // Verify editor has write permissions but NOT system administration or CRM management
+    assert.strictEqual(serverHasPermission(ServerUserRole.EDITOR, ServerPermission.CONTENT_WRITE), true);
+    assert.strictEqual(serverHasPermission(ServerUserRole.EDITOR, ServerPermission.MEDIA_UPLOAD), true);
+    assert.strictEqual(serverHasPermission(ServerUserRole.EDITOR, ServerPermission.MANAGE_SYSTEM), false);
+    assert.strictEqual(serverHasPermission(ServerUserRole.EDITOR, ServerPermission.MANAGE_CRM), false);
+
+    // Verify standard user has only content read permission
+    assert.strictEqual(serverHasPermission(ServerUserRole.USER, ServerPermission.CONTENT_READ), true);
+    assert.strictEqual(serverHasPermission(ServerUserRole.USER, ServerPermission.CONTENT_WRITE), false);
+    assert.strictEqual(serverHasPermission(ServerUserRole.USER, ServerPermission.MEDIA_UPLOAD), false);
+    assert.strictEqual(serverHasPermission(ServerUserRole.USER, ServerPermission.MANAGE_SYSTEM), false);
   });
 });
