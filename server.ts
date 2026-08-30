@@ -25,6 +25,9 @@ dotenv.config();
 
 const app = express();
 
+// Disable X-Powered-By technology disclosure
+app.disable('x-powered-by');
+
 // Trust reverse proxy for accurate client IP resolution in rate limiting
 app.set('trust proxy', 1);
 

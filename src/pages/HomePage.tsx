@@ -27,19 +27,27 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate, onSelectProject,
 
   const loadCmsData = async () => {
     try {
-      const [configData, projectList, blogList, videoList] = await Promise.all([
+      const results = await Promise.allSettled([
         cmsService.getHomePageConfig(),
         cmsService.getProjects(),
         cmsService.getBlogs(),
         cmsService.getVideos()
       ]);
 
-      if (configData) setHomeConfig(configData);
-      if (projectList && projectList.length > 0) setProjects(projectList);
-      if (blogList && blogList.length > 0) setBlogs(blogList);
-      if (videoList && videoList.length > 0) setVideos(videoList);
+      if (results[0].status === 'fulfilled' && results[0].value) {
+        setHomeConfig(results[0].value);
+      }
+      if (results[1].status === 'fulfilled' && results[1].value && results[1].value.length > 0) {
+        setProjects(results[1].value);
+      }
+      if (results[2].status === 'fulfilled' && results[2].value && results[2].value.length > 0) {
+        setBlogs(results[2].value);
+      }
+      if (results[3].status === 'fulfilled' && results[3].value && results[3].value.length > 0) {
+        setVideos(results[3].value);
+      }
     } catch (err) {
-      console.error('Error loading CMS data for home page:', err);
+      console.warn('Notice loading CMS data for home page:', err);
     }
   };
   // Helper function to map feature icon names to Lucide icons

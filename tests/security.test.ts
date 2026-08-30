@@ -4,6 +4,7 @@ import crypto from 'node:crypto';
 import DOMPurify from 'isomorphic-dompurify';
 import { sanitizeSvgContent } from '../src/lib/svgSanitizer';
 import { sanitizeCmsHtml, escapeHtml, sanitizeUrl } from '../src/lib/htmlSanitizer';
+import { csrfDefenseMiddleware } from '../server/security/csrf';
 import { 
   MemoryRateLimitStore, 
   DistributedRateLimitStore, 
@@ -264,6 +265,119 @@ describe('4. CORS, CSRF & Origin Security', () => {
     assert.strictEqual(isAllowedOrigin('https://www.probitian.com', 'probitian.com'), true);
     assert.strictEqual(isAllowedOrigin('https://preview-app.run.app', 'probitian.com'), true);
     assert.strictEqual(isAllowedOrigin('http://localhost:3000', 'localhost'), true);
+  });
+
+  test('csrfDefenseMiddleware blocks untrusted origins on admin, cms, and crm routes', () => {
+    const protectedPaths = [
+      { path: '/api/admin/roles/assign', method: 'POST' },
+      { path: '/api/cms/projects', method: 'POST' },
+      { path: '/api/crm/leads', method: 'POST' },
+      { path: '/api/crm/leads/123', method: 'DELETE' },
+      { path: '/api/crm/sequences/456', method: 'PUT' },
+      { path: '/api/crm/campaigns/789', method: 'PATCH' },
+      { path: '/api/crm/campaigns/123/send', method: 'POST' }
+    ];
+    
+    for (const { path, method } of protectedPaths) {
+      let statusCalled = 0;
+      let jsonCalled = false;
+      const fakeReq: any = {
+        method,
+        path,
+        get: (header: string) => header.toLowerCase() === 'host' ? 'probitian.com' : undefined,
+        headers: {
+          origin: 'https://evil-attacker.com'
+        }
+      };
+      const fakeRes: any = {
+        status: (code: number) => {
+          statusCalled = code;
+          return {
+            json: () => { jsonCalled = true; }
+          };
+        }
+      };
+      let nextCalled = false;
+      csrfDefenseMiddleware(fakeReq, fakeRes, () => { nextCalled = true; });
+      assert.strictEqual(statusCalled, 403, `Expected 403 for untrusted origin on ${method} ${path}`);
+      assert.strictEqual(nextCalled, false, `Expected next() not to be called for ${method} ${path}`);
+    }
+  });
+
+  test('csrfDefenseMiddleware permits trusted origins and same-origin requests', () => {
+    const testCases = [
+      { path: '/api/crm/leads', method: 'POST', origin: 'https://probitian.com' },
+      { path: '/api/crm/leads/123', method: 'DELETE', origin: 'https://www.probitian.com' },
+      { path: '/api/crm/campaigns/123/send', method: 'POST', origin: 'https://probitian.ai.studio' },
+      { path: '/api/admin/roles/assign', method: 'POST', origin: 'https://probitian.com' },
+      { path: '/api/cms/projects', method: 'POST', origin: 'http://localhost:3000' }
+    ];
+
+    for (const { path, method, origin } of testCases) {
+      let statusCalled = 0;
+      const fakeReq: any = {
+        method,
+        path,
+        get: (header: string) => header.toLowerCase() === 'host' ? 'probitian.com' : undefined,
+        headers: { origin }
+      };
+      const fakeRes: any = {
+        status: (code: number) => { statusCalled = code; return { json: () => {} }; }
+      };
+      let nextCalled = false;
+      csrfDefenseMiddleware(fakeReq, fakeRes, () => { nextCalled = true; });
+      assert.strictEqual(statusCalled, 0, `Expected status not to be set for trusted origin on ${path}`);
+      assert.strictEqual(nextCalled, true, `Expected next() to be called for trusted origin on ${path}`);
+    }
+  });
+
+  test('csrfDefenseMiddleware blocks untrusted or malformed Referer headers when Origin is absent', () => {
+    const untrustedReferers = [
+      'https://attacker.evil.com/phishing',
+      'https://malicious-site.org/attack',
+      'not-a-valid-url'
+    ];
+
+    for (const referer of untrustedReferers) {
+      let statusCalled = 0;
+      const fakeReq: any = {
+        method: 'POST',
+        path: '/api/crm/leads',
+        get: (header: string) => header.toLowerCase() === 'host' ? 'probitian.com' : undefined,
+        headers: { referer }
+      };
+      const fakeRes: any = {
+        status: (code: number) => { statusCalled = code; return { json: () => {} }; }
+      };
+      let nextCalled = false;
+      csrfDefenseMiddleware(fakeReq, fakeRes, () => { nextCalled = true; });
+      assert.strictEqual(statusCalled, 403, `Expected 403 for untrusted/malformed referer: ${referer}`);
+      assert.strictEqual(nextCalled, false, `Expected next() not called for referer: ${referer}`);
+    }
+  });
+
+  test('csrfDefenseMiddleware preserves public form endpoints exemptions', () => {
+    const publicEndpoints = [
+      { path: '/api/newsletter', method: 'POST' },
+      { path: '/api/cms/messages', method: 'POST' }
+    ];
+
+    for (const { path, method } of publicEndpoints) {
+      let statusCalled = 0;
+      const fakeReq: any = {
+        method,
+        path,
+        get: (header: string) => header.toLowerCase() === 'host' ? 'probitian.com' : undefined,
+        headers: { origin: 'https://external-client-domain.org' }
+      };
+      const fakeRes: any = {
+        status: (code: number) => { statusCalled = code; return { json: () => {} }; }
+      };
+      let nextCalled = false;
+      csrfDefenseMiddleware(fakeReq, fakeRes, () => { nextCalled = true; });
+      assert.strictEqual(statusCalled, 0, `Expected status 0 for public endpoint ${path}`);
+      assert.strictEqual(nextCalled, true, `Expected next() called for public endpoint ${path}`);
+    }
   });
 });
 

@@ -26,12 +26,13 @@ import {
 } from '../types';
 import { LegalSettings, DEFAULT_LEGAL_SETTINGS } from '../data/defaultLegalData';
 import { PROBITIAN_LOGO_URL, PROBITIAN_X_URL, DEFAULT_SOCIAL_LINKS } from '../constants/branding';
+import { PROJECTS, BLOG_ARTICLES, LEARN_TOPICS, YOUTUBE_VIDEOS } from '../data/mockData';
 
 /**
  * Safe fetch helper for Express API routes (Single source of truth: Supabase via Express)
- * Throws explicit error on HTTP non-2xx so callers can distinguish between valid empty data and API failures.
+ * Includes retry mechanism for transient server boot / reverse proxy cold starts.
  */
-async function safeFetchJson<T = any>(url: string, options?: RequestInit): Promise<T> {
+async function safeFetchJson<T = any>(url: string, options?: RequestInit, maxRetries = 2): Promise<T> {
   const fetchOptions: RequestInit = {
     credentials: 'include',
     ...options,
@@ -39,30 +40,59 @@ async function safeFetchJson<T = any>(url: string, options?: RequestInit): Promi
       ...options?.headers
     }
   };
-  const response = await fetch(url, fetchOptions);
-  const contentType = response.headers.get('content-type') || '';
 
-  if (!response.ok) {
-    let errorText = '';
-    if (contentType.includes('application/json')) {
-      try {
-        const json = await response.json();
-        errorText = json.error || json.message || JSON.stringify(json);
-      } catch (e) {
-        errorText = await response.text();
+  let attempt = 0;
+  while (attempt <= maxRetries) {
+    try {
+      const response = await fetch(url, fetchOptions);
+      const contentType = response.headers.get('content-type') || '';
+
+      if (!response.ok) {
+        let errorText = '';
+        if (contentType.includes('application/json')) {
+          try {
+            const json = await response.json();
+            errorText = json.error || json.message || JSON.stringify(json);
+          } catch {
+            errorText = await response.text();
+          }
+        } else {
+          errorText = await response.text();
+        }
+
+        // If the server is starting up or returning gateway errors, wait and retry
+        if (attempt < maxRetries && (response.status === 502 || response.status === 503 || response.status === 504 || errorText.includes('Starting Server'))) {
+          attempt++;
+          await new Promise(r => setTimeout(r, 400 * attempt));
+          continue;
+        }
+
+        throw new Error(errorText || `API HTTP ${response.status} (${url})`);
       }
-    } else {
-      errorText = await response.text();
+
+      if (!contentType.includes('application/json')) {
+        const text = await response.text();
+        // If received "Starting Server..." or HTML page during dev boot, retry
+        if (attempt < maxRetries && (text.includes('Starting Server') || text.includes('<!doctype') || text.includes('<html'))) {
+          attempt++;
+          await new Promise(r => setTimeout(r, 500 * attempt));
+          continue;
+        }
+        throw new Error(`Expected JSON from ${url} but received ${contentType}: ${text.slice(0, 150)}`);
+      }
+
+      return (await response.json()) as T;
+    } catch (err: any) {
+      if (attempt < maxRetries && (err?.name === 'TypeError' || err?.message?.includes('Failed to fetch') || err?.message?.includes('Starting Server') || err?.message?.includes('Expected JSON'))) {
+        attempt++;
+        await new Promise(r => setTimeout(r, 500 * attempt));
+        continue;
+      }
+      throw err;
     }
-    throw new Error(errorText || `API HTTP ${response.status} (${url})`);
   }
 
-  if (!contentType.includes('application/json')) {
-    const text = await response.text();
-    throw new Error(`Expected JSON from ${url} but received ${contentType}: ${text.slice(0, 300)}`);
-  }
-
-  return (await response.json()) as T;
+  throw new Error(`Failed to fetch JSON from ${url} after ${maxRetries} attempts`);
 }
 
 // ==================== CMS SERVICE API (EXPRESS ROUTED TO SUPABASE) ====================
@@ -70,20 +100,36 @@ async function safeFetchJson<T = any>(url: string, options?: RequestInit): Promi
 export const cmsService = {
   // --- GENERAL SETTINGS ---
   async getGeneralSettings(): Promise<WebsiteGeneralSettings> {
-    const data = await safeFetchJson<WebsiteGeneralSettings | null>('/api/cms/settings/general');
-    return {
-      website_name: data?.website_name || 'ProBitian',
-      tagline: data?.tagline || 'Master Business Intelligence',
-      contact_email: data?.contact_email || 'probitianofficial@gmail.com',
-      logo_url: data?.logo_url || PROBITIAN_LOGO_URL,
-      favicon_url: data?.favicon_url || PROBITIAN_LOGO_URL,
-      banner_url: data?.banner_url || '/banner.svg',
-      theme_color: data?.theme_color || 'purple',
-      footer_copyright: data?.footer_copyright || '© 2026 ProBitian. All Rights Reserved.',
-      community_hub_name: data?.community_hub_name || 'ProBitian Community Hub',
-      community_hub_address: data?.community_hub_address || 'M93M+688, Salaiya, Madhya Pradesh 486440, India',
-      community_hub_maps_url: data?.community_hub_maps_url || 'https://maps.app.goo.gl/T4426JADcNHHFPqb7'
-    };
+    try {
+      const data = await safeFetchJson<WebsiteGeneralSettings | null>('/api/cms/settings/general');
+      return {
+        website_name: data?.website_name || 'ProBitian',
+        tagline: data?.tagline || 'Master Business Intelligence',
+        contact_email: data?.contact_email || 'probitianofficial@gmail.com',
+        logo_url: data?.logo_url || PROBITIAN_LOGO_URL,
+        favicon_url: data?.favicon_url || PROBITIAN_LOGO_URL,
+        banner_url: data?.banner_url || '/banner.svg',
+        theme_color: data?.theme_color || 'purple',
+        footer_copyright: data?.footer_copyright || '© 2026 ProBitian. All Rights Reserved.',
+        community_hub_name: data?.community_hub_name || 'ProBitian Community Hub',
+        community_hub_address: data?.community_hub_address || 'M93M+688, Salaiya, Madhya Pradesh 486440, India',
+        community_hub_maps_url: data?.community_hub_maps_url || 'https://maps.app.goo.gl/T4426JADcNHHFPqb7'
+      };
+    } catch (e: any) {
+      return {
+        website_name: 'ProBitian',
+        tagline: 'Master Business Intelligence',
+        contact_email: 'probitianofficial@gmail.com',
+        logo_url: PROBITIAN_LOGO_URL,
+        favicon_url: PROBITIAN_LOGO_URL,
+        banner_url: '/banner.svg',
+        theme_color: 'purple',
+        footer_copyright: '© 2026 ProBitian. All Rights Reserved.',
+        community_hub_name: 'ProBitian Community Hub',
+        community_hub_address: 'M93M+688, Salaiya, Madhya Pradesh 486440, India',
+        community_hub_maps_url: 'https://maps.app.goo.gl/T4426JADcNHHFPqb7'
+      };
+    }
   },
 
   async saveGeneralSettings(settings: WebsiteGeneralSettings): Promise<boolean> {
@@ -102,15 +148,26 @@ export const cmsService = {
 
   // --- SEO SETTINGS ---
   async getSeoSettings(): Promise<SeoSettings> {
-    const data = await safeFetchJson<SeoSettings | null>('/api/cms/settings/seo');
-    return {
-      meta_title: data?.meta_title || 'ProBitian | Master Business Intelligence',
-      meta_description: data?.meta_description || 'Master Power BI, SQL, Excel, Power Query, AI Tools, and Dashboard Design through practical projects and industry-focused tutorials.',
-      keywords: data?.keywords || 'Power BI, SQL, DAX, Power Query, Data Analytics, Business Intelligence, Excel, AI, ProBitian',
-      og_image: data?.og_image || '/banner.svg',
-      twitter_handle: data?.twitter_handle || '@probitian',
-      robots_txt: data?.robots_txt || 'User-agent: *\nAllow: /'
-    };
+    try {
+      const data = await safeFetchJson<SeoSettings | null>('/api/cms/settings/seo');
+      return {
+        meta_title: data?.meta_title || 'ProBitian | Master Business Intelligence',
+        meta_description: data?.meta_description || 'Master Power BI, SQL, Excel, Power Query, AI Tools, and Dashboard Design through practical projects and industry-focused tutorials.',
+        keywords: data?.keywords || 'Power BI, SQL, DAX, Power Query, Data Analytics, Business Intelligence, Excel, AI, ProBitian',
+        og_image: data?.og_image || '/banner.svg',
+        twitter_handle: data?.twitter_handle || '@probitian',
+        robots_txt: data?.robots_txt || 'User-agent: *\nAllow: /'
+      };
+    } catch {
+      return {
+        meta_title: 'ProBitian | Master Business Intelligence',
+        meta_description: 'Master Power BI, SQL, Excel, Power Query, AI Tools, and Dashboard Design through practical projects and industry-focused tutorials.',
+        keywords: 'Power BI, SQL, DAX, Power Query, Data Analytics, Business Intelligence, Excel, AI, ProBitian',
+        og_image: '/banner.svg',
+        twitter_handle: '@probitian',
+        robots_txt: 'User-agent: *\nAllow: /'
+      };
+    }
   },
 
   async saveSeoSettings(seo: SeoSettings): Promise<boolean> {
@@ -129,11 +186,15 @@ export const cmsService = {
 
   // --- LEGAL & POLICIES SETTINGS ---
   async getLegalSettings(): Promise<LegalSettings> {
-    const data = await safeFetchJson<LegalSettings | null>('/api/cms/settings/legal');
-    if (data && typeof data === 'object' && (data.terms || data.privacy)) {
-      return data as LegalSettings;
+    try {
+      const data = await safeFetchJson<LegalSettings | null>('/api/cms/settings/legal');
+      if (data && typeof data === 'object' && (data.terms || data.privacy)) {
+        return data as LegalSettings;
+      }
+      return DEFAULT_LEGAL_SETTINGS;
+    } catch {
+      return DEFAULT_LEGAL_SETTINGS;
     }
-    return DEFAULT_LEGAL_SETTINGS;
   },
 
   async saveLegalSettings(legal: LegalSettings): Promise<boolean> {
@@ -152,11 +213,15 @@ export const cmsService = {
 
   // --- HOME PAGE CONFIG ---
   async getHomePageConfig(): Promise<HomePageConfig | null> {
-    const data = await safeFetchJson<HomePageConfig | null>('/api/cms/settings/home');
-    if (data && typeof data === 'object' && data.hero_heading) {
-      return data as HomePageConfig;
+    try {
+      const data = await safeFetchJson<HomePageConfig | null>('/api/cms/settings/home');
+      if (data && typeof data === 'object' && data.hero_heading) {
+        return data as HomePageConfig;
+      }
+      return null;
+    } catch {
+      return null;
     }
-    return null;
   },
 
   async saveHomePageConfig(config: HomePageConfig): Promise<boolean> {
@@ -175,29 +240,33 @@ export const cmsService = {
 
   // --- PROJECTS ---
   async getProjects(): Promise<ProjectItem[]> {
-    const data = await safeFetchJson<any[]>('/api/cms/projects');
-    if (Array.isArray(data)) {
-      return data.map((p: any) => ({
-        id: String(p.id),
-        title: p.title || 'Untitled Project',
-        category: p.category || 'General',
-        description: p.description || '',
-        fullDescription: p.full_description || p.fullDescription || p.description || '',
-        toolsUsed: p.tools_used || p.toolsUsed || [],
-        imagePlaceholder: p.image_url || p.imagePlaceholder || 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=1200&q=80',
-        galleryUrls: p.gallery_urls || p.galleryUrls || [],
-        kpis: Array.isArray(p.kpis) ? p.kpis : [],
-        featured: Boolean(p.featured),
-        published: p.published !== false,
-        githubUrl: p.github_url || p.githubUrl,
-        liveDemoUrl: p.live_demo_url || p.liveDemoUrl,
-        youtubeUrl: p.youtube_url || p.youtubeUrl,
-        tags: p.tags || [],
-        displayOrder: p.display_order ?? p.displayOrder,
-        created_at: p.created_at
-      }));
+    try {
+      const data = await safeFetchJson<any[]>('/api/cms/projects');
+      if (Array.isArray(data) && data.length > 0) {
+        return data.map((p: any) => ({
+          id: String(p.id),
+          title: p.title || 'Untitled Project',
+          category: p.category || 'General',
+          description: p.description || '',
+          fullDescription: p.full_description || p.fullDescription || p.description || '',
+          toolsUsed: p.tools_used || p.toolsUsed || [],
+          imagePlaceholder: p.image_url || p.imagePlaceholder || 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=1200&q=80',
+          galleryUrls: p.gallery_urls || p.galleryUrls || [],
+          kpis: Array.isArray(p.kpis) ? p.kpis : [],
+          featured: Boolean(p.featured),
+          published: p.published !== false,
+          githubUrl: p.github_url || p.githubUrl,
+          liveDemoUrl: p.live_demo_url || p.liveDemoUrl,
+          youtubeUrl: p.youtube_url || p.youtubeUrl,
+          tags: p.tags || [],
+          displayOrder: p.display_order ?? p.displayOrder,
+          created_at: p.created_at
+        }));
+      }
+      return PROJECTS;
+    } catch {
+      return PROJECTS;
     }
-    return [];
   },
 
   async saveProject(project: ProjectItem): Promise<boolean> {
@@ -226,28 +295,32 @@ export const cmsService = {
 
   // --- BLOGS ---
   async getBlogs(): Promise<BlogArticle[]> {
-    const data = await safeFetchJson<any[]>('/api/cms/blogs');
-    if (Array.isArray(data)) {
-      return data.map((b: any) => ({
-        id: String(b.id),
-        title: b.title || 'Untitled Article',
-        slug: b.slug || (b.title ? b.title.toLowerCase().replace(/[^a-z0-9]+/g, '-') : 'article'),
-        excerpt: b.excerpt || '',
-        content: b.content || '',
-        category: b.category || 'Data Analytics',
-        tags: b.tags || [],
-        date: b.date || (b.created_at ? new Date(b.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recent'),
-        readTime: b.read_time || b.readTime || '5 min read',
-        author: b.author || 'Shivam Singh',
-        imageUrl: b.featured_image || b.imageUrl || 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=800&q=80',
-        status: b.status || 'published',
-        scheduledAt: b.scheduled_at || b.scheduledAt,
-        metaTitle: b.meta_title || b.metaTitle,
-        metaDescription: b.meta_description || b.metaDescription,
-        created_at: b.created_at
-      }));
+    try {
+      const data = await safeFetchJson<any[]>('/api/cms/blogs');
+      if (Array.isArray(data) && data.length > 0) {
+        return data.map((b: any) => ({
+          id: String(b.id),
+          title: b.title || 'Untitled Article',
+          slug: b.slug || (b.title ? b.title.toLowerCase().replace(/[^a-z0-9]+/g, '-') : 'article'),
+          excerpt: b.excerpt || '',
+          content: b.content || '',
+          category: b.category || 'Data Analytics',
+          tags: b.tags || [],
+          date: b.date || (b.created_at ? new Date(b.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recent'),
+          readTime: b.read_time || b.readTime || '5 min read',
+          author: b.author || 'Shivam Singh',
+          imageUrl: b.featured_image || b.imageUrl || 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=800&q=80',
+          status: b.status || 'published',
+          scheduledAt: b.scheduled_at || b.scheduledAt,
+          metaTitle: b.meta_title || b.metaTitle,
+          metaDescription: b.meta_description || b.metaDescription,
+          created_at: b.created_at
+        }));
+      }
+      return BLOG_ARTICLES;
+    } catch {
+      return BLOG_ARTICLES;
     }
-    return [];
   },
 
   async saveBlog(blog: BlogArticle): Promise<boolean> {
@@ -276,29 +349,33 @@ export const cmsService = {
 
   // --- COURSES / LEARN TOPICS ---
   async getCourses(): Promise<LearnTopic[]> {
-    const data = await safeFetchJson<any[]>('/api/cms/courses');
-    if (Array.isArray(data)) {
-      return data.map((c: any) => ({
-        id: String(c.id),
-        title: c.title || 'Untitled Course',
-        slug: c.slug || (c.title ? c.title.toLowerCase().replace(/[^a-z0-9]+/g, '-') : 'course'),
-        icon: c.icon || 'BarChart3',
-        level: c.level || 'All Levels',
-        description: c.description || '',
-        modulesCount: c.modules_count ?? c.modulesCount ?? 5,
-        duration: c.duration || '5 Hours',
-        keyTakeaways: c.key_takeaways || c.keyTakeaways || [],
-        syllabus: Array.isArray(c.syllabus) ? c.syllabus : (Array.isArray(c.curriculum) ? c.curriculum : []),
-        thumbnail: c.thumbnail || c.thumbnail_url,
-        videoUrl: c.video_url || c.videoUrl,
-        pdfUrl: c.pdf_url || c.pdfUrl,
-        category: c.category || 'Data Analytics',
-        published: c.published !== false,
-        resources: c.resources || [],
-        created_at: c.created_at
-      }));
+    try {
+      const data = await safeFetchJson<any[]>('/api/cms/courses');
+      if (Array.isArray(data) && data.length > 0) {
+        return data.map((c: any) => ({
+          id: String(c.id),
+          title: c.title || 'Untitled Course',
+          slug: c.slug || (c.title ? c.title.toLowerCase().replace(/[^a-z0-9]+/g, '-') : 'course'),
+          icon: c.icon || 'BarChart3',
+          level: c.level || 'All Levels',
+          description: c.description || '',
+          modulesCount: c.modules_count ?? c.modulesCount ?? 5,
+          duration: c.duration || '5 Hours',
+          keyTakeaways: c.key_takeaways || c.keyTakeaways || [],
+          syllabus: Array.isArray(c.syllabus) ? c.syllabus : (Array.isArray(c.curriculum) ? c.curriculum : []),
+          thumbnail: c.thumbnail || c.thumbnail_url,
+          videoUrl: c.video_url || c.videoUrl,
+          pdfUrl: c.pdf_url || c.pdfUrl,
+          category: c.category || 'Data Analytics',
+          published: c.published !== false,
+          resources: c.resources || [],
+          created_at: c.created_at
+        }));
+      }
+      return LEARN_TOPICS;
+    } catch {
+      return LEARN_TOPICS;
     }
-    return [];
   },
 
   async saveCourse(course: LearnTopic): Promise<boolean> {
@@ -327,24 +404,28 @@ export const cmsService = {
 
   // --- YOUTUBE VIDEOS ---
   async getVideos(): Promise<YouTubeVideo[]> {
-    const data = await safeFetchJson<any[]>('/api/cms/videos');
-    if (Array.isArray(data)) {
-      return data.map((v: any) => ({
-        id: String(v.id),
-        title: v.title || 'Untitled Video',
-        description: v.description || '',
-        thumbnail: v.thumbnail || '',
-        duration: v.duration || '10:00',
-        views: v.views || (v.views_count ? `${v.views_count} views` : '1K views'),
-        url: v.youtube_url || v.url || '',
-        youtubeId: v.youtube_id || v.youtubeId || '',
-        category: v.category || 'Power BI',
-        playlist: v.playlist,
-        tags: v.tags || [],
-        created_at: v.created_at
-      }));
+    try {
+      const data = await safeFetchJson<any[]>('/api/cms/videos');
+      if (Array.isArray(data) && data.length > 0) {
+        return data.map((v: any) => ({
+          id: String(v.id),
+          title: v.title || 'Untitled Video',
+          description: v.description || '',
+          thumbnail: v.thumbnail || '',
+          duration: v.duration || '10:00',
+          views: v.views || (v.views_count ? `${v.views_count} views` : '1K views'),
+          url: v.youtube_url || v.url || '',
+          youtubeId: v.youtube_id || v.youtubeId || '',
+          category: v.category || 'Power BI',
+          playlist: v.playlist,
+          tags: v.tags || [],
+          created_at: v.created_at
+        }));
+      }
+      return YOUTUBE_VIDEOS;
+    } catch {
+      return YOUTUBE_VIDEOS;
     }
-    return [];
   },
 
   async saveVideo(video: YouTubeVideo): Promise<boolean> {

@@ -422,4 +422,12 @@ describe('14. Express 4 HTTP Regression & Routing Verification', () => {
     assert.ok(!html.includes('probitian-banner.png'));
     assert.ok(!html.includes('raw.githubusercontent.com/ShivamSinghPro'));
   });
+
+  test('HTTP responses do not expose X-Powered-By technology disclosure header', async () => {
+    const paths = ['/', '/admin', '/api/cms/projects', '/robots.txt', '/sitemap.xml'];
+    for (const path of paths) {
+      const res = await fetch(`${baseUrl}${path}`);
+      assert.strictEqual(res.headers.get('x-powered-by'), null, `X-Powered-By header must be absent on ${path}`);
+    }
+  });
 });
