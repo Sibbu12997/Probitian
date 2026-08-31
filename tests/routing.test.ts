@@ -36,6 +36,7 @@ describe('11. Routing & Canonical URL Resolution', () => {
     assert.strictEqual(getPageCanonicalUrl('contact'), 'https://probitian.ai.studio/contact');
     assert.strictEqual(getPageCanonicalUrl('privacy'), 'https://probitian.ai.studio/privacy');
     assert.strictEqual(getPageCanonicalUrl('terms'), 'https://probitian.ai.studio/terms');
+    assert.strictEqual(getPageCanonicalUrl('power-bi-demo'), 'https://probitian.ai.studio/power-bi-demo');
   });
 
   test('parseRoute handles standard HTML5 pathname routes', () => {
@@ -46,6 +47,9 @@ describe('11. Routing & Canonical URL Resolution', () => {
 
     const about = parseRoute('/about', '');
     assert.strictEqual(about.page, 'about');
+
+    const powerBiDemo = parseRoute('/power-bi-demo', '');
+    assert.strictEqual(powerBiDemo.page, 'power-bi-demo');
 
     const blogPost = parseRoute('/blog/advanced-dax', '');
     assert.strictEqual(blogPost.page, 'blog');
@@ -79,6 +83,7 @@ describe('12. Page SEO Metadata & Title Generation', () => {
     assert.strictEqual(getPageTitle('contact', null), 'Contact Shivam Singh | ProBItian Community Hub');
     assert.strictEqual(getPageTitle('privacy', null), 'Privacy Policy | ProBItian Data Protection');
     assert.strictEqual(getPageTitle('terms', null), 'Terms of Service | ProBItian');
+    assert.strictEqual(getPageTitle('power-bi-demo', null), 'Live Interactive Power BI Demo | ProBitian');
     assert.strictEqual(getPageTitle('404', null), 'Page Not Found (404) | ProBItian');
   });
 

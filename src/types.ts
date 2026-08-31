@@ -1,6 +1,17 @@
 export { PROBITIAN_LOGO_URL, PROBITIAN_BANNER_URL } from './constants/branding';
 
-export type NavPage = 'home' | 'about' | 'projects' | 'blog' | 'learn' | 'contact' | 'privacy' | 'terms' | 'admin' | '404';
+export type NavPage = 'home' | 'about' | 'projects' | 'blog' | 'learn' | 'contact' | 'privacy' | 'terms' | 'power-bi-demo' | 'admin' | '404';
+
+export interface TestimonialItem {
+  id: string;
+  quote: string;
+  author: string;
+  role: string;
+  avatar?: string;
+  company?: string;
+  rating?: number;
+  published?: boolean;
+}
 
 export interface FeatureCardItem {
   id: string;

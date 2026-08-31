@@ -5,6 +5,8 @@ dotenv.config();
 
 export const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
+export const APP_VERSION = '1.1.0';
+
 export const OFFICIAL_ADMIN_EMAIL = (process.env.ADMIN_EMAIL || process.env.VITE_CONTACT_EMAIL || 'probitianofficial@gmail.com').toLowerCase().trim();
 
 export const CONFIGURED_ADMIN_EMAILS: string[] = [
@@ -58,3 +60,19 @@ export function constantTimeCompare(a: string, b: string): boolean {
   const hashB = crypto.createHash('sha256').update(b).digest();
   return crypto.timingSafeEqual(hashA, hashB);
 }
+
+export const DEFAULT_HOME_CONFIG = {
+  hero_heading: 'Master Business Intelligence with Real-World Projects',
+  hero_description: 'Master Power BI, SQL, Excel, AI and Dashboard Design through practical projects and industry-focused tutorials.',
+  buttons: [
+    { label: 'Start Learning', path: 'https://youtube.com/@probitian', primary: true },
+    { label: 'Follow on Instagram', path: 'https://instagram.com/probitian', primary: false }
+  ],
+  banner_url: '/banner.svg',
+  statistics: [
+    { label: 'Free Tutorials', value: '100+' },
+    { label: 'Portfolio Projects', value: '25+' },
+    { label: 'YouTube Learners', value: '10K+' },
+    { label: 'Career Resources', value: '50+' }
+  ]
+};

@@ -1,11 +1,15 @@
+import { hasOptionalConsent, subscribeToConsentChanges } from './cookieConsent';
+
 // Google Analytics 4 (GA4) Analytics Utility for ProBitian
 // Uses VITE_GA4_MEASUREMENT_ID from environment variables.
 // Strictly prevents sending any personally identifiable information (PII).
+// Strictly requires explicit user consent ('all') before initialization or event tracking.
 
 declare global {
   interface Window {
     dataLayer: any[];
     gtag?: (...args: any[]) => void;
+    [key: string]: any;
   }
 }
 
@@ -15,12 +19,35 @@ const getMeasurementId = (): string => {
 
 let isInitialized = false;
 
+// Setup reactive listener for consent updates
+if (typeof window !== 'undefined') {
+  subscribeToConsentChanges((choice) => {
+    const measurementId = getMeasurementId();
+    if (choice === 'all') {
+      if (measurementId && typeof window !== 'undefined') {
+        window[`ga-disable-${measurementId}`] = false;
+      }
+      initGA();
+      trackPageView(window.location.pathname + window.location.hash);
+    } else if (choice === 'necessary') {
+      if (measurementId && typeof window !== 'undefined') {
+        window[`ga-disable-${measurementId}`] = true;
+      }
+    }
+  });
+}
+
 /**
- * Initializes Google Analytics 4 dynamically if measurement ID is present.
+ * Initializes Google Analytics 4 dynamically strictly if optional consent is granted.
  */
 export const initGA = (): boolean => {
   if (typeof window === 'undefined') return false;
   
+  // Strict Privacy Boundary: Do not initialize or inject scripts without explicit optional consent
+  if (!hasOptionalConsent()) {
+    return false;
+  }
+
   const measurementId = getMeasurementId();
 
   if (!measurementId || measurementId.trim() === '' || measurementId.includes('G-XXXXXXXXXX')) {
@@ -28,6 +55,7 @@ export const initGA = (): boolean => {
   }
 
   try {
+    window[`ga-disable-${measurementId}`] = false;
     window.dataLayer = window.dataLayer || [];
     if (!window.gtag) {
       window.gtag = function () {

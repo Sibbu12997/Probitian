@@ -22,6 +22,7 @@ import {
 import { UserRole, Permission } from '../auth/types';
 import { loginLimiter } from '../middleware/rateLimiters';
 import { serverSupabase, supabaseUrl, serverSecretKey } from '../services/supabase';
+import { recordAuditLog } from '../services/audit';
 
 const router = express.Router();
 
@@ -55,14 +56,31 @@ router.post('/admin/verify-passkey', loginLimiter, (req, res) => {
     const role = UserRole.ADMIN;
     const session = createAdminSession(adminEmail, role);
 
+    recordAuditLog(req, {
+      actor: adminEmail,
+      role,
+      action: 'LOGIN_PASSKEY',
+      resource: 'auth',
+      result: 'SUCCESS',
+      metadata: { method: 'passkey' }
+    });
+
     res.setHeader('Set-Cookie', getAdminCookieHeader(session.token, req));
     return res.json({ 
       success: true, 
       email: adminEmail, 
-      role,
-      token: session.token 
+      role 
     });
   }
+
+  recordAuditLog(req, {
+    actor: typeof email === 'string' ? email : 'anonymous',
+    role: 'USER',
+    action: 'LOGIN_PASSKEY_FAILED',
+    resource: 'auth',
+    result: 'FAILURE',
+    metadata: { reason: 'Invalid credentials' }
+  });
 
   return res.status(401).json({ error: 'Invalid credentials' });
 });
@@ -107,17 +125,34 @@ router.post('/admin/verify-supabase-session', loginLimiter, async (req, res) => 
     // Only allow Admin or Editor into admin control center
     if (role !== UserRole.ADMIN && role !== UserRole.EDITOR) {
       console.warn(`[SECURITY RBAC] Unauthorized Supabase user attempted admin login: ${userEmail} (${verifiedUser.id}) with role "${role}"`);
+      recordAuditLog(req, {
+        actor: userEmail,
+        role,
+        action: 'LOGIN_SUPABASE_DENIED',
+        resource: 'auth',
+        result: 'DENIED',
+        metadata: { reason: 'Insufficient privileges' }
+      });
       return res.status(403).json({ error: 'Forbidden: Account does not have editor or administrator privileges' });
     }
 
     const session = createAdminSession(userEmail, role, verifiedUser.id);
 
+    recordAuditLog(req, {
+      actor: userEmail,
+      role,
+      action: 'LOGIN_SUPABASE',
+      resource: 'auth',
+      resource_id: verifiedUser.id,
+      result: 'SUCCESS',
+      metadata: { method: 'supabase' }
+    });
+
     res.setHeader('Set-Cookie', getAdminCookieHeader(session.token, req));
     return res.json({ 
       success: true, 
       email: userEmail, 
-      role,
-      token: session.token 
+      role 
     });
   } catch (err) {
     console.error('[Admin Supabase Session Verification Error]', err);
@@ -141,6 +176,7 @@ router.get('/admin/session', (req, res) => {
 
 // POST /api/admin/logout
 router.post('/admin/logout', (req, res) => {
+  const session = getAdminSession(req);
   const cookies = parseCookies(req);
   let token = cookies['admin_session'];
 
@@ -153,11 +189,45 @@ router.post('/admin/logout', (req, res) => {
     }
   }
 
+  if (session) {
+    recordAuditLog(req, {
+      actor: session.email,
+      role: session.role,
+      action: 'LOGOUT',
+      resource: 'auth',
+      result: 'SUCCESS'
+    });
+  }
+
   if (token) {
     invalidateAdminSession(token);
   }
   res.setHeader('Set-Cookie', getAdminCookieHeader('', req, 0));
   return res.json({ success: true });
+});
+
+// GET /api/admin/audit-logs - Query audit history (Admin only)
+router.get('/admin/audit-logs', requireAuth, requireRole(UserRole.ADMIN), async (req, res) => {
+  const limit = Math.min(parseInt(req.query.limit as string, 10) || 50, 200);
+  const offset = Math.max(parseInt(req.query.offset as string, 10) || 0, 0);
+
+  if (serverSupabase) {
+    try {
+      const { data, error, count } = await serverSupabase
+        .from('audit_logs')
+        .select('*', { count: 'exact' })
+        .order('created_at', { ascending: false })
+        .range(offset, offset + limit - 1);
+
+      if (!error && Array.isArray(data)) {
+        return res.json({ success: true, logs: data, total: count || data.length });
+      }
+    } catch (err) {
+      console.warn('[Audit Logs Query Error]', err);
+    }
+  }
+
+  return res.json({ success: true, logs: [], total: 0 });
 });
 
 // GET /api/admin/roles - List all users and roles (Admin only)
@@ -191,6 +261,7 @@ router.get('/admin/roles', requireAuth, requireRole(UserRole.ADMIN), async (req,
 
 // POST /api/admin/roles/assign - Assign role to user (Admin only)
 router.post('/admin/roles/assign', requireAuth, requireRole(UserRole.ADMIN), async (req, res) => {
+  const currentSession = getAdminSession(req);
   const { userId, email, role } = req.body || {};
 
   if (!role || !Object.values(UserRole).includes(role)) {
@@ -215,6 +286,17 @@ router.post('/admin/roles/assign', requireAuth, requireRole(UserRole.ADMIN), asy
         console.error('[Role Assignment DB Error]', error.message);
         return res.status(500).json({ error: 'Failed to update user role in database' });
       }
+
+      // Record audit event
+      recordAuditLog(req, {
+        actor: currentSession?.email || 'admin',
+        role: currentSession?.role || UserRole.ADMIN,
+        action: 'ROLE_ASSIGNED',
+        resource: 'profiles',
+        resource_id: data?.id || userId,
+        result: 'SUCCESS',
+        metadata: { target_email: data?.email || email, new_role: role }
+      });
 
       // Immediately invalidate any active sessions belonging to the modified user
       invalidateUserSessions({ userId: data?.id || userId, email: data?.email || email });

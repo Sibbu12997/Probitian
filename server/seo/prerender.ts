@@ -423,6 +423,31 @@ export async function getRouteSeo(
         httpStatus: 200
       };
 
+    case '/power-bi-demo':
+    case '/powerbi-demo':
+      return {
+        title: 'Live Interactive Power BI Demo | ProBitian',
+        description: 'Explore an interactive business intelligence dashboard and see how data can become clear, actionable insights.',
+        canonicalUrl: `${SITE_URL}/power-bi-demo`,
+        robots: 'index, follow',
+        ogType: 'website',
+        ogImage: DEFAULT_OG_IMAGE,
+        jsonLd: {
+          '@context': 'https://schema.org',
+          '@type': 'WebPage',
+          'name': 'ProBitian Live Interactive Power BI Demo',
+          'description': 'Explore an interactive business intelligence dashboard and see how data can become clear, actionable insights.',
+          'url': `${SITE_URL}/power-bi-demo`
+        },
+        preRenderedHtml: `
+          <main class="probitian-powerbi-demo">
+            <h1>Live Interactive Power BI Dashboard Demo</h1>
+            <p>Explore an interactive business intelligence dashboard and see how data can become clear, actionable insights.</p>
+          </main>
+        `,
+        httpStatus: 200
+      };
+
     default:
       // Unknown route -> 404 Not Found with strict noindex, nofollow
       return {

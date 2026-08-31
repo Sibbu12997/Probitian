@@ -20,6 +20,7 @@ export function getPageTitle(currentPage: NavPage, selectedBlog: BlogArticle | n
     case 'contact': return 'Contact Shivam Singh | ProBItian Community Hub';
     case 'privacy': return 'Privacy Policy | ProBItian Data Protection';
     case 'terms': return 'Terms of Service | ProBItian';
+    case 'power-bi-demo': return 'Live Interactive Power BI Demo | ProBitian';
     case 'admin': return 'Admin CMS Portal | ProBItian';
     case '404': return 'Page Not Found (404) | ProBItian';
     default: return 'ProBItian | Master Business Intelligence, Power BI & SQL';
@@ -38,6 +39,7 @@ export function getPageDescription(currentPage: NavPage, selectedBlog: BlogArtic
     case 'contact': return 'Get in touch with ProBItian for data analytics inquiries, enterprise BI consultations, course support, or community collaboration.';
     case 'privacy': return 'Read ProBItian\'s privacy policy, data protection standards, cookie policies, and personal information handling practices.';
     case 'terms': return 'Review the terms and conditions governing access to ProBItian educational tutorials, portfolio code assets, and learning resources.';
+    case 'power-bi-demo': return 'Explore an interactive business intelligence dashboard and see how data can become clear, actionable insights.';
     case 'admin': return 'ProBItian internal content management portal.';
     case '404': return 'The requested page could not be found on ProBItian.';
     default: return 'Master Power BI, SQL, Excel, Power Query, AI Tools, and Dashboard Design through practical projects and industry-focused tutorials.';

@@ -3,13 +3,26 @@ import crypto from 'crypto';
 import path from 'path';
 import { requireAuth, requirePermission } from '../auth/rbac';
 import { Permission } from '../auth/types';
-import { isValidId, isValidUuid, PROBITIAN_MEDIA_BUCKET } from '../config/constants';
+import { isValidId, isValidUuid, PROBITIAN_MEDIA_BUCKET, DEFAULT_HOME_CONFIG } from '../config/constants';
 import { contactLimiter, uploadLimiter } from '../middleware/rateLimiters';
 import { serverSupabase, readCmsData, writeCmsData } from '../services/supabase';
 import { sanitizeSvgString, validateFileSignature } from '../security/sanitizer';
 import { emailService } from '../../src/services/emailService';
 
 const router = express.Router();
+
+// ==================== POWER BI DEMO CONFIGURATION ====================
+const DEFAULT_POWER_BI_DEMO_URL = 'https://app.powerbi.com/view?r=eyJrIjoiNzUyNDk1ZjgtNTA1OS00MDUxLTgyNmEtMjVhYmM2NTlkOGJjIiwidCI6ImU2YmVkMTFkLWM2YzMtNDFkMC05NzU3LTkxNWQwZjIzZmQ4NyJ9';
+
+// GET /api/config/power-bi-demo & /api/cms/config/power-bi-demo (Public)
+const getPowerBiDemoConfig = (req: express.Request, res: express.Response) => {
+  const customUrl = process.env.POWERBI_DEMO_URL?.trim();
+  const url = customUrl || DEFAULT_POWER_BI_DEMO_URL;
+  return res.json({ url });
+};
+
+router.get('/config/power-bi-demo', getPowerBiDemoConfig);
+router.get('/cms/config/power-bi-demo', getPowerBiDemoConfig);
 
 // ==================== PROJECTS ====================
 
@@ -997,17 +1010,35 @@ router.delete('/cms/media/:id', requireAuth, requirePermission(Permission.EDIT_C
 router.get('/cms/settings/:key', async (req, res) => {
   const { key } = req.params;
 
+  const getDefaultSetting = (settingKey: string) => {
+    if (settingKey === 'home') return DEFAULT_HOME_CONFIG;
+    return null;
+  };
+
   if (serverSupabase) {
     try {
       const { data, error } = await serverSupabase.from('settings').select('*').eq('key', key).maybeSingle();
       if (error) {
+        // If database error, return default fallback if available or 503
+        const fallback = getDefaultSetting(key);
+        if (fallback !== null) {
+          return res.json(fallback);
+        }
         return res.status(503).json({ error: 'Database service unavailable' });
       }
-      if (data) {
-        return res.json(data.value !== undefined ? data.value : data);
+      if (data && data.value !== undefined && data.value !== null) {
+        return res.json(data.value);
       }
-      return res.json(null);
+      if (data && typeof data === 'object' && Object.keys(data).length > 0 && data.value === undefined) {
+        return res.json(data);
+      }
+      const fallback = getDefaultSetting(key);
+      return res.json(fallback);
     } catch (err: any) {
+      const fallback = getDefaultSetting(key);
+      if (fallback !== null) {
+        return res.json(fallback);
+      }
       return res.status(503).json({ error: 'Database service unavailable' });
     }
   }
@@ -1016,17 +1047,21 @@ router.get('/cms/settings/:key', async (req, res) => {
     const data = readCmsData();
     const settings = data.settings;
     if (settings && typeof settings === 'object') {
-      if (!Array.isArray(settings) && settings[key] !== undefined) {
+      if (!Array.isArray(settings) && settings[key] !== undefined && settings[key] !== null) {
         return res.json(settings[key]);
       }
       if (Array.isArray(settings)) {
         const match = settings.find((s: any) => s.key === key);
-        return res.json(match ? (match.value !== undefined ? match.value : match) : null);
+        if (match) {
+          return res.json(match.value !== undefined ? match.value : match);
+        }
       }
     }
-    return res.json(null);
+    const fallback = getDefaultSetting(key);
+    return res.json(fallback);
   } catch {
-    return res.json(null);
+    const fallback = getDefaultSetting(key);
+    return res.json(fallback);
   }
 });
 

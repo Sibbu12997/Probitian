@@ -100,6 +100,9 @@ export function parseRoute(pathname: string = window.location.pathname, hash: st
     case 'terms':
     case 'terms-of-service':
       return { page: 'terms', slug: null, isLegacyHash, targetCanonicalPath: '/terms' };
+    case 'power-bi-demo':
+    case 'powerbi-demo':
+      return { page: 'power-bi-demo', slug: null, isLegacyHash, targetCanonicalPath: '/power-bi-demo' };
     case 'admin':
       return { page: 'admin', slug: null, isLegacyHash, targetCanonicalPath: '/admin' };
     case '404':

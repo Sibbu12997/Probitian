@@ -8,6 +8,7 @@ import { LearnPage } from '../../pages/LearnPage';
 import { ContactPage } from '../../pages/ContactPage';
 import { PrivacyPage } from '../../pages/PrivacyPage';
 import { TermsPage } from '../../pages/TermsPage';
+import { PowerBIDemoPage } from '../../pages/PowerBIDemoPage';
 import { NotFoundPage } from '../../pages/NotFoundPage';
 import { AdminLogin } from '../../pages/admin/AdminLogin';
 import { AdminPortal } from '../../pages/admin/AdminPortal';
@@ -58,6 +59,8 @@ export const PageRenderer: React.FC<PageRendererProps> = ({
       return <PrivacyPage onNavigate={onNavigate} />;
     case 'terms':
       return <TermsPage onNavigate={onNavigate} />;
+    case 'power-bi-demo':
+      return <PowerBIDemoPage onNavigate={onNavigate} />;
     case 'admin':
       if (!adminUser) {
         return (

@@ -25,7 +25,7 @@ import {
   SequenceDeliveryLog
 } from '../types';
 import { LegalSettings, DEFAULT_LEGAL_SETTINGS } from '../data/defaultLegalData';
-import { PROBITIAN_LOGO_URL, PROBITIAN_X_URL, DEFAULT_SOCIAL_LINKS } from '../constants/branding';
+import { PROBITIAN_LOGO_URL, PROBITIAN_X_URL, DEFAULT_SOCIAL_LINKS, DEFAULT_HOME_CONFIG } from '../constants/branding';
 import { PROJECTS, BLOG_ARTICLES, LEARN_TOPICS, YOUTUBE_VIDEOS } from '../data/mockData';
 
 /**
@@ -98,6 +98,17 @@ async function safeFetchJson<T = any>(url: string, options?: RequestInit, maxRet
 // ==================== CMS SERVICE API (EXPRESS ROUTED TO SUPABASE) ====================
 
 export const cmsService = {
+  // --- POWER BI DEMO EMBED CONFIG ---
+  async getPowerBiDemoUrl(): Promise<string> {
+    const DEFAULT_FALLBACK_URL = 'https://app.powerbi.com/view?r=eyJrIjoiNzUyNDk1ZjgtNTA1OS00MDUxLTgyNmEtMjVhYmM2NTlkOGJjIiwidCI6ImU2YmVkMTFkLWM2YzMtNDFkMC05NzU3LTkxNWQwZjIzZmQ4NyJ9';
+    try {
+      const data = await safeFetchJson<{ url?: string }>('/api/config/power-bi-demo');
+      return data?.url?.trim() || DEFAULT_FALLBACK_URL;
+    } catch {
+      return DEFAULT_FALLBACK_URL;
+    }
+  },
+
   // --- GENERAL SETTINGS ---
   async getGeneralSettings(): Promise<WebsiteGeneralSettings> {
     try {
@@ -212,15 +223,20 @@ export const cmsService = {
   },
 
   // --- HOME PAGE CONFIG ---
-  async getHomePageConfig(): Promise<HomePageConfig | null> {
+  async getHomePageConfig(): Promise<HomePageConfig> {
     try {
       const data = await safeFetchJson<HomePageConfig | null>('/api/cms/settings/home');
       if (data && typeof data === 'object' && data.hero_heading) {
-        return data as HomePageConfig;
+        return {
+          ...DEFAULT_HOME_CONFIG,
+          ...data,
+          buttons: Array.isArray(data.buttons) ? data.buttons : DEFAULT_HOME_CONFIG.buttons,
+          statistics: Array.isArray(data.statistics) ? data.statistics : DEFAULT_HOME_CONFIG.statistics,
+        } as HomePageConfig;
       }
-      return null;
+      return DEFAULT_HOME_CONFIG as HomePageConfig;
     } catch {
-      return null;
+      return DEFAULT_HOME_CONFIG as HomePageConfig;
     }
   },
 

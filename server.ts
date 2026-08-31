@@ -5,7 +5,7 @@ import dotenv from 'dotenv';
 import { createServer as createViteServer } from 'vite';
 
 // Server Modules & Middleware
-import { PORT } from './server/config/constants';
+import { PORT, APP_VERSION } from './server/config/constants';
 import { securityHeadersMiddleware } from './server/security/headers';
 import { corsMiddleware } from './server/security/cors';
 import { csrfMiddleware } from './server/security/csrf';
@@ -42,6 +42,28 @@ app.use(csrfMiddleware);
 
 // SEO direct routes (robots.txt & sitemap.xml)
 app.use(seoRouter);
+
+// Observability & System Health Endpoint
+app.get('/api/health', async (req, res) => {
+  let dbStatus = 'unconfigured';
+  if (serverSupabase) {
+    try {
+      const { error } = await serverSupabase.from('settings').select('id').limit(1);
+      dbStatus = error ? 'error' : 'connected';
+    } catch {
+      dbStatus = 'error';
+    }
+  }
+
+  res.json({
+    status: 'ok',
+    version: APP_VERSION,
+    environment: process.env.NODE_ENV || 'development',
+    database: dbStatus,
+    uptime: Math.round(process.uptime()),
+    timestamp: new Date().toISOString()
+  });
+});
 
 // API Route Handlers
 app.use('/api', authRouter);

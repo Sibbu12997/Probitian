@@ -6,10 +6,22 @@ import { trackSocialClick, trackCtaClick, trackDatasetDownloadClick } from '../l
 interface ProjectModalProps {
   project: ProjectItem | null;
   onClose: () => void;
+  onNavigate?: (page: any) => void;
 }
 
-export const ProjectModal: React.FC<ProjectModalProps> = ({ project, onClose }) => {
+export const ProjectModal: React.FC<ProjectModalProps> = ({ project, onClose, onNavigate }) => {
   if (!project) return null;
+
+  const handleLiveDemoClick = (e: React.MouseEvent) => {
+    if (!project.liveDemoUrl) return;
+    trackCtaClick(`Live Dashboard Demo: ${project.title}`, project.liveDemoUrl);
+    if (project.liveDemoUrl.startsWith('/') && onNavigate) {
+      e.preventDefault();
+      onClose();
+      const pageKey = project.liveDemoUrl.replace('/', '');
+      onNavigate(pageKey);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-fadeIn">
@@ -112,6 +124,19 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({ project, onClose }) 
         {/* Modal Actions */}
         <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-4">
           <div className="flex flex-wrap items-center gap-3">
+            {project.liveDemoUrl && (
+              <a
+                href={project.liveDemoUrl}
+                target={project.liveDemoUrl.startsWith('http') ? '_blank' : undefined}
+                rel={project.liveDemoUrl.startsWith('http') ? 'noopener noreferrer' : undefined}
+                onClick={handleLiveDemoClick}
+                className="btn-radius px-6 py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold shadow-soft flex items-center gap-2 transition-all cursor-pointer"
+              >
+                <span>View Live Dashboard</span>
+                <ExternalLink className="w-4 h-4" />
+              </a>
+            )}
+
             <a
               href="https://youtube.com/@probitian"
               target="_blank"

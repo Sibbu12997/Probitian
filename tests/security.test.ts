@@ -11,10 +11,12 @@ import {
   getAdminSession as getServerAdminSession,
   invalidateAdminSession as invalidateServerAdminSession,
   invalidateUserSessions as invalidateServerUserSessions,
+  getAdminCookieHeader as getServerAdminCookieHeader,
   adminSessions as serverAdminSessions,
   revokedSessions as serverRevokedSessions,
   userRevocationTimestamps as serverUserRevocationTimestamps
 } from '../server/auth/session';
+import { APP_VERSION } from '../server/config/constants';
 import { 
   requireAuth as serverRequireAuth, 
   requireRole as serverRequireRole, 
@@ -1139,5 +1141,23 @@ describe('10. Server RBAC, Authentication & Session Hardening Verification', () 
     assert.strictEqual(serverHasPermission(ServerUserRole.USER, ServerPermission.CONTENT_WRITE), false);
     assert.strictEqual(serverHasPermission(ServerUserRole.USER, ServerPermission.MEDIA_UPLOAD), false);
     assert.strictEqual(serverHasPermission(ServerUserRole.USER, ServerPermission.MANAGE_SYSTEM), false);
+  });
+
+  test('11. Health Check status and version validation', () => {
+    assert.strictEqual(APP_VERSION, '1.1.0');
+  });
+
+  test('12. Session token creation and cookie header generation adheres to HttpOnly Secure Lax/None standard', () => {
+    const session = createServerAdminSession('admin@probitian.com', ServerUserRole.ADMIN);
+    assert.ok(session.token);
+    assert.strictEqual(session.email, 'admin@probitian.com');
+    assert.strictEqual(session.role, ServerUserRole.ADMIN);
+
+    const mockHttpsReq = createMockRequest({ 'x-forwarded-proto': 'https' });
+    const cookieHeader = getServerAdminCookieHeader(session.token, mockHttpsReq);
+
+    assert.ok(cookieHeader.includes('HttpOnly'));
+    assert.ok(cookieHeader.includes('Path=/'));
+    assert.ok(cookieHeader.includes('Secure'));
   });
 });

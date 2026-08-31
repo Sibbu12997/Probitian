@@ -96,6 +96,11 @@ export const AnalyticsManager: React.FC<AnalyticsManagerProps> = () => {
       if (reportRes.ok) {
         const reportJson = await reportRes.json();
         setReportData(reportJson);
+        if (reportJson.error) {
+          setErrorMsg(reportJson.error);
+        }
+      } else {
+        setErrorMsg(`Analytics server returned status ${reportRes.status}`);
       }
 
       setLastUpdated(new Date().toLocaleTimeString());
@@ -276,14 +281,37 @@ export const AnalyticsManager: React.FC<AnalyticsManagerProps> = () => {
         </div>
       )}
 
+      {/* Error / Alert Notice */}
+      {errorMsg && (
+        <div className="flex items-center justify-between p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-300 text-xs font-semibold">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-amber-500 shrink-0" />
+            <span>{errorMsg}</span>
+          </div>
+          <button
+            onClick={fetchAnalyticsData}
+            className="px-2.5 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-800 dark:text-amber-200 rounded-lg text-[11px] font-bold cursor-pointer transition-colors"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
       {/* Connection Notice */}
-      {ga4Status.hasReportingCredentials && (
+      {ga4Status.hasReportingCredentials ? (
         <div className="flex items-center justify-between p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-xs font-semibold">
           <div className="flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
             <span>GA4 Data API Connected to Property ID: <strong className="font-mono">{ga4Status.propertyId}</strong></span>
           </div>
           <span className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400">Live Data Sync Active</span>
+        </div>
+      ) : (
+        <div className="p-3.5 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Activity className="w-4 h-4 text-purple-600 shrink-0" />
+            <span>Client Event Measurement Active (<strong className="font-mono text-purple-600 dark:text-purple-400">{ga4Status.measurementId || 'G-G3WJXY6THP'}</strong>). Configure Service Account credentials in environment variables to pull direct Google Analytics reports into this dashboard.</span>
+          </div>
         </div>
       )}
 

@@ -22,7 +22,16 @@ export function parseCookies(req: express.Request): Record<string, string> {
 }
 
 export function getSessionSecret(): string {
-  return (process.env.ADMIN_PASSKEY || process.env.SUPABASE_SECRET_KEY || process.env.SESSION_SECRET || EPHEMERAL_SERVER_KEY).trim();
+  if (process.env.SESSION_SECRET && process.env.SESSION_SECRET.trim()) {
+    return process.env.SESSION_SECRET.trim();
+  }
+  if (process.env.ADMIN_PASSKEY && process.env.ADMIN_PASSKEY.trim()) {
+    return process.env.ADMIN_PASSKEY.trim();
+  }
+  if (process.env.SUPABASE_SECRET_KEY && process.env.SUPABASE_SECRET_KEY.trim()) {
+    return process.env.SUPABASE_SECRET_KEY.trim();
+  }
+  return EPHEMERAL_SERVER_KEY;
 }
 
 export function createSignedSessionToken(

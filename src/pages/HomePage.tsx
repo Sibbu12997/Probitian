@@ -3,7 +3,7 @@ import { NavPage, ProjectItem, BlogArticle, YouTubeVideo, HomePageConfig } from 
 import { FEATURE_CARDS, PROJECTS, YOUTUBE_VIDEOS, BLOG_ARTICLES, WHY_PROBITIAN_CARDS } from '../data/mockData';
 import { cmsService } from '../services/cmsService';
 import { BannerGraphic } from '../components/BannerGraphic';
-import { Youtube, Instagram, ArrowRight, Play, Sparkles, BarChart3, Database, Table, Filter, BrainCircuit, GraduationCap, Briefcase, HeartHandshake, TrendingUp, CheckCircle, ExternalLink } from 'lucide-react';
+import { Youtube, Instagram, ArrowRight, Play, Sparkles, BarChart3, Database, Table, Filter, BrainCircuit, GraduationCap, Briefcase, HeartHandshake, TrendingUp, CheckCircle, ExternalLink, Quote, Star, MessageSquare } from 'lucide-react';
 import { trackSocialClick, trackCtaClick, trackCourseClick, trackProjectClick, trackBlogClick } from '../lib/analytics';
 
 interface HomePageProps {
@@ -222,16 +222,30 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate, onSelectProject,
                 Featured BI Dashboards
               </h2>
             </div>
-            <a
-              href="/projects"
-              onClick={(e) => {
-                e.preventDefault();
-                onNavigate('projects');
-              }}
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-purple-600 dark:text-purple-400 hover:underline"
-            >
-              View All 6 Portfolio Projects <ArrowRight className="w-4 h-4" />
-            </a>
+            <div className="flex flex-wrap items-center gap-3">
+              <a
+                href="/power-bi-demo"
+                onClick={(e) => {
+                  e.preventDefault();
+                  trackCtaClick('Explore Live Power BI Demo', 'power-bi-demo');
+                  onNavigate('power-bi-demo');
+                }}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-xs transition-colors cursor-pointer"
+              >
+                <BarChart3 className="w-3.5 h-3.5" />
+                <span>Explore Live Power BI Demo →</span>
+              </a>
+              <a
+                href="/projects"
+                onClick={(e) => {
+                  e.preventDefault();
+                  onNavigate('projects');
+                }}
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-purple-600 dark:text-purple-400 hover:underline"
+              >
+                View All 6 Portfolio Projects <ArrowRight className="w-4 h-4" />
+              </a>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -289,6 +303,88 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate, onSelectProject,
             ))}
           </div>
         </div>
+      </section>
+
+      {/* ----------------- WHAT PEOPLE SAY / TESTIMONIALS SECTION ----------------- */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10">
+        <div className="text-center space-y-3 max-w-2xl mx-auto">
+          <span className="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300">
+            Community Voices
+          </span>
+          <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white">
+            What People Say
+          </h2>
+          <p className="text-slate-600 dark:text-slate-400 text-sm">
+            Hear how ProBItian tutorials, data modeling guides, and portfolio projects help data professionals advance their skills.
+          </p>
+        </div>
+
+        {homeConfig?.testimonials && homeConfig.testimonials.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {homeConfig.testimonials.map((t) => (
+              <div
+                key={t.id}
+                className="card-radius bg-white dark:bg-slate-800/90 p-6 border border-slate-200 dark:border-slate-700/80 shadow-soft hover:shadow-soft-lg transition-all flex flex-col justify-between space-y-4"
+              >
+                <div className="space-y-3">
+                  <div className="flex items-center gap-1 text-amber-400">
+                    {[...Array(5)].map((_, i) => (
+                      <Star key={i} className="w-4 h-4 fill-current" />
+                    ))}
+                  </div>
+                  <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 italic leading-relaxed">
+                    "{t.quote}"
+                  </p>
+                </div>
+
+                <div className="pt-3 border-t border-slate-100 dark:border-slate-700/60 flex items-center gap-3">
+                  {t.avatar ? (
+                    <img src={t.avatar} alt={t.author} className="w-10 h-10 rounded-full object-cover" />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-purple-100 dark:bg-purple-900/60 text-purple-700 dark:text-purple-300 font-bold flex items-center justify-center text-xs">
+                      {t.author.slice(0, 2).toUpperCase()}
+                    </div>
+                  )}
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-900 dark:text-white">{t.author}</h4>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">{t.role}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="card-radius bg-slate-50 dark:bg-slate-800/50 p-8 border border-dashed border-slate-300 dark:border-slate-700 text-center space-y-4 max-w-3xl mx-auto">
+            <div className="w-12 h-12 rounded-full bg-purple-100 dark:bg-purple-900/40 text-purple-600 dark:text-purple-300 mx-auto flex items-center justify-center">
+              <MessageSquare className="w-6 h-6" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                Share Your ProBitian Learning Experience
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 max-w-lg mx-auto">
+                Have you landed a data role or built an enterprise dashboard using our tutorials? We would love to feature your journey.
+              </p>
+            </div>
+            <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
+              <button
+                onClick={() => onNavigate('contact')}
+                className="btn-radius px-5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold transition-colors cursor-pointer"
+              >
+                Submit Your Feedback
+              </button>
+              <a
+                href="https://youtube.com/@probitian"
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => trackSocialClick('youtube', 'https://youtube.com/@probitian')}
+                className="btn-radius px-5 py-2.5 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-600 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors"
+              >
+                Join Community Discussions
+              </a>
+            </div>
+          </div>
+        )}
       </section>
 
       {/* ----------------- LATEST CONTENT (YOUTUBE & BLOGS) ----------------- */}

@@ -24,6 +24,25 @@ export interface SocialLinkConfig {
   display_order: number;
 }
 
+export interface HomePageButtonConfig {
+  label: string;
+  path: string;
+  primary: boolean;
+}
+
+export interface HomePageStatConfig {
+  label: string;
+  value: string;
+}
+
+export interface HomePageConfigData {
+  hero_heading: string;
+  hero_description: string;
+  buttons: HomePageButtonConfig[];
+  banner_url: string;
+  statistics: HomePageStatConfig[];
+}
+
 // Centralized default social connections configuration
 export const DEFAULT_SOCIAL_LINKS: SocialLinkConfig[] = [
   { id: '1', platform: 'youtube', url: PROBITIAN_YOUTUBE_URL, icon: 'Youtube', is_active: true, display_order: 1 },
@@ -34,4 +53,20 @@ export const DEFAULT_SOCIAL_LINKS: SocialLinkConfig[] = [
   { id: '6', platform: 'linkedin', url: PROBITIAN_LINKEDIN_URL, icon: 'Linkedin', is_active: true, display_order: 6 },
   { id: '7', platform: 'x', url: PROBITIAN_X_URL, icon: 'X', is_active: true, display_order: 7 }
 ];
+
+export const DEFAULT_HOME_CONFIG: HomePageConfigData = {
+  hero_heading: 'Master Business Intelligence with Real-World Projects',
+  hero_description: 'Master Power BI, SQL, Excel, AI and Dashboard Design through practical projects and industry-focused tutorials.',
+  buttons: [
+    { label: 'Start Learning', path: 'https://youtube.com/@probitian', primary: true },
+    { label: 'Follow on Instagram', path: 'https://instagram.com/probitian', primary: false }
+  ],
+  banner_url: '/banner.svg',
+  statistics: [
+    { label: 'Free Tutorials', value: '100+' },
+    { label: 'Portfolio Projects', value: '25+' },
+    { label: 'YouTube Learners', value: '10K+' },
+    { label: 'Career Resources', value: '50+' }
+  ]
+};
 

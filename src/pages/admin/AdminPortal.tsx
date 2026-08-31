@@ -282,8 +282,14 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
           </div>
 
           <div className="pt-6 border-t border-slate-200 dark:border-slate-800 space-y-1 text-[11px] text-slate-500 dark:text-slate-500">
-            <p className="font-semibold text-slate-700 dark:text-slate-400">ProBItian CMS v2.5</p>
-            <p>Supabase Auth & DB Configured</p>
+            <div className="flex items-center justify-between font-semibold text-slate-700 dark:text-slate-400">
+              <span>ProBitian Core</span>
+              <span className="font-mono text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700">v1.1.0</span>
+            </div>
+            <p className="flex items-center gap-1.5 text-[10px]">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
+              <span>Production Ready (Secure RBAC)</span>
+            </p>
           </div>
         </aside>
 

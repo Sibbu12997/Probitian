@@ -29,11 +29,14 @@ describe('CMS Settings and Endpoints Verification', () => {
     }
   });
 
-  test('GET /api/cms/settings/home returns 200 JSON (or null default) and never 404', async () => {
+  test('GET /api/cms/settings/home returns 200 JSON with home configuration schema and never 404', async () => {
     const res = await fetch(`${baseUrl}/api/cms/settings/home`);
     assert.strictEqual(res.status, 200);
     const data = await res.json();
-    assert.ok(data !== undefined);
+    assert.ok(data !== null && typeof data === 'object');
+    assert.ok(typeof data.hero_heading === 'string');
+    assert.ok(Array.isArray(data.buttons));
+    assert.ok(Array.isArray(data.statistics));
   });
 
   test('GET /api/cms/settings/seo returns 200 JSON', async () => {
