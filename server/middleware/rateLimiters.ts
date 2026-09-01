@@ -21,6 +21,8 @@ export interface SharedStoreProvider {
 export class DistributedRateLimitStore {
   private localHits = new Map<string, { count: number; resetTime: number }>();
   private provider: SharedStoreProvider | null = null;
+  private providerUnavailableUntil = 0;
+  private hasLoggedProviderError = false;
 
   setProvider(provider: SharedStoreProvider) {
     this.provider = provider;
@@ -32,15 +34,24 @@ export class DistributedRateLimitStore {
     allowed: boolean;
     remaining: number;
   }> {
-    if (this.provider) {
+    const now = Date.now();
+
+    if (this.provider && now >= this.providerUnavailableUntil) {
       try {
-        return await this.provider.incrementAtomic(key, windowMs, max);
-      } catch (err) {
-        console.warn(`[RateLimitStore] Remote provider failed for key ${key}, using in-memory store.`, err);
+        const result = await this.provider.incrementAtomic(key, windowMs, max);
+        this.hasLoggedProviderError = false;
+        return result;
+      } catch (err: any) {
+        // If RPC function is not found or remote database is unreachable, back off remote provider for 5 minutes
+        this.providerUnavailableUntil = now + 5 * 60 * 1000;
+        if (!this.hasLoggedProviderError) {
+          this.hasLoggedProviderError = true;
+          const msg = err?.message || err?.code || 'Remote provider error';
+          console.info(`[RateLimitStore] Remote rate limit store unavailable (${msg}), seamlessly falling back to in-memory store.`);
+        }
       }
     }
 
-    const now = Date.now();
     const existing = this.localHits.get(key);
 
     if (!existing || now > existing.resetTime) {
