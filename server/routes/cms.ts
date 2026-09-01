@@ -3,7 +3,7 @@ import crypto from 'crypto';
 import path from 'path';
 import { requireAuth, requirePermission } from '../auth/rbac';
 import { Permission } from '../auth/types';
-import { isValidId, isValidUuid, PROBITIAN_MEDIA_BUCKET, DEFAULT_HOME_CONFIG } from '../config/constants';
+import { isValidId, isValidUuid, PROBITIAN_MEDIA_BUCKET, DEFAULT_HOME_CONFIG, DEFAULT_FOUNDER_MESSAGE } from '../config/constants';
 import { contactLimiter, uploadLimiter } from '../middleware/rateLimiters';
 import { serverSupabase, readCmsData, writeCmsData } from '../services/supabase';
 import { sanitizeSvgString, validateFileSignature } from '../security/sanitizer';
@@ -1012,6 +1012,7 @@ router.get('/cms/settings/:key', async (req, res) => {
 
   const getDefaultSetting = (settingKey: string) => {
     if (settingKey === 'home') return DEFAULT_HOME_CONFIG;
+    if (settingKey === 'founder_message' || settingKey === 'founder') return DEFAULT_FOUNDER_MESSAGE;
     return null;
   };
 
@@ -1065,8 +1066,8 @@ router.get('/cms/settings/:key', async (req, res) => {
   }
 });
 
-// POST /api/cms/settings/:key (Protected: Admin only)
-router.post('/cms/settings/:key', requireAuth, requirePermission(Permission.MANAGE_SYSTEM), async (req, res) => {
+// POST /api/cms/settings/:key (Protected: Editor / Admin)
+router.post('/cms/settings/:key', requireAuth, requirePermission(Permission.EDIT_CONTENT), async (req, res) => {
   const { key } = req.params;
   const payload = req.body;
 
@@ -1076,7 +1077,7 @@ router.post('/cms/settings/:key', requireAuth, requirePermission(Permission.MANA
         key,
         value: payload,
         updated_at: new Date().toISOString()
-      });
+      }, { onConflict: 'key' });
       if (error) {
         return res.status(500).json({ error: 'Failed to save setting' });
       }
@@ -1124,8 +1125,8 @@ router.get('/cms/settings', async (req, res) => {
   }
 });
 
-// POST /api/cms/settings (Protected: Admin only)
-router.post('/cms/settings', requireAuth, requirePermission(Permission.MANAGE_SYSTEM), async (req, res) => {
+// POST /api/cms/settings (Protected: Editor / Admin)
+router.post('/cms/settings', requireAuth, requirePermission(Permission.EDIT_CONTENT), async (req, res) => {
   const setting = req.body;
   if (!setting || !setting.key) {
     return res.status(400).json({ error: 'Invalid setting payload' });
@@ -1136,7 +1137,7 @@ router.post('/cms/settings', requireAuth, requirePermission(Permission.MANAGE_SY
       const { error } = await serverSupabase.from('settings').upsert({
         ...setting,
         updated_at: new Date().toISOString()
-      });
+      }, { onConflict: 'key' });
       if (error) {
         return res.status(500).json({ error: 'Failed to save setting' });
       }

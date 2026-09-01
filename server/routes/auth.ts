@@ -69,7 +69,8 @@ router.post('/admin/verify-passkey', loginLimiter, (req, res) => {
     return res.json({ 
       success: true, 
       email: adminEmail, 
-      role 
+      role,
+      token: session.token
     });
   }
 
@@ -152,7 +153,8 @@ router.post('/admin/verify-supabase-session', loginLimiter, async (req, res) => 
     return res.json({ 
       success: true, 
       email: userEmail, 
-      role 
+      role,
+      token: session.token
     });
   } catch (err) {
     console.error('[Admin Supabase Session Verification Error]', err);
@@ -168,7 +170,8 @@ router.get('/admin/session', (req, res) => {
       authenticated: true, 
       email: session.email, 
       role: session.role,
-      userId: session.userId 
+      userId: session.userId,
+      token: session.token
     });
   }
   return res.json({ authenticated: false });

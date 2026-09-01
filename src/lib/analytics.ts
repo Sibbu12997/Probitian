@@ -117,6 +117,7 @@ const sanitizeParams = (params?: Record<string, any>): Record<string, any> => {
  * Tracks SPA page views in GA4
  */
 export const trackPageView = (pagePath: string, pageTitle?: string) => {
+  if (!hasOptionalConsent()) return;
   initGA();
   const measurementId = getMeasurementId();
   if (typeof window !== 'undefined' && window.gtag) {
@@ -138,6 +139,7 @@ export const trackPageView = (pagePath: string, pageTitle?: string) => {
  * Generic event tracker
  */
 export const trackEvent = (eventName: string, parameters?: Record<string, any>) => {
+  if (!hasOptionalConsent()) return;
   initGA();
   if (typeof window !== 'undefined' && window.gtag) {
     const safeParams = sanitizeParams({

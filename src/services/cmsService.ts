@@ -2,6 +2,7 @@ import {
   WebsiteGeneralSettings,
   SeoSettings,
   HomePageConfig,
+  FounderMessageConfig,
   ProjectItem,
   BlogArticle,
   LearnTopic,
@@ -25,18 +26,39 @@ import {
   SequenceDeliveryLog
 } from '../types';
 import { LegalSettings, DEFAULT_LEGAL_SETTINGS } from '../data/defaultLegalData';
+import { DEFAULT_FOUNDER_MESSAGE } from '../data/defaultFounderData';
 import { PROBITIAN_LOGO_URL, PROBITIAN_X_URL, DEFAULT_SOCIAL_LINKS, DEFAULT_HOME_CONFIG } from '../constants/branding';
 import { PROJECTS, BLOG_ARTICLES, LEARN_TOPICS, YOUTUBE_VIDEOS } from '../data/mockData';
+
+/**
+ * Retrieve admin authentication headers if an admin session token exists
+ */
+function getAdminAuthHeaders(): Record<string, string> {
+  try {
+    if (typeof window !== 'undefined') {
+      const token = localStorage.getItem('admin_session_token');
+      if (token && typeof token === 'string' && token.trim()) {
+        return {
+          'Authorization': `Bearer ${token.trim()}`,
+          'x-admin-token': token.trim()
+        };
+      }
+    }
+  } catch {}
+  return {};
+}
 
 /**
  * Safe fetch helper for Express API routes (Single source of truth: Supabase via Express)
  * Includes retry mechanism for transient server boot / reverse proxy cold starts.
  */
 async function safeFetchJson<T = any>(url: string, options?: RequestInit, maxRetries = 2): Promise<T> {
+  const authHeaders = getAdminAuthHeaders();
   const fetchOptions: RequestInit = {
     credentials: 'include',
     ...options,
     headers: {
+      ...authHeaders,
       ...options?.headers
     }
   };
@@ -250,6 +272,45 @@ export const cmsService = {
       return Boolean(res && res.success !== false);
     } catch (e: any) {
       console.error('Failed to save home config via Express API:', e?.message || e);
+      return false;
+    }
+  },
+
+  // --- FOUNDER / CEO MESSAGE ---
+  async getFounderMessage(): Promise<FounderMessageConfig> {
+    try {
+      const data = await safeFetchJson<FounderMessageConfig | null>('/api/cms/settings/founder_message');
+      if (data && typeof data === 'object' && (data.name || data.heading || data.message_paragraphs)) {
+        return {
+          ...DEFAULT_FOUNDER_MESSAGE,
+          ...data,
+          message_paragraphs: Array.isArray(data.message_paragraphs) && data.message_paragraphs.length > 0
+            ? data.message_paragraphs
+            : DEFAULT_FOUNDER_MESSAGE.message_paragraphs,
+          highlights: Array.isArray(data.highlights) && data.highlights.length > 0
+            ? data.highlights
+            : DEFAULT_FOUNDER_MESSAGE.highlights,
+          social_links: Array.isArray(data.social_links) && data.social_links.length > 0
+            ? data.social_links
+            : DEFAULT_FOUNDER_MESSAGE.social_links
+        } as FounderMessageConfig;
+      }
+      return DEFAULT_FOUNDER_MESSAGE as FounderMessageConfig;
+    } catch {
+      return DEFAULT_FOUNDER_MESSAGE as FounderMessageConfig;
+    }
+  },
+
+  async saveFounderMessage(config: FounderMessageConfig): Promise<boolean> {
+    try {
+      const res = await safeFetchJson<{ success?: boolean }>('/api/cms/settings/founder_message', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(config)
+      });
+      return Boolean(res && res.success !== false);
+    } catch (e: any) {
+      console.error('Failed to save founder message via Express API:', e?.message || e);
       return false;
     }
   },
@@ -1343,6 +1404,7 @@ export const cmsService = {
       general: await this.getGeneralSettings(),
       seo: await this.getSeoSettings(),
       homePage: await this.getHomePageConfig(),
+      founderMessage: await this.getFounderMessage(),
       projects: await this.getProjects(),
       blogs: await this.getBlogs(),
       courses: await this.getCourses(),
@@ -1362,6 +1424,7 @@ export const cmsService = {
     if (data.general) await this.saveGeneralSettings(data.general);
     if (data.seo) await this.saveSeoSettings(data.seo);
     if (data.homePage) await this.saveHomePageConfig(data.homePage);
+    if (data.founderMessage) await this.saveFounderMessage(data.founderMessage);
     if (data.projects && Array.isArray(data.projects)) {
       for (const p of data.projects) await this.saveProject(p);
     }

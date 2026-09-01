@@ -5,6 +5,7 @@ import { Header } from '../../components/Header';
 import { Footer } from '../../components/Footer';
 import { ProjectModal } from '../../components/ProjectModal';
 import { BlogModal } from '../../components/BlogModal';
+import { CookieConsentBanner } from '../../components/CookieConsentBanner';
 import { PageRenderer } from './PageRenderer';
 import { PageSeoMeta } from '../seo/usePageSeo';
 
@@ -107,6 +108,9 @@ export const AppShell: React.FC<AppShellProps> = ({
         article={selectedBlog}
         onClose={onCloseBlogModal}
       />
+
+      {/* Cookie & Privacy Consent Banner */}
+      <CookieConsentBanner onNavigate={onNavigate} />
     </div>
   );
 };

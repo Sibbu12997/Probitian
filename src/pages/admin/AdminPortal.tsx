@@ -24,12 +24,14 @@ import {
   Sparkles,
   Sun,
   Moon,
-  Scale
+  Scale,
+  Quote
 } from 'lucide-react';
 
 import { Palette } from 'lucide-react';
 import { PROBITIAN_LOGO_URL } from '../../constants/branding';
 import { BrandingManager } from './modules/BrandingManager';
+import { FounderMessageManager } from './modules/FounderMessageManager';
 import { DashboardOverview } from './modules/DashboardOverview';
 import { AnalyticsManager } from './modules/AnalyticsManager';
 import { HomePageManager } from './modules/HomePageManager';
@@ -91,6 +93,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       group: 'Content Manager',
       items: [
         { id: 'homepage', label: 'Home Page Editor', icon: Home },
+        { id: 'founder', label: 'Founder & CEO Message', icon: Quote },
         { id: 'projects', label: 'Projects Portfolio', icon: FolderKanban },
         { id: 'blog', label: 'Blog & Articles', icon: Newspaper },
         { id: 'learn', label: 'Learn & Courses', icon: GraduationCap },
@@ -144,6 +147,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
         />
       );
       case 'homepage': return <HomePageManager />;
+      case 'founder': return <FounderMessageManager />;
       case 'projects': return <ProjectsManager />;
       case 'blog': return <BlogManager />;
       case 'learn': return <LearnManager />;

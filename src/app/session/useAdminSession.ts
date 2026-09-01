@@ -18,10 +18,27 @@ export function useAdminSession(): AdminSessionState {
     let isMounted = true;
     async function checkSession() {
       try {
-        const res = await fetch('/api/admin/session', { credentials: 'include' });
+        const headers: Record<string, string> = {};
+        try {
+          const token = localStorage.getItem('admin_session_token');
+          if (token && token.trim()) {
+            headers['Authorization'] = `Bearer ${token.trim()}`;
+            headers['x-admin-token'] = token.trim();
+          }
+        } catch {}
+
+        const res = await fetch('/api/admin/session', { 
+          credentials: 'include',
+          headers
+        });
         if (res.ok) {
           const data = await res.json();
           if (isMounted && data.authenticated && data.email) {
+            if (data.token) {
+              try {
+                localStorage.setItem('admin_session_token', data.token);
+              } catch {}
+            }
             setAdminUser(data.email);
             setAdminRole(data.role || 'admin');
           }
@@ -47,12 +64,29 @@ export function useAdminSession(): AdminSessionState {
 
   const handleAdminLogout = useCallback(async () => {
     try {
-      await fetch('/api/admin/logout', { method: 'POST', credentials: 'include' });
+      const headers: Record<string, string> = {};
+      try {
+        const token = localStorage.getItem('admin_session_token');
+        if (token && token.trim()) {
+          headers['Authorization'] = `Bearer ${token.trim()}`;
+          headers['x-admin-token'] = token.trim();
+        }
+      } catch {}
+
+      await fetch('/api/admin/logout', { 
+        method: 'POST', 
+        credentials: 'include',
+        headers
+      });
     } catch (e) {
       console.warn('Logout error:', e);
+    } finally {
+      try {
+        localStorage.removeItem('admin_session_token');
+      } catch {}
+      setAdminUser(null);
+      setAdminRole(null);
     }
-    setAdminUser(null);
-    setAdminRole(null);
   }, []);
 
   return {

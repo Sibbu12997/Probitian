@@ -43,6 +43,11 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
 
         if (response.ok) {
           const resData = await response.json();
+          if (resData.token) {
+            try {
+              localStorage.setItem('admin_session_token', resData.token);
+            } catch {}
+          }
           onLoginSuccess(resData.email || userEmail);
         } else {
           const errData = await response.json().catch(() => null);
@@ -70,6 +75,11 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
 
           if (sessionRes.ok) {
             const resData = await sessionRes.json();
+            if (resData.token) {
+              try {
+                localStorage.setItem('admin_session_token', resData.token);
+              } catch {}
+            }
             onLoginSuccess(resData.email || data.user.email || userEmail);
           } else {
             const errData = await sessionRes.json().catch(() => null);

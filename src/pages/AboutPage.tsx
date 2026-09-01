@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { NavPage } from '../types';
 import { cmsService } from '../services/cmsService';
 import { BannerGraphic } from '../components/BannerGraphic';
+import { FounderMessageSection } from '../components/FounderMessageSection';
 import { 
   BookOpen, 
   FolderKanban, 
@@ -18,11 +19,7 @@ import {
   Instagram, 
   Linkedin,
   Mail, 
-  GraduationCap,
-  Quote,
-  Award,
-  CheckCircle2,
-  Target
+  GraduationCap
 } from 'lucide-react';
 import { XIcon } from '../components/icons/XIcon';
 import { trackSocialClick, trackContactClick } from '../lib/analytics';
@@ -181,6 +178,9 @@ export const AboutPage: React.FC<AboutPageProps> = ({ onNavigate }) => {
         </div>
       </div>
 
+      {/* Founder & Lead Instructor Editorial Message (CMS Managed) */}
+      <FounderMessageSection contactEmail={contactEmail} />
+
       {/* What You Can Learn Section */}
       <div className="space-y-8 bg-slate-50 dark:bg-slate-900/60 p-8 sm:p-12 rounded-3xl border border-slate-200 dark:border-slate-800">
         <div className="text-center max-w-2xl mx-auto space-y-2">
@@ -215,133 +215,6 @@ export const AboutPage: React.FC<AboutPageProps> = ({ onNavigate }) => {
               </div>
             );
           })}
-        </div>
-      </div>
-
-      {/* Founder & Lead Instructor Message */}
-      <div className="card-radius bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-soft overflow-hidden">
-        <div className="p-8 sm:p-12 space-y-8">
-          <div className="flex flex-col lg:flex-row gap-8 lg:gap-12 items-start">
-            {/* Left: Founder Profile Identity Card */}
-            <div className="w-full lg:w-80 shrink-0 space-y-5 bg-slate-50 dark:bg-slate-800/60 p-6 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 text-center flex flex-col items-center">
-              <div className="relative">
-                <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-gradient-to-br from-purple-600 via-indigo-600 to-amber-500 p-1 shadow-lg flex items-center justify-center text-white text-3xl font-black">
-                  <span className="tracking-wider">SS</span>
-                </div>
-                <div className="absolute bottom-0 right-0 p-1.5 rounded-full bg-emerald-500 text-white shadow-md" title="Verified Instructor">
-                  <CheckCircle2 className="w-4 h-4" />
-                </div>
-              </div>
-
-              <div className="space-y-1 text-center">
-                <h3 className="text-xl font-extrabold text-slate-900 dark:text-white">
-                  Shivam Singh
-                </h3>
-                <p className="text-xs font-semibold text-purple-600 dark:text-purple-400">
-                  Founder & Lead BI Instructor
-                </p>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 pt-1">
-                  Data Analyst & Business Intelligence Specialist
-                </p>
-              </div>
-
-              <div className="w-full pt-3 border-t border-slate-200 dark:border-slate-700/60 flex flex-wrap items-center justify-center gap-2">
-                <a
-                  href="https://www.linkedin.com/company/probitian/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={() => trackSocialClick('linkedin', 'https://www.linkedin.com/company/probitian/')}
-                  className="p-2 rounded-lg bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:text-[#0077b5] dark:hover:text-blue-400 transition-colors shadow-xs"
-                  aria-label="Shivam Singh LinkedIn"
-                >
-                  <Linkedin className="w-4 h-4" />
-                </a>
-                <a
-                  href="https://youtube.com/@probitian"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={() => trackSocialClick('youtube', 'https://youtube.com/@probitian')}
-                  className="p-2 rounded-lg bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:text-red-500 transition-colors shadow-xs"
-                  aria-label="Shivam Singh YouTube"
-                >
-                  <Youtube className="w-4 h-4" />
-                </a>
-                <a
-                  href="https://x.com/Probitian"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={() => trackSocialClick('x', 'https://x.com/Probitian')}
-                  className="p-2 rounded-lg bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:text-slate-950 dark:hover:text-white transition-colors shadow-xs"
-                  aria-label="Shivam Singh X"
-                >
-                  <XIcon className="w-4 h-4" />
-                </a>
-                <a
-                  href={`mailto:${contactEmail}`}
-                  onClick={() => trackContactClick('founder_message_email')}
-                  className="p-2 rounded-lg bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:text-purple-600 transition-colors shadow-xs"
-                  aria-label="Email Shivam Singh"
-                >
-                  <Mail className="w-4 h-4" />
-                </a>
-              </div>
-            </div>
-
-            {/* Right: Message Content */}
-            <div className="flex-1 space-y-6">
-              <div className="space-y-2">
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300">
-                  <Quote className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
-                  <span>Founder's Note</span>
-                </div>
-                <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white">
-                  Why We Built Pro<span className="text-amber-500 font-black">BI</span>tian
-                </h2>
-              </div>
-
-              <div className="space-y-4 text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
-                <p>
-                  "When I started building business intelligence solutions for real enterprises, I noticed a huge disconnect in how data analytics was taught online. Most resources focused exclusively on memorizing tool syntax and toy datasets, leaving learners unprepared for the real challenges of messy source tables, complex DAX calculations, and executive decision-making."
-                </p>
-                <p>
-                  "I created ProBitian to provide an authentic, project-first learning platform. Our mission is simple: to make enterprise-grade Power BI, SQL, and data modeling accessible, practical, and directly applicable to advancing your analytics career."
-                </p>
-              </div>
-
-              {/* Three Core Guiding Commitments */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t border-slate-100 dark:border-slate-800">
-                <div className="space-y-1.5 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-700/50">
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-slate-900 dark:text-white">
-                    <Target className="w-4 h-4 text-amber-500" />
-                    <span>Project-First</span>
-                  </div>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                    Learn by building end-to-end portfolio dashboards with real enterprise schemas.
-                  </p>
-                </div>
-
-                <div className="space-y-1.5 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-700/50">
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-slate-900 dark:text-white">
-                    <Award className="w-4 h-4 text-purple-500" />
-                    <span>Industry Rigor</span>
-                  </div>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                    Deep dive into star schemas, DAX optimization, and clean Power Query M transformations.
-                  </p>
-                </div>
-
-                <div className="space-y-1.5 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-700/50">
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-slate-900 dark:text-white">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                    <span>Career Ready</span>
-                  </div>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                    Develop tangible proof-of-work that helps you stand out in technical interviews.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
 

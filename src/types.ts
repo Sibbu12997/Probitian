@@ -391,4 +391,38 @@ export interface SequenceDeliveryLog {
   sent_at: string;
 }
 
+// ==================== FOUNDER / CEO MESSAGE ====================
+
+export interface FounderHighlight {
+  id: string;
+  icon: string;
+  title: string;
+  description: string;
+}
+
+export interface FounderSocialLink {
+  platform: 'linkedin' | 'youtube' | 'x' | 'email' | 'instagram' | 'github' | string;
+  url: string;
+  enabled: boolean;
+}
+
+export interface FounderMessageConfig {
+  enabled: boolean;
+  name: string;
+  role: string;
+  bio_subtitle?: string;
+  avatar_url?: string;
+  media_id?: string;
+  badge_text?: string;
+  heading?: string;
+  heading_highlight?: string;
+  message_paragraphs: string[];
+  highlights?: FounderHighlight[];
+  social_links?: FounderSocialLink[];
+  show_verified_badge?: boolean;
+  signature_text?: string;
+  quote_callout?: string;
+  updated_at?: string;
+}
+
 

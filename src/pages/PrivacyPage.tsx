@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { NavPage } from '../types';
-import { ShieldCheck, ArrowLeft, FileText, Mail, Calendar, Lock } from 'lucide-react';
+import { ShieldCheck, ArrowLeft, FileText, Mail, Calendar, Lock, Cookie } from 'lucide-react';
 import { cmsService } from '../services/cmsService';
 import { LegalSettings, DEFAULT_LEGAL_SETTINGS } from '../data/defaultLegalData';
+import { getCookieConsent } from '../lib/cookieConsent';
 
 interface PrivacyPageProps {
   onNavigate: (page: NavPage) => void;
@@ -95,6 +96,27 @@ export const PrivacyPage: React.FC<PrivacyPageProps> = ({ onNavigate }) => {
             </section>
           ))
         )}
+
+        {/* Cookie & Tracking Preferences Management */}
+        <div className="mt-8 p-5 rounded-2xl bg-purple-50/60 dark:bg-purple-950/30 border border-purple-200/80 dark:border-purple-800/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <h4 className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <Cookie className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+              Cookie &amp; Tracking Preferences
+            </h4>
+            <p className="text-xs text-slate-600 dark:text-slate-400">
+              Manage your choice between strictly necessary storage and optional analytics tracking.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => window.dispatchEvent(new CustomEvent('probitian_open_cookie_preferences'))}
+            className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs transition-all cursor-pointer shrink-0 shadow-xs"
+          >
+            Cookie Preferences
+          </button>
+        </div>
 
         {/* Contact Footer Banner inside card */}
         <div className="mt-8 p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/60 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">

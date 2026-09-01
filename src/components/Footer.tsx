@@ -274,9 +274,16 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
         {/* Bottom Bar */}
         <div className="pt-8 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-400 gap-4">
           <p>© 2026 ProBItian. All Rights Reserved.</p>
-          <div className="flex items-center gap-6">
+          <div className="flex flex-wrap items-center gap-6">
             <a href="/privacy" onClick={(e) => { e.preventDefault(); onNavigate('privacy'); }} className="hover:text-purple-400 transition-colors">Privacy Policy</a>
             <a href="/terms" onClick={(e) => { e.preventDefault(); onNavigate('terms'); }} className="hover:text-purple-400 transition-colors">Terms of Service</a>
+            <button 
+              type="button"
+              onClick={() => window.dispatchEvent(new CustomEvent('probitian_open_cookie_preferences'))} 
+              className="hover:text-purple-400 transition-colors cursor-pointer bg-transparent border-0 p-0 text-xs text-slate-400"
+            >
+              Cookie Preferences
+            </button>
             <a href="/contact" onClick={(e) => { e.preventDefault(); onNavigate('contact'); }} className="hover:text-purple-400 transition-colors">Support</a>
             <a href="/admin" onClick={(e) => { e.preventDefault(); onNavigate('admin'); }} className="hover:text-amber-400 font-semibold transition-colors text-amber-500/80">Admin Portal</a>
           </div>
