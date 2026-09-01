@@ -11,10 +11,14 @@ import {
   Compass, 
   Cpu, 
   Database,
+  Rocket,
+  TrendingUp,
+  BarChart3,
+  ShieldCheck,
+  Briefcase,
   Linkedin,
   Youtube,
-  Mail,
-  ExternalLink
+  Mail
 } from 'lucide-react';
 import { XIcon } from './icons/XIcon';
 import { cmsService } from '../services/cmsService';
@@ -25,14 +29,19 @@ import { trackSocialClick, trackContactClick } from '../lib/analytics';
 const AVAILABLE_ICONS: { [key: string]: React.ElementType } = {
   Target,
   Award,
+  GraduationCap,
   CheckCircle2,
   Sparkles,
   BookOpen,
-  GraduationCap,
   Lightbulb,
   Compass,
   Cpu,
-  Database
+  Database,
+  Rocket,
+  TrendingUp,
+  BarChart3,
+  ShieldCheck,
+  Briefcase
 };
 
 interface FounderMessageSectionProps {
@@ -98,36 +107,54 @@ export const FounderMessageSection: React.FC<FounderMessageSectionProps> = ({
     ? config.signature_text.replace(/^[—–-]\s*/, '').trim() 
     : '';
 
+  // Extract signature name and role cleanly
+  let signatureName = config.name || 'Shivam Singh';
+  let signatureRole = config.role || '';
+
+  if (cleanSignature) {
+    if (cleanSignature.includes('\n')) {
+      const lines = cleanSignature.split('\n').map(l => l.trim()).filter(Boolean);
+      signatureName = lines[0];
+      if (lines.length > 1) signatureRole = lines.slice(1).join(' ');
+    } else if (config.role && cleanSignature.includes(config.role)) {
+      signatureName = cleanSignature.replace(config.role, '').trim() || config.name;
+      signatureRole = config.role;
+    } else {
+      signatureName = cleanSignature;
+    }
+  }
+
   return (
     <section 
       aria-labelledby="founder-message-heading"
-      className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-sm overflow-hidden transition-all duration-300"
+      className="space-y-8 sm:space-y-12 transition-all duration-300"
     >
-      <div className="p-6 sm:p-10 lg:p-12 space-y-8 lg:space-y-10">
-        <div className="flex flex-col lg:flex-row gap-8 lg:gap-12 items-start">
-          
-          {/* Left Column: Founder Portrait & Identity */}
-          <div className="w-full lg:w-72 shrink-0 flex flex-col items-center lg:items-start text-center lg:text-left space-y-4">
-            <div className="relative">
+      {/* Top Main Editorial Composition: Founder Identity Card (Left) + Story & Message (Right) */}
+      <div className="flex flex-col lg:flex-row gap-8 lg:gap-12 items-center lg:items-start">
+        
+        {/* Left Column: Founder Portrait & Identity Card */}
+        <div className="w-full max-w-sm lg:w-[320px] xl:w-[340px] shrink-0">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-6 sm:p-7 shadow-xs flex flex-col items-center text-center space-y-4">
+            
+            {/* Portrait Photograph */}
+            <div className="relative w-48 h-56 sm:w-56 sm:h-64 rounded-2xl overflow-hidden shadow-sm border border-slate-100 dark:border-slate-800 bg-slate-100 dark:bg-slate-800 shrink-0">
               {config.avatar_url && !imageError ? (
-                <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-2xl overflow-hidden shadow-md ring-1 ring-slate-900/10 dark:ring-white/10 bg-slate-100 dark:bg-slate-800">
-                  <img
-                    src={config.avatar_url}
-                    alt={config.name}
-                    referrerPolicy="no-referrer"
-                    onError={() => setImageError(true)}
-                    className="w-full h-full object-cover object-top"
-                  />
-                </div>
+                <img
+                  src={config.avatar_url}
+                  alt={config.name}
+                  referrerPolicy="no-referrer"
+                  onError={() => setImageError(true)}
+                  className="w-full h-full object-cover object-top"
+                />
               ) : (
-                <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-2xl bg-gradient-to-br from-purple-600 via-indigo-600 to-amber-500 shadow-md flex items-center justify-center text-white text-3xl font-black">
+                <div className="w-full h-full bg-gradient-to-br from-purple-600 via-indigo-600 to-amber-500 flex items-center justify-center text-white text-4xl font-black">
                   <span className="tracking-wider">{initials}</span>
                 </div>
               )}
 
               {config.show_verified_badge && (
                 <div 
-                  className="absolute -bottom-1.5 -right-1.5 p-1.5 rounded-full bg-emerald-500 text-white shadow-sm ring-2 ring-white dark:ring-slate-900" 
+                  className="absolute bottom-2.5 right-2.5 p-1.5 rounded-full bg-emerald-500 text-white shadow-sm ring-2 ring-white dark:ring-slate-900 flex items-center justify-center" 
                   title="Verified Instructor & Founder"
                 >
                   <CheckCircle2 className="w-3.5 h-3.5" />
@@ -135,15 +162,16 @@ export const FounderMessageSection: React.FC<FounderMessageSectionProps> = ({
               )}
             </div>
 
-            <div className="space-y-1">
-              <h3 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
+            {/* Founder Identity Meta */}
+            <div className="space-y-1 w-full">
+              <h3 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
                 {config.name}
               </h3>
-              <p className="text-xs sm:text-sm font-semibold text-purple-600 dark:text-purple-400">
+              <p className="text-xs sm:text-sm font-bold text-purple-600 dark:text-purple-400">
                 {config.role}
               </p>
               {config.bio_subtitle && (
-                <p className="text-xs text-slate-500 dark:text-slate-400 leading-normal pt-0.5">
+                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed pt-1">
                   {config.bio_subtitle}
                 </p>
               )}
@@ -151,7 +179,7 @@ export const FounderMessageSection: React.FC<FounderMessageSectionProps> = ({
 
             {/* Verified Social Channels */}
             {activeSocialLinks.length > 0 && (
-              <div className="flex flex-wrap items-center justify-center lg:justify-start gap-2 pt-1">
+              <div className="flex items-center justify-center gap-2.5 pt-1 w-full">
                 {activeSocialLinks.map((link) => {
                   if (link.platform === 'linkedin') {
                     return (
@@ -161,25 +189,24 @@ export const FounderMessageSection: React.FC<FounderMessageSectionProps> = ({
                         target="_blank"
                         rel="noopener noreferrer"
                         onClick={() => trackSocialClick('linkedin', link.url)}
-                        className="p-2 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-[#0077b5] dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-700/80 transition-colors border border-slate-200/60 dark:border-slate-700/60 shadow-2xs"
+                        className="w-9 h-9 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-850 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-[#0077b5] dark:hover:text-blue-400 flex items-center justify-center transition-all cursor-pointer shadow-2xs"
                         aria-label={`${config.name} on LinkedIn`}
                       >
                         <Linkedin className="w-4 h-4" />
                       </a>
                     );
                   }
-                  if (link.platform === 'youtube') {
+                  if (link.platform === 'email') {
+                    const mailTarget = link.url.startsWith('mailto:') ? link.url : `mailto:${link.url || contactEmail}`;
                     return (
                       <a
-                        key="youtube"
-                        href={link.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={() => trackSocialClick('youtube', link.url)}
-                        className="p-2 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-red-500 hover:bg-slate-100 dark:hover:bg-slate-700/80 transition-colors border border-slate-200/60 dark:border-slate-700/60 shadow-2xs"
-                        aria-label={`${config.name} on YouTube`}
+                        key="email"
+                        href={mailTarget}
+                        onClick={() => trackContactClick('founder_message_email')}
+                        className="w-9 h-9 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-850 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-purple-600 flex items-center justify-center transition-all cursor-pointer shadow-2xs"
+                        aria-label={`Email ${config.name}`}
                       >
-                        <Youtube className="w-4 h-4" />
+                        <Mail className="w-4 h-4" />
                       </a>
                     );
                   }
@@ -191,24 +218,25 @@ export const FounderMessageSection: React.FC<FounderMessageSectionProps> = ({
                         target="_blank"
                         rel="noopener noreferrer"
                         onClick={() => trackSocialClick('x', link.url)}
-                        className="p-2 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-700/80 transition-colors border border-slate-200/60 dark:border-slate-700/60 shadow-2xs"
+                        className="w-9 h-9 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-850 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white flex items-center justify-center transition-all cursor-pointer shadow-2xs"
                         aria-label={`${config.name} on X`}
                       >
                         <XIcon className="w-4 h-4" />
                       </a>
                     );
                   }
-                  if (link.platform === 'email') {
-                    const mailTarget = link.url.startsWith('mailto:') ? link.url : `mailto:${link.url || contactEmail}`;
+                  if (link.platform === 'youtube') {
                     return (
                       <a
-                        key="email"
-                        href={mailTarget}
-                        onClick={() => trackContactClick('founder_message_email')}
-                        className="p-2 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-purple-600 hover:bg-slate-100 dark:hover:bg-slate-700/80 transition-colors border border-slate-200/60 dark:border-slate-700/60 shadow-2xs"
-                        aria-label={`Email ${config.name}`}
+                        key="youtube"
+                        href={link.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={() => trackSocialClick('youtube', link.url)}
+                        className="w-9 h-9 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-850 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-red-500 flex items-center justify-center transition-all cursor-pointer shadow-2xs"
+                        aria-label={`${config.name} on YouTube`}
                       >
-                        <Mail className="w-4 h-4" />
+                        <Youtube className="w-4 h-4" />
                       </a>
                     );
                   }
@@ -217,67 +245,77 @@ export const FounderMessageSection: React.FC<FounderMessageSectionProps> = ({
               </div>
             )}
           </div>
-
-          {/* Right Column: Editorial Note & Message */}
-          <div className="flex-1 space-y-5">
-            <div className="space-y-2">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-purple-50 dark:bg-purple-950/50 text-purple-700 dark:text-purple-300 border border-purple-200/60 dark:border-purple-800/40">
-                <Quote className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
-                <span>{config.badge_text || "Founder's Note"}</span>
-              </div>
-              <h2 id="founder-message-heading" className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight leading-tight">
-                {renderHeading()}
-              </h2>
-            </div>
-
-            {/* Narrative Paragraphs — Clean, highly readable body typography */}
-            <div className="space-y-4 text-base text-slate-700 dark:text-slate-300 leading-relaxed font-normal">
-              {paragraphs.map((paragraph, idx) => (
-                <p key={idx}>
-                  {paragraph}
-                </p>
-              ))}
-            </div>
-
-            {/* Founder Signature */}
-            {cleanSignature && (
-              <div className="pt-3">
-                <p className="text-base sm:text-lg font-bold text-slate-900 dark:text-white font-serif italic">
-                  — {cleanSignature}
-                </p>
-              </div>
-            )}
-          </div>
-
         </div>
 
-        {/* Core Guiding Commitments / Pillars (Secondary visual weight, spanning bottom) */}
-        {config.highlights && config.highlights.length > 0 && (
-          <div className="pt-6 sm:pt-8 border-t border-slate-100 dark:border-slate-800/80">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 sm:gap-4">
-              {config.highlights.map((highlight) => {
-                const IconComp = AVAILABLE_ICONS[highlight.icon] || Target;
-                return (
-                  <div 
-                    key={highlight.id || highlight.title}
-                    className="p-4 rounded-2xl bg-slate-50/70 dark:bg-slate-800/30 border border-slate-200/60 dark:border-slate-800/60 space-y-1.5 transition-colors hover:border-purple-500/30"
-                  >
-                    <div className="flex items-center gap-2 text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
-                      <div className="p-1 rounded-lg bg-purple-100/80 dark:bg-purple-900/40 text-purple-600 dark:text-purple-400">
-                        <IconComp className="w-3.5 h-3.5" />
-                      </div>
-                      <span>{highlight.title}</span>
-                    </div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed whitespace-pre-line">
-                      {highlight.description}
-                    </p>
-                  </div>
-                );
-              })}
+        {/* Right Column: Editorial Note & Message */}
+        <div className="flex-1 space-y-6 lg:pt-1">
+          <div className="space-y-3">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-purple-50 dark:bg-purple-950/50 text-purple-700 dark:text-purple-300 border border-purple-200/60 dark:border-purple-800/40">
+              <Quote className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+              <span>{config.badge_text || "FOUNDER'S NOTE"}</span>
+            </div>
+            <h2 id="founder-message-heading" className="text-3xl sm:text-4xl lg:text-[40px] font-black text-slate-900 dark:text-white tracking-tight leading-tight">
+              {renderHeading()}
+            </h2>
+          </div>
+
+          {/* Narrative Paragraphs — Clean, spacious, highly readable body typography */}
+          <div className="space-y-4 sm:space-y-5 text-base sm:text-lg text-slate-700 dark:text-slate-300 leading-relaxed font-normal">
+            {paragraphs.map((paragraph, idx) => (
+              <p key={idx}>
+                {paragraph}
+              </p>
+            ))}
+          </div>
+
+          {/* Right-Aligned Founder Signature */}
+          <div className="pt-4 sm:pt-6 flex justify-end">
+            <div className="text-right space-y-0.5">
+              <div className="flex items-center justify-end gap-2">
+                <span className="text-purple-600 dark:text-purple-400 font-bold text-lg leading-none">—</span>
+                <span className="text-base sm:text-lg font-black text-slate-900 dark:text-white tracking-tight">
+                  {signatureName}
+                </span>
+              </div>
+              {signatureRole && (
+                <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium">
+                  {signatureRole}
+                </p>
+              )}
             </div>
           </div>
-        )}
+        </div>
+
       </div>
+
+      {/* Bottom Row: Guiding Commitments / Pillars (3 Separate Cards Spanning Horizontally) */}
+      {config.highlights && config.highlights.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5 sm:gap-6 mt-8 sm:mt-12">
+          {config.highlights.map((highlight) => {
+            const IconComp = AVAILABLE_ICONS[highlight.icon] || Target;
+            const cleanDesc = highlight.description ? highlight.description.replace(/\n+/g, ' ').trim() : '';
+            return (
+              <div 
+                key={highlight.id || highlight.title}
+                className="rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 flex items-start gap-4 shadow-2xs hover:border-purple-500/30 transition-colors"
+              >
+                <div className="w-12 h-12 rounded-2xl bg-purple-50 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0">
+                  <IconComp className="w-6 h-6" />
+                </div>
+                <div className="space-y-1.5 flex-1">
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                    {highlight.title}
+                  </h3>
+                  <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+                    {cleanDesc}
+                  </p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </section>
   );
 };
+

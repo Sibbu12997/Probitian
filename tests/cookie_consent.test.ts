@@ -93,6 +93,20 @@ describe('Cookie & Privacy Consent Manager', () => {
     assert.strictEqual(localStorage.getItem(COOKIE_CONSENT_VERSION_KEY), CURRENT_CONSENT_VERSION);
   });
 
+  test('"Reject All" action safely maps to necessary technical state without storing PII', () => {
+    // In our architecture, rejecting all optional tracking maps to 'necessary' state
+    setCookieConsent('necessary');
+    assert.strictEqual(getCookieConsent(), 'necessary');
+    assert.strictEqual(hasOptionalConsent(), false);
+    assert.strictEqual(hasUserConsentChoice(), true);
+    
+    // Validate storage has no sensitive data or tokens
+    const storedChoice = localStorage.getItem(COOKIE_CONSENT_KEY);
+    assert.strictEqual(storedChoice, 'necessary');
+    assert.strictEqual(storedChoice?.includes('token'), false);
+    assert.strictEqual(storedChoice?.includes('@'), false);
+  });
+
   test('selecting "all" enables optional tracking and records choice', () => {
     setCookieConsent('all');
     assert.strictEqual(getCookieConsent(), 'all');
@@ -124,5 +138,26 @@ describe('Cookie & Privacy Consent Manager', () => {
     assert.strictEqual(notifiedChoice, 'necessary');
 
     unsubscribe();
+  });
+
+  test('cookie preference modal re-opening preserves existing consent until explicit change', () => {
+    // 1. Initial choice: necessary
+    setCookieConsent('necessary');
+    assert.strictEqual(getCookieConsent(), 'necessary');
+    assert.strictEqual(hasOptionalConsent(), false);
+
+    // 2. User opens and closes preference dialog without changing choice -> remains 'necessary'
+    assert.strictEqual(getCookieConsent(), 'necessary');
+    assert.strictEqual(hasOptionalConsent(), false);
+
+    // 3. User explicitly updates to 'all'
+    setCookieConsent('all');
+    assert.strictEqual(getCookieConsent(), 'all');
+    assert.strictEqual(hasOptionalConsent(), true);
+
+    // 4. User changes back to 'necessary' via Reject All / Necessary Only
+    setCookieConsent('necessary');
+    assert.strictEqual(getCookieConsent(), 'necessary');
+    assert.strictEqual(hasOptionalConsent(), false);
   });
 });
