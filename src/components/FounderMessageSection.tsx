@@ -77,18 +77,25 @@ export const FounderMessageSection: React.FC<FounderMessageSectionProps> = ({
     ? config.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
     : 'SS';
 
-  // Highlight brand word in heading if present (e.g. ProBItian)
+  // Highlight brand word in heading if present (e.g. ProBitian)
   const renderHeading = () => {
-    const heading = config.heading || 'Why We Built ProBItian';
-    const highlight = config.heading_highlight || 'ProBItian';
+    const heading = config.heading || 'Why We Built ProBitian';
+    const highlight = config.heading_highlight || 'ProBitian';
 
-    if (highlight && heading.includes(highlight)) {
-      const parts = heading.split(highlight);
+    // Check for highlight word or ProBitian/ProBItian case-insensitively
+    const match = heading.match(new RegExp(`(${highlight}|ProBitian|ProBItian)`, 'i'));
+
+    if (match && match[0]) {
+      const idx = heading.indexOf(match[0]);
+      const before = heading.substring(0, idx);
+      const matchedWord = heading.substring(idx, idx + match[0].length);
+      const after = heading.substring(idx + match[0].length);
+
       return (
         <>
-          {parts[0]}
-          <span className="text-gradient">Pro<span className="text-amber-500 font-black">BI</span>tian</span>
-          {parts.slice(1).join(highlight)}
+          <span>{before}</span>
+          <span className="text-gradient">{matchedWord}</span>
+          <span>{after}</span>
         </>
       );
     }
@@ -250,11 +257,11 @@ export const FounderMessageSection: React.FC<FounderMessageSectionProps> = ({
         {/* Right Column: Editorial Note & Message */}
         <div className="flex-1 space-y-6 lg:pt-1">
           <div className="space-y-3">
-            <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-purple-50 dark:bg-purple-950/50 text-purple-700 dark:text-purple-300 border border-purple-200/60 dark:border-purple-800/40">
-              <Quote className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+            <div className="inline-flex items-center gap-1.5 px-3 py-0.5 sm:py-1 rounded-full text-[11px] sm:text-xs font-semibold uppercase tracking-wider bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200/50 dark:border-purple-800/30 shadow-2xs">
+              <Quote className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-purple-600 dark:text-purple-400 shrink-0" />
               <span>{config.badge_text || "FOUNDER'S NOTE"}</span>
             </div>
-            <h2 id="founder-message-heading" className="text-3xl sm:text-4xl lg:text-[40px] font-black text-slate-900 dark:text-white tracking-tight leading-tight">
+            <h2 id="founder-message-heading" className="text-3xl sm:text-4xl lg:text-[42px] font-extrabold text-slate-900 dark:text-white tracking-tight leading-tight">
               {renderHeading()}
             </h2>
           </div>
