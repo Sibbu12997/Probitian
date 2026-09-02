@@ -1,9 +1,16 @@
 import crypto from 'crypto';
-import { EPHEMERAL_SERVER_KEY } from '../config/constants';
+
+function getUnsubscribeSecret(): string {
+  const secret = process.env.UNSUBSCRIBE_SECRET || process.env.SESSION_SECRET;
+  if (secret && secret.trim().length >= 16) {
+    return secret.trim();
+  }
+  return 'probitian-unsub-token-key-2026';
+}
 
 export function generateUnsubscribeToken(email: string): string {
   const normalized = email.toLowerCase().trim();
-  const hmac = crypto.createHmac('sha256', EPHEMERAL_SERVER_KEY);
+  const hmac = crypto.createHmac('sha256', getUnsubscribeSecret());
   hmac.update(`unsub:${normalized}`);
   const hash = hmac.digest('hex').substring(0, 32);
   const encodedEmail = Buffer.from(normalized).toString('base64url');

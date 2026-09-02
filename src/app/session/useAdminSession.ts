@@ -13,32 +13,17 @@ export function useAdminSession(): AdminSessionState {
   const [adminRole, setAdminRole] = useState<'admin' | 'editor' | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // Validate server-side admin session on load
+  // Validate server-side admin session on load via HttpOnly cookie
   useEffect(() => {
     let isMounted = true;
     async function checkSession() {
       try {
-        const headers: Record<string, string> = {};
-        try {
-          const token = localStorage.getItem('admin_session_token');
-          if (token && token.trim()) {
-            headers['Authorization'] = `Bearer ${token.trim()}`;
-            headers['x-admin-token'] = token.trim();
-          }
-        } catch {}
-
         const res = await fetch('/api/admin/session', { 
-          credentials: 'include',
-          headers
+          credentials: 'include'
         });
         if (res.ok) {
           const data = await res.json();
           if (isMounted && data.authenticated && data.email) {
-            if (data.token) {
-              try {
-                localStorage.setItem('admin_session_token', data.token);
-              } catch {}
-            }
             setAdminUser(data.email);
             setAdminRole(data.role || 'admin');
           }
@@ -64,26 +49,13 @@ export function useAdminSession(): AdminSessionState {
 
   const handleAdminLogout = useCallback(async () => {
     try {
-      const headers: Record<string, string> = {};
-      try {
-        const token = localStorage.getItem('admin_session_token');
-        if (token && token.trim()) {
-          headers['Authorization'] = `Bearer ${token.trim()}`;
-          headers['x-admin-token'] = token.trim();
-        }
-      } catch {}
-
       await fetch('/api/admin/logout', { 
         method: 'POST', 
-        credentials: 'include',
-        headers
+        credentials: 'include'
       });
     } catch (e) {
       console.warn('Logout error:', e);
     } finally {
-      try {
-        localStorage.removeItem('admin_session_token');
-      } catch {}
       setAdminUser(null);
       setAdminRole(null);
     }

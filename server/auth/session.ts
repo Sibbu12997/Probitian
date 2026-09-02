@@ -1,6 +1,5 @@
 import crypto from 'crypto';
 import express from 'express';
-import { EPHEMERAL_SERVER_KEY } from '../config/constants';
 import { AdminSession, SessionTokenPayload, UserRole } from './types';
 
 export const adminSessions = new Map<string, AdminSession>();
@@ -9,7 +8,7 @@ export const userRevocationTimestamps = new Map<string, number>();
 
 export function parseCookies(req: express.Request): Record<string, string> {
   const list: Record<string, string> = {};
-  const rc = req.headers.cookie;
+  const rc = req.headers?.cookie;
   if (rc) {
     rc.split(';').forEach(cookie => {
       const parts = cookie.split('=');
@@ -21,17 +20,25 @@ export function parseCookies(req: express.Request): Record<string, string> {
   return list;
 }
 
+export function validateSessionSecretConfig(): void {
+  const isProd = process.env.NODE_ENV === 'production';
+  const secret = process.env.SESSION_SECRET?.trim();
+  if (isProd) {
+    if (!secret || secret.length < 32) {
+      throw new Error('SESSION_SECRET must be configured with a strong value (minimum 32 characters) in production.');
+    }
+  }
+}
+
 export function getSessionSecret(): string {
-  if (process.env.SESSION_SECRET && process.env.SESSION_SECRET.trim()) {
-    return process.env.SESSION_SECRET.trim();
+  const secret = process.env.SESSION_SECRET?.trim();
+  if (secret && secret.length >= 32) {
+    return secret;
   }
-  if (process.env.ADMIN_PASSKEY && process.env.ADMIN_PASSKEY.trim()) {
-    return process.env.ADMIN_PASSKEY.trim();
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('SESSION_SECRET must be configured with a strong value (minimum 32 characters) in production.');
   }
-  if (process.env.SUPABASE_SECRET_KEY && process.env.SUPABASE_SECRET_KEY.trim()) {
-    return process.env.SUPABASE_SECRET_KEY.trim();
-  }
-  return EPHEMERAL_SERVER_KEY;
+  return secret || 'probitian-dev-local-session-secret-2026-only-for-dev';
 }
 
 export function createSignedSessionToken(
@@ -132,31 +139,18 @@ export function getAdminCookieHeader(token: string, req: express.Request, maxAge
                   Boolean(process.env.DISABLE_HMR) ||
                   process.env.NODE_ENV === 'production';
 
+  const secureFlag = isHttps ? '; Secure' : '';
+
   if (maxAgeSeconds === 0) {
-    if (isHttps) {
-      return 'admin_session=; HttpOnly; Path=/; SameSite=None; Secure; Max-Age=0';
-    }
-    return 'admin_session=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0';
+    return `admin_session=; HttpOnly; Path=/; SameSite=Lax${secureFlag}; Max-Age=0`;
   }
 
-  if (isHttps) {
-    return `admin_session=${token}; HttpOnly; Path=/; SameSite=None; Secure; Max-Age=${maxAgeSeconds}`;
-  }
-  return `admin_session=${token}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${maxAgeSeconds}`;
+  return `admin_session=${token}; HttpOnly; Path=/; SameSite=Lax${secureFlag}; Max-Age=${maxAgeSeconds}`;
 }
 
 export function getAdminSession(req: express.Request): AdminSession | null {
   const cookies = parseCookies(req);
-  let token = cookies['admin_session'];
-
-  if (!token) {
-    const authHeader = req.headers['authorization'];
-    if (authHeader && typeof authHeader === 'string' && authHeader.startsWith('Bearer ')) {
-      token = authHeader.slice(7).trim();
-    } else if (req.headers['x-admin-token'] && typeof req.headers['x-admin-token'] === 'string') {
-      token = (req.headers['x-admin-token'] as string).trim();
-    }
-  }
+  const token = cookies['admin_session'];
 
   if (!token) return null;
   if (revokedSessions.has(token)) return null;
@@ -232,3 +226,4 @@ const sessionCleanupTimer = setInterval(() => {
 if (sessionCleanupTimer && typeof sessionCleanupTimer.unref === 'function') {
   sessionCleanupTimer.unref();
 }
+

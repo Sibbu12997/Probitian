@@ -137,7 +137,7 @@ describe('Public CMS Endpoints Resiliency & Production Regression Tests', () => 
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${userToken}`
+        'Cookie': `admin_session=${userToken}`
       },
       body: JSON.stringify({
         fileName: 'image.png',
@@ -155,7 +155,7 @@ describe('Public CMS Endpoints Resiliency & Production Regression Tests', () => 
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${editorToken}`
+        'Cookie': `admin_session=${editorToken}`
       },
       body: JSON.stringify({}) // Missing required fields -> hits body validation in handleUpload
     });
@@ -173,7 +173,7 @@ describe('Public CMS Endpoints Resiliency & Production Regression Tests', () => 
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${editorToken}`
+        'Cookie': `admin_session=${editorToken}`
       },
       body: JSON.stringify({
         fileName: 'valid.png',
@@ -195,7 +195,7 @@ describe('Public CMS Endpoints Resiliency & Production Regression Tests', () => 
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${editorToken}`
+        'Cookie': `admin_session=${editorToken}`
       },
       body: JSON.stringify({
         fileName: 'fake.png',
@@ -216,7 +216,7 @@ describe('Public CMS Endpoints Resiliency & Production Regression Tests', () => 
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${editorToken}`
+        'Cookie': `admin_session=${editorToken}`
       },
       body: JSON.stringify({
         fileName: 'photo.jpg',
@@ -237,7 +237,7 @@ describe('Public CMS Endpoints Resiliency & Production Regression Tests', () => 
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${editorToken}`
+        'Cookie': `admin_session=${editorToken}`
       },
       body: JSON.stringify({
         fileName: 'spoofed.jpg',
@@ -264,7 +264,7 @@ describe('Public CMS Endpoints Resiliency & Production Regression Tests', () => 
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${editorToken}`
+        'Cookie': `admin_session=${editorToken}`
       },
       body: JSON.stringify({
         fileName: 'image.webp',
@@ -285,7 +285,7 @@ describe('Public CMS Endpoints Resiliency & Production Regression Tests', () => 
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${editorToken}`
+        'Cookie': `admin_session=${editorToken}`
       },
       body: JSON.stringify({
         fileName: 'invalid.webp',
@@ -309,7 +309,7 @@ describe('Public CMS Endpoints Resiliency & Production Regression Tests', () => 
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${editorToken}`
+        'Cookie': `admin_session=${editorToken}`
       },
       body: JSON.stringify({
         fileName: 'graphic.svg',
@@ -340,7 +340,7 @@ describe('Public CMS Endpoints Resiliency & Production Regression Tests', () => 
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${editorToken}`
+        'Cookie': `admin_session=${editorToken}`
       },
       body: JSON.stringify({
         fileName: 'malware.exe',
@@ -360,7 +360,7 @@ describe('Public CMS Endpoints Resiliency & Production Regression Tests', () => 
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${editorToken}`
+        'Cookie': `admin_session=${editorToken}`
       },
       body: JSON.stringify({
         fileName: 'payload.elf',
@@ -380,7 +380,7 @@ describe('Public CMS Endpoints Resiliency & Production Regression Tests', () => 
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${editorToken}`
+        'Cookie': `admin_session=${editorToken}`
       },
       body: JSON.stringify({
         fileName: 'script.sh',
@@ -400,7 +400,7 @@ describe('Public CMS Endpoints Resiliency & Production Regression Tests', () => 
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${editorToken}`
+        'Cookie': `admin_session=${editorToken}`
       },
       body: JSON.stringify({
         fileName: 'shell.php',
@@ -420,7 +420,7 @@ describe('Public CMS Endpoints Resiliency & Production Regression Tests', () => 
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${editorToken}`
+        'Cookie': `admin_session=${editorToken}`
       },
       body: JSON.stringify({
         fileName: '../../../../etc/passwd.png',

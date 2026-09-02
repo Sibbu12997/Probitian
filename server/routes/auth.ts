@@ -69,8 +69,7 @@ router.post('/admin/verify-passkey', loginLimiter, (req, res) => {
     return res.json({ 
       success: true, 
       email: adminEmail, 
-      role,
-      token: session.token
+      role
     });
   }
 
@@ -153,8 +152,7 @@ router.post('/admin/verify-supabase-session', loginLimiter, async (req, res) => 
     return res.json({ 
       success: true, 
       email: userEmail, 
-      role,
-      token: session.token
+      role
     });
   } catch (err) {
     console.error('[Admin Supabase Session Verification Error]', err);
@@ -170,8 +168,7 @@ router.get('/admin/session', (req, res) => {
       authenticated: true, 
       email: session.email, 
       role: session.role,
-      userId: session.userId,
-      token: session.token
+      userId: session.userId
     });
   }
   return res.json({ authenticated: false });
@@ -181,16 +178,7 @@ router.get('/admin/session', (req, res) => {
 router.post('/admin/logout', (req, res) => {
   const session = getAdminSession(req);
   const cookies = parseCookies(req);
-  let token = cookies['admin_session'];
-
-  if (!token) {
-    const authHeader = req.headers['authorization'];
-    if (authHeader && typeof authHeader === 'string' && authHeader.startsWith('Bearer ')) {
-      token = authHeader.slice(7).trim();
-    } else if (req.headers['x-admin-token'] && typeof req.headers['x-admin-token'] === 'string') {
-      token = (req.headers['x-admin-token'] as string).trim();
-    }
-  }
+  const token = cookies['admin_session'];
 
   if (session) {
     recordAuditLog(req, {

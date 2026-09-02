@@ -12,6 +12,7 @@ import {
   invalidateAdminSession as invalidateServerAdminSession,
   invalidateUserSessions as invalidateServerUserSessions,
   getAdminCookieHeader as getServerAdminCookieHeader,
+  validateSessionSecretConfig,
   adminSessions as serverAdminSessions,
   revokedSessions as serverRevokedSessions,
   userRevocationTimestamps as serverUserRevocationTimestamps
@@ -942,10 +943,10 @@ describe('9. Distributed Rate-Limit Store, Concurrency & Fail-Safe Architecture'
 });
 
 describe('10. Server RBAC, Authentication & Session Hardening Verification', () => {
-  function createMockRequest(headers: Record<string, string> = {}) {
+  function createMockRequest(headers: Record<string, string> = {}, cookies: Record<string, string> = {}) {
     return {
       headers: { ...headers },
-      cookies: {},
+      cookies: { ...cookies },
       get: (headerName: string) => headers[headerName.toLowerCase()]
     } as any;
   }
@@ -968,11 +969,12 @@ describe('10. Server RBAC, Authentication & Session Hardening Verification', () 
         headersSet[k] = v;
       },
       getStatus: () => statusCode,
-      getBody: () => jsonBody
+      getBody: () => jsonBody,
+      getHeader: (k: string) => headersSet[k]
     };
   }
 
-  test('1. Unauthenticated request -> 401', () => {
+  test('1. Unauthenticated request without cookie -> 401', () => {
     const req = createMockRequest();
     const res = createMockResponse();
     let nextCalled = false;
@@ -984,9 +986,9 @@ describe('10. Server RBAC, Authentication & Session Hardening Verification', () 
     assert.ok(res.getBody()?.error?.includes('Unauthorized'));
   });
 
-  test('2. USER accessing admin endpoint -> 403', () => {
+  test('2. USER accessing admin endpoint via cookie -> 403', () => {
     const userSession = createServerAdminSession('normaluser@example.com', ServerUserRole.USER, 'user-id-123');
-    const req = createMockRequest({ authorization: `Bearer ${userSession.token}` });
+    const req = createMockRequest({ cookie: `admin_session=${userSession.token}` });
     const res = createMockResponse();
     let nextCalled = false;
 
@@ -998,9 +1000,9 @@ describe('10. Server RBAC, Authentication & Session Hardening Verification', () 
     assert.ok(res.getBody()?.error?.includes('Administrator privilege required'));
   });
 
-  test('3. EDITOR accessing admin-only endpoint -> 403', () => {
+  test('3. EDITOR accessing admin-only endpoint via cookie -> 403', () => {
     const editorSession = createServerAdminSession('editoruser@example.com', ServerUserRole.EDITOR, 'editor-id-456');
-    const req = createMockRequest({ authorization: `Bearer ${editorSession.token}` });
+    const req = createMockRequest({ cookie: `admin_session=${editorSession.token}` });
     const res = createMockResponse();
     let nextCalled = false;
 
@@ -1012,9 +1014,9 @@ describe('10. Server RBAC, Authentication & Session Hardening Verification', () 
     assert.ok(res.getBody()?.error?.includes('Administrator privilege required'));
   });
 
-  test('4. ADMIN accessing admin endpoint -> success (calls next)', () => {
+  test('4. ADMIN accessing admin endpoint via cookie -> success (calls next)', () => {
     const adminSession = createServerAdminSession('adminuser@example.com', ServerUserRole.ADMIN, 'admin-id-789');
-    const req = createMockRequest({ authorization: `Bearer ${adminSession.token}` });
+    const req = createMockRequest({ cookie: `admin_session=${adminSession.token}` });
     const res = createMockResponse();
     let nextCalled = false;
 
@@ -1034,7 +1036,7 @@ describe('10. Server RBAC, Authentication & Session Hardening Verification', () 
     const initialToken = activeAdminSession.token;
 
     // Step 2: Confirm admin-only access works
-    const req1 = createMockRequest({ authorization: `Bearer ${initialToken}` });
+    const req1 = createMockRequest({ cookie: `admin_session=${initialToken}` });
     const res1 = createMockResponse();
     let nextCalled1 = false;
     serverRequireRole(ServerUserRole.ADMIN)(req1, res1 as any, () => { nextCalled1 = true; });
@@ -1045,7 +1047,7 @@ describe('10. Server RBAC, Authentication & Session Hardening Verification', () 
     invalidateServerUserSessions({ userId: testUserId, email: testEmail });
 
     // Step 4: Reuse the SAME existing session token
-    const req2 = createMockRequest({ authorization: `Bearer ${initialToken}` });
+    const req2 = createMockRequest({ cookie: `admin_session=${initialToken}` });
     const res2 = createMockResponse();
     let nextCalled2 = false;
     serverRequireRole(ServerUserRole.ADMIN)(req2, res2 as any, () => { nextCalled2 = true; });
@@ -1060,7 +1062,7 @@ describe('10. Server RBAC, Authentication & Session Hardening Verification', () 
     serverUserRevocationTimestamps.delete(testUserId);
   });
 
-  test('6. Tampered session -> 401', () => {
+  test('6. Tampered session cookie -> 401', () => {
     const legitSession = createServerAdminSession('tamper-test@probitian.com', ServerUserRole.ADMIN);
     const [payloadStr, sig] = legitSession.token.split('.');
     const decoded = JSON.parse(Buffer.from(payloadStr, 'base64url').toString('utf-8'));
@@ -1068,7 +1070,7 @@ describe('10. Server RBAC, Authentication & Session Hardening Verification', () 
     const tamperedPayload = Buffer.from(JSON.stringify(decoded)).toString('base64url');
     const tamperedToken = `${tamperedPayload}.${sig}`;
 
-    const req = createMockRequest({ authorization: `Bearer ${tamperedToken}` });
+    const req = createMockRequest({ cookie: `admin_session=${tamperedToken}` });
     const res = createMockResponse();
     let nextCalled = false;
 
@@ -1077,10 +1079,10 @@ describe('10. Server RBAC, Authentication & Session Hardening Verification', () 
     assert.strictEqual(nextCalled, false);
   });
 
-  test('7. Expired session -> 401', () => {
+  test('7. Expired session cookie -> 401', () => {
     // Mint token with negative maxAge (expired in the past)
     const expiredToken = createServerSignedSessionToken('expired-user@probitian.com', ServerUserRole.ADMIN, 'exp-id', -10000);
-    const req = createMockRequest({ authorization: `Bearer ${expiredToken}` });
+    const req = createMockRequest({ cookie: `admin_session=${expiredToken}` });
     const res = createMockResponse();
     let nextCalled = false;
 
@@ -1096,7 +1098,7 @@ describe('10. Server RBAC, Authentication & Session Hardening Verification', () 
     // User logs out -> invalidate session token
     invalidateServerAdminSession(token);
 
-    const req = createMockRequest({ authorization: `Bearer ${token}` });
+    const req = createMockRequest({ cookie: `admin_session=${token}` });
     const res = createMockResponse();
     let nextCalled = false;
 
@@ -1111,7 +1113,7 @@ describe('10. Server RBAC, Authentication & Session Hardening Verification', () 
 
     serverRevokedSessions.add(token);
 
-    const req = createMockRequest({ authorization: `Bearer ${token}` });
+    const req = createMockRequest({ cookie: `admin_session=${token}` });
     const res = createMockResponse();
     let nextCalled = false;
 
@@ -1123,7 +1125,29 @@ describe('10. Server RBAC, Authentication & Session Hardening Verification', () 
     serverRevokedSessions.delete(token);
   });
 
-  test('10. Existing security middleware and role-permission matrices remain active', () => {
+  test('10. Sending Authorization Bearer <token> WITHOUT cookie fails with 401', () => {
+    const adminSession = createServerAdminSession('bearer-test@probitian.com', ServerUserRole.ADMIN);
+    const req = createMockRequest({ authorization: `Bearer ${adminSession.token}` });
+    const res = createMockResponse();
+    let nextCalled = false;
+
+    serverRequireAuth(req, res as any, () => { nextCalled = true; });
+    assert.strictEqual(res.getStatus(), 401);
+    assert.strictEqual(nextCalled, false);
+  });
+
+  test('11. Sending x-admin-token <token> WITHOUT cookie fails with 401', () => {
+    const adminSession = createServerAdminSession('header-test@probitian.com', ServerUserRole.ADMIN);
+    const req = createMockRequest({ 'x-admin-token': adminSession.token });
+    const res = createMockResponse();
+    let nextCalled = false;
+
+    serverRequireAuth(req, res as any, () => { nextCalled = true; });
+    assert.strictEqual(res.getStatus(), 401);
+    assert.strictEqual(nextCalled, false);
+  });
+
+  test('12. Existing security middleware and role-permission matrices remain active', () => {
     // Verify admin has all system permissions
     assert.strictEqual(serverHasPermission(ServerUserRole.ADMIN, ServerPermission.MANAGE_SYSTEM), true);
     assert.strictEqual(serverHasPermission(ServerUserRole.ADMIN, ServerPermission.MANAGE_CRM), true);
@@ -1143,11 +1167,11 @@ describe('10. Server RBAC, Authentication & Session Hardening Verification', () 
     assert.strictEqual(serverHasPermission(ServerUserRole.USER, ServerPermission.MANAGE_SYSTEM), false);
   });
 
-  test('11. Health Check status and version validation', () => {
+  test('13. Health Check status and version validation', () => {
     assert.strictEqual(APP_VERSION, '1.1.0');
   });
 
-  test('12. Session token creation and cookie header generation adheres to HttpOnly Secure Lax/None standard', () => {
+  test('14. Session cookie header generation enforces HttpOnly, Path=/, SameSite=Lax, and Secure on HTTPS', () => {
     const session = createServerAdminSession('admin@probitian.com', ServerUserRole.ADMIN);
     assert.ok(session.token);
     assert.strictEqual(session.email, 'admin@probitian.com');
@@ -1158,6 +1182,46 @@ describe('10. Server RBAC, Authentication & Session Hardening Verification', () 
 
     assert.ok(cookieHeader.includes('HttpOnly'));
     assert.ok(cookieHeader.includes('Path=/'));
+    assert.ok(cookieHeader.includes('SameSite=Lax'));
     assert.ok(cookieHeader.includes('Secure'));
+
+    // Logout cookie header sets Max-Age=0
+    const logoutCookieHeader = getServerAdminCookieHeader('', mockHttpsReq, 0);
+    assert.ok(logoutCookieHeader.includes('Max-Age=0'));
+    assert.ok(logoutCookieHeader.includes('HttpOnly'));
+  });
+
+  test('15. Production SESSION_SECRET validation throws on missing or weak secrets', () => {
+    const originalEnv = process.env.NODE_ENV;
+    const originalSecret = process.env.SESSION_SECRET;
+
+    try {
+      process.env.NODE_ENV = 'production';
+
+      // Test missing secret in production
+      delete process.env.SESSION_SECRET;
+      assert.throws(() => {
+        validateSessionSecretConfig();
+      }, /SESSION_SECRET must be configured with a strong value/);
+
+      // Test short secret in production (< 32 chars)
+      process.env.SESSION_SECRET = 'too-short-secret';
+      assert.throws(() => {
+        validateSessionSecretConfig();
+      }, /SESSION_SECRET must be configured with a strong value/);
+
+      // Test strong secret in production (>= 32 chars)
+      process.env.SESSION_SECRET = 'a-very-strong-production-session-secret-with-plenty-of-entropy';
+      assert.doesNotThrow(() => {
+        validateSessionSecretConfig();
+      });
+    } finally {
+      process.env.NODE_ENV = originalEnv;
+      if (originalSecret !== undefined) {
+        process.env.SESSION_SECRET = originalSecret;
+      } else {
+        delete process.env.SESSION_SECRET;
+      }
+    }
   });
 });

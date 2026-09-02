@@ -12,6 +12,7 @@ import { csrfMiddleware } from './server/security/csrf';
 import { apiErrorHandler, apiNotFoundHandler } from './server/middleware/errorHandler';
 import { serverSupabase } from './server/services/supabase';
 import { getRouteSeo, injectSeoIntoHtml } from './server/seo/prerender';
+import { validateSessionSecretConfig } from './server/auth/session';
 
 // Route Modules
 import authRouter from './server/routes/auth';
@@ -22,6 +23,9 @@ import cmsRouter from './server/routes/cms';
 import seoRouter from './server/routes/seo';
 
 dotenv.config();
+
+// P0 Session Secret Validation (fails startup in production if missing/weak)
+validateSessionSecretConfig();
 
 const app = express();
 

@@ -31,34 +31,15 @@ import { PROBITIAN_LOGO_URL, PROBITIAN_X_URL, DEFAULT_SOCIAL_LINKS, DEFAULT_HOME
 import { PROJECTS, BLOG_ARTICLES, LEARN_TOPICS, YOUTUBE_VIDEOS } from '../data/mockData';
 
 /**
- * Retrieve admin authentication headers if an admin session token exists
- */
-function getAdminAuthHeaders(): Record<string, string> {
-  try {
-    if (typeof window !== 'undefined') {
-      const token = localStorage.getItem('admin_session_token');
-      if (token && typeof token === 'string' && token.trim()) {
-        return {
-          'Authorization': `Bearer ${token.trim()}`,
-          'x-admin-token': token.trim()
-        };
-      }
-    }
-  } catch {}
-  return {};
-}
-
-/**
  * Safe fetch helper for Express API routes (Single source of truth: Supabase via Express)
  * Includes retry mechanism for transient server boot / reverse proxy cold starts.
+ * Relies strictly on browser HttpOnly cookie credentials without client-side token exposure.
  */
 async function safeFetchJson<T = any>(url: string, options?: RequestInit, maxRetries = 2): Promise<T> {
-  const authHeaders = getAdminAuthHeaders();
   const fetchOptions: RequestInit = {
     credentials: 'include',
     ...options,
     headers: {
-      ...authHeaders,
       ...options?.headers
     }
   };

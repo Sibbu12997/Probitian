@@ -19,8 +19,6 @@ export const CONFIGURED_ADMIN_EMAILS: string[] = [
 
 export const PROBITIAN_MEDIA_BUCKET = 'probitian-media';
 
-export const EPHEMERAL_SERVER_KEY = process.env.ADMIN_PASSKEY || process.env.SUPABASE_SECRET_KEY || process.env.SESSION_SECRET || 'probitian-secure-session-key-fallback-2026';
-
 export const VALID_SPA_ROUTES = new Set([
   '/',
   '/about',
