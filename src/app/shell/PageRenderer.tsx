@@ -15,6 +15,7 @@ import { AdminPortal } from '../../pages/admin/AdminPortal';
 
 export interface PageRendererProps {
   currentPage: NavPage;
+  currentAdminModule?: string | null;
   adminUser: string | null;
   isDarkMode: boolean;
   onNavigate: (page: NavPage, slug?: string) => void;
@@ -27,6 +28,7 @@ export interface PageRendererProps {
 
 export const PageRenderer: React.FC<PageRendererProps> = ({
   currentPage,
+  currentAdminModule,
   adminUser,
   isDarkMode,
   onNavigate,
@@ -75,10 +77,11 @@ export const PageRenderer: React.FC<PageRendererProps> = ({
       return (
         <AdminPortal
           userEmail={adminUser}
+          initialModule={currentAdminModule}
           isDarkMode={isDarkMode}
           onToggleDarkMode={onToggleDarkMode}
           onLogout={onAdminLogout}
-          onNavigateFront={(page) => onNavigate(page as NavPage)}
+          onNavigateFront={(page, slug) => onNavigate(page as NavPage, slug)}
         />
       );
     case '404':

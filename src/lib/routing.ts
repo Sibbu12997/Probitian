@@ -35,6 +35,12 @@ export function getPageCanonicalUrl(page: NavPage | string = 'home', slug?: stri
   if (page === 'home' || page === '') {
     return `${CANONICAL_SITE_URL}/`;
   }
+  if (page === 'admin') {
+    if (slug && slug !== 'dashboard' && slug !== 'overview') {
+      return `${CANONICAL_SITE_URL}/admin/${slugify(slug)}`;
+    }
+    return `${CANONICAL_SITE_URL}/admin/`;
+  }
   if (page === 'blog' && slug && slug.trim()) {
     const cleanSlug = slugify(slug);
     return `${CANONICAL_SITE_URL}/blog/${cleanSlug}`;
@@ -52,17 +58,36 @@ export interface ParsedRoute {
 /**
  * Parses pathname and hash into a typed route object.
  */
-export function parseRoute(pathname: string = window.location.pathname, hash: string = window.location.hash): ParsedRoute {
+export function parseRoute(pathname: string = typeof window !== 'undefined' ? window.location.pathname : '/', hash: string = typeof window !== 'undefined' ? window.location.hash : ''): ParsedRoute {
   let isLegacyHash = false;
-  let rawPath = pathname.toLowerCase().trim();
+  let rawPath = (pathname || '/').toLowerCase().trim();
 
-  // Check for legacy hash routes (e.g., /#/about or #/blog/some-slug or #about)
+  // Check for legacy hash routes (e.g., /#/about, #/blog/some-slug, /admin/#/, #/admin, #about, /admin/#/dashboard)
   if (hash && hash.startsWith('#')) {
     const hashClean = hash.replace(/^#\/?/, '').trim();
     if (hashClean) {
-      rawPath = '/' + hashClean;
+      if (rawPath === '/admin' || rawPath === '/admin/') {
+        // e.g. /admin/#/dashboard, /admin/#/leads
+        rawPath = `/admin/${hashClean}`;
+      } else {
+        rawPath = '/' + hashClean;
+      }
       isLegacyHash = true;
+    } else {
+      // Hash is just '#' or '#/' (empty)
+      if (rawPath === '/admin' || rawPath === '/admin/' || rawPath === '/' || rawPath === '') {
+        isLegacyHash = true;
+      }
     }
+  }
+
+  // Handle case where pathname itself contains '/#/' (e.g., /admin/#/ passed as pathname)
+  if (rawPath.includes('/#/')) {
+    rawPath = rawPath.replace('/#/', '/');
+    isLegacyHash = true;
+  } else if (rawPath.includes('/#')) {
+    rawPath = rawPath.replace('/#', '/');
+    isLegacyHash = true;
   }
 
   // Strip trailing slashes unless root
@@ -103,8 +128,15 @@ export function parseRoute(pathname: string = window.location.pathname, hash: st
     case 'power-bi-demo':
     case 'powerbi-demo':
       return { page: 'power-bi-demo', slug: null, isLegacyHash, targetCanonicalPath: '/power-bi-demo' };
-    case 'admin':
-      return { page: 'admin', slug: null, isLegacyHash, targetCanonicalPath: '/admin' };
+    case 'admin': {
+      if (segments.length > 1) {
+        const adminSub = slugify(segments.slice(1).join('-'));
+        if (adminSub && adminSub !== 'dashboard' && adminSub !== 'overview') {
+          return { page: 'admin', slug: adminSub, isLegacyHash, targetCanonicalPath: `/admin/${adminSub}` };
+        }
+      }
+      return { page: 'admin', slug: null, isLegacyHash, targetCanonicalPath: '/admin/' };
+    }
     case '404':
       return { page: '404', slug: null, isLegacyHash, targetCanonicalPath: '/404' };
     default:

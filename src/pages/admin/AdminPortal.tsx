@@ -56,22 +56,57 @@ import { Send, Building2, SendHorizontal, Workflow } from 'lucide-react';
 
 interface AdminPortalProps {
   userEmail: string;
+  initialModule?: string | null;
   isDarkMode?: boolean;
   onToggleDarkMode?: () => void;
   onLogout: () => void;
-  onNavigateFront: (page: string) => void;
+  onNavigateFront: (page: string, slug?: string) => void;
 }
+
+const resolveModuleId = (slug?: string | null): string => {
+  if (!slug) return 'overview';
+  const s = slug.toLowerCase().trim();
+  if (s === 'dashboard' || s === 'overview') return 'overview';
+  if (s === 'campaigns' || s === 'lead_campaigns' || s === 'lead-campaigns') return 'lead_campaigns';
+  if (s === 'sequences' || s === 'lead_sequences' || s === 'lead-sequences') return 'lead_sequences';
+  if (s === 'newsletter' || s === 'newsletter-campaigns') return 'campaigns';
+  return s;
+};
+
+const getModuleUrl = (moduleId: string): string => {
+  if (moduleId === 'overview') return '/admin/';
+  if (moduleId === 'lead_campaigns') return '/admin/campaigns';
+  if (moduleId === 'lead_sequences') return '/admin/sequences';
+  return `/admin/${moduleId}`;
+};
 
 export const AdminPortal: React.FC<AdminPortalProps> = ({
   userEmail,
+  initialModule,
   isDarkMode = true,
   onToggleDarkMode,
   onLogout,
   onNavigateFront
 }) => {
-  const [activeModule, setActiveModule] = useState<string>('overview');
+  const [activeModule, setActiveModule] = useState<string>(() => resolveModuleId(initialModule));
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [selectedLeadIdsForCampaign, setSelectedLeadIdsForCampaign] = useState<string[]>([]);
+
+  // Synchronize active module if route changes externally (e.g. browser back/forward)
+  React.useEffect(() => {
+    if (initialModule !== undefined) {
+      setActiveModule(resolveModuleId(initialModule));
+    }
+  }, [initialModule]);
+
+  const handleModuleSelect = (moduleId: string) => {
+    setActiveModule(moduleId);
+    setIsSidebarOpen(false);
+    const targetUrl = getModuleUrl(moduleId);
+    if (window.location.pathname !== targetUrl || window.location.hash) {
+      window.history.pushState(null, '', targetUrl);
+    }
+  };
 
   const navGroups = [
     {
@@ -125,20 +160,20 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
   const renderModule = () => {
     switch (activeModule) {
-      case 'overview': return <DashboardOverview onNavigate={(m) => setActiveModule(m)} />;
+      case 'overview': return <DashboardOverview onNavigate={(m) => handleModuleSelect(m)} />;
       case 'analytics': return <AnalyticsManager />;
       case 'leads': return (
         <LeadsManager
           onLaunchCampaign={(leadIds) => {
             setSelectedLeadIdsForCampaign(leadIds);
-            setActiveModule('lead_campaigns');
+            handleModuleSelect('lead_campaigns');
           }}
-          onNavigateToSequences={() => setActiveModule('lead_sequences')}
+          onNavigateToSequences={() => handleModuleSelect('lead_sequences')}
         />
       );
       case 'lead_sequences': return (
         <LeadSequencesManager
-          onNavigateToLeads={() => setActiveModule('leads')}
+          onNavigateToLeads={() => handleModuleSelect('leads')}
         />
       );
       case 'lead_campaigns': return (
@@ -163,7 +198,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       case 'legal': return <LegalManager />;
       case 'settings': return <SettingsManager />;
       case 'backup': return <BackupManager />;
-      default: return <DashboardOverview onNavigate={(m) => setActiveModule(m)} />;
+      default: return <DashboardOverview onNavigate={(m) => handleModuleSelect(m)} />;
     }
   };
 
@@ -263,8 +298,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                       <button
                         key={item.id}
                         onClick={() => {
-                          setActiveModule(item.id);
-                          setIsSidebarOpen(false);
+                          handleModuleSelect(item.id);
                         }}
                         className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                           isActive

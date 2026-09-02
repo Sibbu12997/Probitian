@@ -37,9 +37,13 @@ describe('11. Routing & Canonical URL Resolution', () => {
     assert.strictEqual(getPageCanonicalUrl('privacy'), 'https://probitian.ai.studio/privacy');
     assert.strictEqual(getPageCanonicalUrl('terms'), 'https://probitian.ai.studio/terms');
     assert.strictEqual(getPageCanonicalUrl('power-bi-demo'), 'https://probitian.ai.studio/power-bi-demo');
+    assert.strictEqual(getPageCanonicalUrl('admin'), 'https://probitian.ai.studio/admin/');
+    assert.strictEqual(getPageCanonicalUrl('admin', 'leads'), 'https://probitian.ai.studio/admin/leads');
+    assert.strictEqual(getPageCanonicalUrl('admin', 'campaigns'), 'https://probitian.ai.studio/admin/campaigns');
+    assert.strictEqual(getPageCanonicalUrl('admin', 'dashboard'), 'https://probitian.ai.studio/admin/');
   });
 
-  test('parseRoute handles standard HTML5 pathname routes', () => {
+  test('parseRoute handles standard HTML5 pathname routes including admin and admin child routes', () => {
     const home = parseRoute('/', '');
     assert.strictEqual(home.page, 'home');
     assert.strictEqual(home.slug, null);
@@ -54,6 +58,36 @@ describe('11. Routing & Canonical URL Resolution', () => {
     const blogPost = parseRoute('/blog/advanced-dax', '');
     assert.strictEqual(blogPost.page, 'blog');
     assert.strictEqual(blogPost.slug, 'advanced-dax');
+
+    const admin = parseRoute('/admin', '');
+    assert.strictEqual(admin.page, 'admin');
+    assert.strictEqual(admin.slug, null);
+    assert.strictEqual(admin.targetCanonicalPath, '/admin/');
+
+    const adminTrailing = parseRoute('/admin/', '');
+    assert.strictEqual(adminTrailing.page, 'admin');
+    assert.strictEqual(adminTrailing.slug, null);
+    assert.strictEqual(adminTrailing.targetCanonicalPath, '/admin/');
+
+    const adminDashboard = parseRoute('/admin/dashboard', '');
+    assert.strictEqual(adminDashboard.page, 'admin');
+    assert.strictEqual(adminDashboard.slug, null);
+    assert.strictEqual(adminDashboard.targetCanonicalPath, '/admin/');
+
+    const adminLeads = parseRoute('/admin/leads', '');
+    assert.strictEqual(adminLeads.page, 'admin');
+    assert.strictEqual(adminLeads.slug, 'leads');
+    assert.strictEqual(adminLeads.targetCanonicalPath, '/admin/leads');
+
+    const adminCampaigns = parseRoute('/admin/campaigns', '');
+    assert.strictEqual(adminCampaigns.page, 'admin');
+    assert.strictEqual(adminCampaigns.slug, 'campaigns');
+    assert.strictEqual(adminCampaigns.targetCanonicalPath, '/admin/campaigns');
+
+    const adminSequences = parseRoute('/admin/sequences', '');
+    assert.strictEqual(adminSequences.page, 'admin');
+    assert.strictEqual(adminSequences.slug, 'sequences');
+    assert.strictEqual(adminSequences.targetCanonicalPath, '/admin/sequences');
 
     const unknownRoute = parseRoute('/nonexistent-route-xyz', '');
     assert.strictEqual(unknownRoute.page, '404');
@@ -70,6 +104,32 @@ describe('11. Routing & Canonical URL Resolution', () => {
     assert.strictEqual(legacyBlog.slug, 'my-slug');
     assert.strictEqual(legacyBlog.isLegacyHash, true);
     assert.strictEqual(legacyBlog.targetCanonicalPath, '/blog/my-slug');
+
+    const legacyAdminHash = parseRoute('/admin', '#/');
+    assert.strictEqual(legacyAdminHash.page, 'admin');
+    assert.strictEqual(legacyAdminHash.isLegacyHash, true);
+    assert.strictEqual(legacyAdminHash.targetCanonicalPath, '/admin/');
+
+    const legacyAdminHashSlash = parseRoute('/admin/', '#/');
+    assert.strictEqual(legacyAdminHashSlash.page, 'admin');
+    assert.strictEqual(legacyAdminHashSlash.isLegacyHash, true);
+    assert.strictEqual(legacyAdminHashSlash.targetCanonicalPath, '/admin/');
+
+    const legacyAdminPathWithHash = parseRoute('/admin/#/', '');
+    assert.strictEqual(legacyAdminPathWithHash.page, 'admin');
+    assert.strictEqual(legacyAdminPathWithHash.isLegacyHash, true);
+    assert.strictEqual(legacyAdminPathWithHash.targetCanonicalPath, '/admin/');
+
+    const legacyRootAdminHash = parseRoute('/', '#/admin');
+    assert.strictEqual(legacyRootAdminHash.page, 'admin');
+    assert.strictEqual(legacyRootAdminHash.isLegacyHash, true);
+    assert.strictEqual(legacyRootAdminHash.targetCanonicalPath, '/admin/');
+
+    const legacyAdminLeadsHash = parseRoute('/admin', '#/leads');
+    assert.strictEqual(legacyAdminLeadsHash.page, 'admin');
+    assert.strictEqual(legacyAdminLeadsHash.slug, 'leads');
+    assert.strictEqual(legacyAdminLeadsHash.isLegacyHash, true);
+    assert.strictEqual(legacyAdminLeadsHash.targetCanonicalPath, '/admin/leads');
   });
 });
 

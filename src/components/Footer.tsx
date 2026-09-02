@@ -285,7 +285,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
               Cookie Preferences
             </button>
             <a href="/contact" onClick={(e) => { e.preventDefault(); onNavigate('contact'); }} className="hover:text-purple-400 transition-colors">Support</a>
-            <a href="/admin" onClick={(e) => { e.preventDefault(); onNavigate('admin'); }} className="hover:text-amber-400 font-semibold transition-colors text-amber-500/80">Admin Portal</a>
+            <a href="/admin/" onClick={(e) => { e.preventDefault(); onNavigate('admin'); }} className="hover:text-amber-400 font-semibold transition-colors text-amber-500/80">Admin Portal</a>
           </div>
         </div>
       </div>

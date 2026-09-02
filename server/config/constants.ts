@@ -38,6 +38,7 @@ export function isKnownSpaRoute(urlPath: string): boolean {
   const cleanPath = urlPath.split('?')[0].toLowerCase().replace(/\/+$/, '') || '/';
   if (VALID_SPA_ROUTES.has(cleanPath)) return true;
   if (cleanPath.startsWith('/blog/')) return true;
+  if (cleanPath === '/admin' || cleanPath.startsWith('/admin/')) return true;
   return false;
 }
 

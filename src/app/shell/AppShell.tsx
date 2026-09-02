@@ -51,6 +51,7 @@ export const AppShell: React.FC<AppShellProps> = ({
         />
         <PageRenderer
           currentPage={currentPage}
+          currentAdminModule={currentBlogSlug}
           adminUser={adminUser}
           isDarkMode={isDarkMode}
           onNavigate={onNavigate}

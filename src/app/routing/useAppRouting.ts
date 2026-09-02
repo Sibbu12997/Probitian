@@ -27,8 +27,8 @@ export function useAppRouting(): RoutingControls {
   const syncRouteFromLocation = useCallback(() => {
     const route = parseRoute(window.location.pathname, window.location.hash);
 
-    // If legacy hash was present, replace URL with standard clean path
-    if (route.isLegacyHash && window.location.hash) {
+    // If legacy hash was present or any hash exists on standard routes, replace URL with standard clean path
+    if ((route.isLegacyHash || window.location.hash) && route.targetCanonicalPath) {
       window.history.replaceState(null, '', route.targetCanonicalPath);
     }
 
@@ -65,9 +65,18 @@ export function useAppRouting(): RoutingControls {
 
   // Unified client-side navigation handler
   const handleNavigate = useCallback((page: NavPage, slug?: string) => {
-    const targetPath = page === 'home' 
-      ? '/' 
-      : (page === 'blog' && slug ? `/blog/${slug}` : `/${page}`);
+    let targetPath = '/';
+    if (page === 'home') {
+      targetPath = '/';
+    } else if (page === 'admin') {
+      targetPath = slug && slug !== 'dashboard' && slug !== 'overview'
+        ? `/admin/${slug}`
+        : '/admin/';
+    } else if (page === 'blog' && slug) {
+      targetPath = `/blog/${slug}`;
+    } else {
+      targetPath = `/${page}`;
+    }
 
     if (window.location.pathname !== targetPath || window.location.hash) {
       window.history.pushState(null, '', targetPath);
