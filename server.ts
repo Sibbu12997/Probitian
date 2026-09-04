@@ -1,7 +1,7 @@
+import 'dotenv/config';
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
-import dotenv from 'dotenv';
 import { createServer as createViteServer } from 'vite';
 
 // Server Modules & Middleware
@@ -12,7 +12,7 @@ import { csrfMiddleware } from './server/security/csrf';
 import { apiErrorHandler, apiNotFoundHandler } from './server/middleware/errorHandler';
 import { serverSupabase } from './server/services/supabase';
 import { getRouteSeo, injectSeoIntoHtml } from './server/seo/prerender';
-import { validateSessionSecretConfig } from './server/auth/session';
+import { validateSessionSecretConfig, parseCookies } from './server/auth/session';
 
 // Route Modules
 import authRouter from './server/routes/auth';
@@ -22,8 +22,6 @@ import analyticsRouter from './server/routes/analytics';
 import cmsRouter from './server/routes/cms';
 import seoRouter from './server/routes/seo';
 
-dotenv.config();
-
 // P0 Session Secret Validation (fails startup in production if missing/weak)
 validateSessionSecretConfig();
 
@@ -32,12 +30,18 @@ const app = express();
 // Disable X-Powered-By technology disclosure
 app.disable('x-powered-by');
 
-// Trust reverse proxy for accurate client IP resolution in rate limiting
-app.set('trust proxy', 1);
+// Trust reverse proxy for accurate client IP and protocol resolution in Cloud Run / containers
+app.set('trust proxy', true);
 
 // Baseline JSON & URL-encoded body parsing
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ limit: '1mb', extended: true }));
+
+// Cookie parsing middleware (populates req.cookies from raw Cookie header)
+app.use((req, res, next) => {
+  (req as any).cookies = parseCookies(req);
+  next();
+});
 
 // Global Security Middleware
 app.use(securityHeadersMiddleware);
@@ -52,7 +56,7 @@ app.get('/api/health', async (req, res) => {
   let dbStatus = 'unconfigured';
   if (serverSupabase) {
     try {
-      const { error } = await serverSupabase.from('settings').select('id').limit(1);
+      const { error } = await serverSupabase.from('settings').select('key').limit(1);
       dbStatus = error ? 'error' : 'connected';
     } catch {
       dbStatus = 'error';

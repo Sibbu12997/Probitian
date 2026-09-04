@@ -923,4 +923,525 @@ router.get('/admin/crm/stats', requireAuth, requirePermission(Permission.MANAGE_
   }
 });
 
+// ==================== LEAD SEQUENCES HELPERS & ROUTES ====================
+
+export async function getSupabaseCrmSequences(): Promise<any[]> {
+  if (!serverSupabase) {
+    const data = readCmsData();
+    return data.lead_sequences || [];
+  }
+  try {
+    const { data: row } = await serverSupabase
+      .from('settings')
+      .select('value')
+      .eq('key', 'crm_lead_sequences')
+      .maybeSingle();
+
+    if (row && Array.isArray(row.value?.sequences)) {
+      return row.value.sequences;
+    }
+    return [];
+  } catch (err) {
+    console.error('[Supabase CRM Sequences Read Exception]', err);
+    return [];
+  }
+}
+
+export async function saveSupabaseCrmSequences(sequences: any[]): Promise<void> {
+  const now = new Date().toISOString();
+  if (!serverSupabase) {
+    const data = readCmsData();
+    data.lead_sequences = sequences;
+    writeCmsData(data);
+    return;
+  }
+  await serverSupabase.from('settings').upsert({
+    key: 'crm_lead_sequences',
+    value: { sequences, updated_at: now },
+    updated_at: now
+  });
+}
+
+export async function getSupabaseSequenceSteps(): Promise<any[]> {
+  if (!serverSupabase) {
+    const data = readCmsData();
+    return data.sequence_steps || [];
+  }
+  try {
+    const { data: row } = await serverSupabase
+      .from('settings')
+      .select('value')
+      .eq('key', 'crm_sequence_steps')
+      .maybeSingle();
+
+    if (row && Array.isArray(row.value?.steps)) {
+      return row.value.steps;
+    }
+    return [];
+  } catch (err) {
+    console.error('[Supabase Sequence Steps Read Exception]', err);
+    return [];
+  }
+}
+
+export async function saveSupabaseSequenceSteps(steps: any[]): Promise<void> {
+  const now = new Date().toISOString();
+  if (!serverSupabase) {
+    const data = readCmsData();
+    data.sequence_steps = steps;
+    writeCmsData(data);
+    return;
+  }
+  await serverSupabase.from('settings').upsert({
+    key: 'crm_sequence_steps',
+    value: { steps, updated_at: now },
+    updated_at: now
+  });
+}
+
+export async function getSupabaseSequenceLeads(): Promise<any[]> {
+  if (!serverSupabase) {
+    const data = readCmsData();
+    return data.sequence_leads || [];
+  }
+  try {
+    const { data: row } = await serverSupabase
+      .from('settings')
+      .select('value')
+      .eq('key', 'crm_sequence_leads')
+      .maybeSingle();
+
+    if (row && Array.isArray(row.value?.sequence_leads)) {
+      return row.value.sequence_leads;
+    }
+    return [];
+  } catch (err) {
+    console.error('[Supabase Sequence Leads Read Exception]', err);
+    return [];
+  }
+}
+
+export async function saveSupabaseSequenceLeads(sequenceLeads: any[]): Promise<void> {
+  const now = new Date().toISOString();
+  if (!serverSupabase) {
+    const data = readCmsData();
+    data.sequence_leads = sequenceLeads;
+    writeCmsData(data);
+    return;
+  }
+  await serverSupabase.from('settings').upsert({
+    key: 'crm_sequence_leads',
+    value: { sequence_leads: sequenceLeads, updated_at: now },
+    updated_at: now
+  });
+}
+
+// GET /api/admin/lead-sequences - List all sequences with stats
+router.get('/admin/lead-sequences', requireAuth, requirePermission(Permission.MANAGE_CRM), async (req, res) => {
+  try {
+    const sequences = await getSupabaseCrmSequences();
+    const allSteps = await getSupabaseSequenceSteps();
+    const allSequenceLeads = await getSupabaseSequenceLeads();
+
+    const result = sequences.map(seq => {
+      const steps = allSteps.filter(s => s.sequence_id === seq.id);
+      const leads = allSequenceLeads.filter(l => l.sequence_id === seq.id);
+      return {
+        ...seq,
+        step_count: steps.length,
+        lead_count: leads.length,
+        steps,
+        leads
+      };
+    });
+
+    return res.json(result);
+  } catch (err: any) {
+    console.error('[GET /api/admin/lead-sequences Error]', err);
+    return res.status(503).json({ error: 'Failed to load lead sequences' });
+  }
+});
+
+// GET /api/admin/lead-sequences/:id - Single sequence with steps & enrolled leads
+router.get('/admin/lead-sequences/:id', requireAuth, requirePermission(Permission.MANAGE_CRM), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const sequences = await getSupabaseCrmSequences();
+    const seq = sequences.find(s => s.id === id);
+    if (!seq) {
+      return res.status(404).json({ error: 'Lead sequence not found' });
+    }
+
+    const allSteps = await getSupabaseSequenceSteps();
+    const allSequenceLeads = await getSupabaseSequenceLeads();
+
+    const steps = allSteps
+      .filter(s => s.sequence_id === id)
+      .sort((a, b) => (a.step_number || 0) - (b.step_number || 0));
+
+    const leads = allSequenceLeads.filter(l => l.sequence_id === id);
+
+    return res.json({
+      ...seq,
+      step_count: steps.length,
+      lead_count: leads.length,
+      steps,
+      leads
+    });
+  } catch (err: any) {
+    console.error('[GET /api/admin/lead-sequences/:id Error]', err);
+    return res.status(503).json({ error: 'Failed to load sequence details' });
+  }
+});
+
+// POST /api/admin/lead-sequences - Create new sequence
+router.post('/admin/lead-sequences', requireAuth, requirePermission(Permission.MANAGE_CRM), async (req, res) => {
+  try {
+    const { name, description, steps } = req.body || {};
+    if (!name || typeof name !== 'string' || !name.trim()) {
+      return res.status(400).json({ error: 'Sequence name is required' });
+    }
+
+    const now = new Date().toISOString();
+    const newSeqId = crypto.randomUUID();
+
+    const newSequence = {
+      id: newSeqId,
+      name: name.trim(),
+      description: (description || '').trim(),
+      status: 'Active',
+      created_at: now,
+      updated_at: now
+    };
+
+    const sequences = await getSupabaseCrmSequences();
+    sequences.unshift(newSequence);
+    await saveSupabaseCrmSequences(sequences);
+
+    if (Array.isArray(steps) && steps.length > 0) {
+      const allSteps = await getSupabaseSequenceSteps();
+      const normalizedSteps = steps.map((s, idx) => ({
+        id: crypto.randomUUID(),
+        sequence_id: newSeqId,
+        step_number: idx + 1,
+        delay_days: Number(s.delay_days) || (idx === 0 ? 0 : 3),
+        subject: s.subject || `Follow-up ${idx + 1}`,
+        html_content: s.html_content || '',
+        plain_text: s.plain_text || '',
+        created_at: now,
+        updated_at: now
+      }));
+      allSteps.push(...normalizedSteps);
+      await saveSupabaseSequenceSteps(allSteps);
+    }
+
+    return res.json({ success: true, sequence: newSequence });
+  } catch (err: any) {
+    console.error('[POST /api/admin/lead-sequences Error]', err);
+    return res.status(500).json({ error: 'Failed to create lead sequence' });
+  }
+});
+
+// PATCH /api/admin/lead-sequences/:id - Update sequence properties
+router.patch('/admin/lead-sequences/:id', requireAuth, requirePermission(Permission.MANAGE_CRM), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updates = req.body || {};
+    const sequences = await getSupabaseCrmSequences();
+    const index = sequences.findIndex(s => s.id === id);
+    if (index === -1) {
+      return res.status(404).json({ error: 'Sequence not found' });
+    }
+
+    const now = new Date().toISOString();
+    const updatedSeq = {
+      ...sequences[index],
+      ...updates,
+      updated_at: now
+    };
+    sequences[index] = updatedSeq;
+    await saveSupabaseCrmSequences(sequences);
+
+    return res.json({ success: true, sequence: updatedSeq });
+  } catch (err: any) {
+    console.error('[PATCH /api/admin/lead-sequences/:id Error]', err);
+    return res.status(500).json({ error: 'Failed to update lead sequence' });
+  }
+});
+
+// DELETE /api/admin/lead-sequences/:id - Delete sequence and steps
+router.delete('/admin/lead-sequences/:id', requireAuth, requirePermission(Permission.MANAGE_CRM), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const sequences = await getSupabaseCrmSequences();
+    const filteredSequences = sequences.filter(s => s.id !== id);
+    await saveSupabaseCrmSequences(filteredSequences);
+
+    const allSteps = await getSupabaseSequenceSteps();
+    const remainingSteps = allSteps.filter(s => s.sequence_id !== id);
+    await saveSupabaseSequenceSteps(remainingSteps);
+
+    const allSequenceLeads = await getSupabaseSequenceLeads();
+    const remainingLeads = allSequenceLeads.filter(l => l.sequence_id !== id);
+    await saveSupabaseSequenceLeads(remainingLeads);
+
+    return res.json({ success: true });
+  } catch (err: any) {
+    console.error('[DELETE /api/admin/lead-sequences/:id Error]', err);
+    return res.status(500).json({ error: 'Failed to delete sequence' });
+  }
+});
+
+// POST /api/admin/lead-sequences/:id/steps - Save steps for sequence
+router.post('/admin/lead-sequences/:id/steps', requireAuth, requirePermission(Permission.MANAGE_CRM), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { steps } = req.body || {};
+    if (!Array.isArray(steps)) {
+      return res.status(400).json({ error: 'Invalid steps payload' });
+    }
+
+    const now = new Date().toISOString();
+    const allSteps = await getSupabaseSequenceSteps();
+    const otherSteps = allSteps.filter(s => s.sequence_id !== id);
+
+    const updatedSteps = steps.map((s, idx) => ({
+      id: s.id || crypto.randomUUID(),
+      sequence_id: id,
+      step_number: s.step_number || idx + 1,
+      delay_days: Number(s.delay_days) || 0,
+      subject: s.subject || `Step ${idx + 1}`,
+      html_content: s.html_content || '',
+      plain_text: s.plain_text || '',
+      created_at: s.created_at || now,
+      updated_at: now
+    }));
+
+    const merged = [...otherSteps, ...updatedSteps];
+    await saveSupabaseSequenceSteps(merged);
+
+    return res.json({ success: true, steps: updatedSteps });
+  } catch (err: any) {
+    console.error('[POST /api/admin/lead-sequences/:id/steps Error]', err);
+    return res.status(500).json({ error: 'Failed to save sequence steps' });
+  }
+});
+
+// POST /api/admin/lead-sequences/:id/enroll - Enroll leads in sequence
+router.post('/admin/lead-sequences/:id/enroll', requireAuth, requirePermission(Permission.MANAGE_CRM), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { leadIds } = req.body || {};
+    if (!Array.isArray(leadIds) || leadIds.length === 0) {
+      return res.status(400).json({ error: 'Lead IDs are required for enrollment' });
+    }
+
+    const allSequenceLeads = await getSupabaseSequenceLeads();
+    const now = new Date().toISOString();
+
+    let enrolledCount = 0;
+    let skippedCount = 0;
+
+    for (const leadId of leadIds) {
+      const alreadyActive = allSequenceLeads.some(
+        sl => sl.sequence_id === id && sl.lead_id === leadId && sl.status === 'Active'
+      );
+      if (alreadyActive) {
+        skippedCount++;
+        continue;
+      }
+
+      allSequenceLeads.push({
+        id: crypto.randomUUID(),
+        sequence_id: id,
+        lead_id: leadId,
+        status: 'Active',
+        current_step: 1,
+        created_at: now,
+        updated_at: now,
+        last_sent_at: null,
+        next_send_at: now
+      });
+      enrolledCount++;
+    }
+
+    await saveSupabaseSequenceLeads(allSequenceLeads);
+
+    return res.json({
+      success: true,
+      message: `Enrolled ${enrolledCount} leads (${skippedCount} already enrolled).`,
+      enrolledCount,
+      skippedCount,
+      totalSelected: leadIds.length
+    });
+  } catch (err: any) {
+    console.error('[POST /api/admin/lead-sequences/:id/enroll Error]', err);
+    return res.status(500).json({ error: 'Failed to enroll leads' });
+  }
+});
+
+// POST /api/admin/lead-sequences/:id/pause - Pause sequence
+router.post('/admin/lead-sequences/:id/pause', requireAuth, requirePermission(Permission.MANAGE_CRM), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const sequences = await getSupabaseCrmSequences();
+    const seq = sequences.find(s => s.id === id);
+    if (!seq) {
+      return res.status(404).json({ error: 'Sequence not found' });
+    }
+
+    seq.status = 'Paused';
+    seq.updated_at = new Date().toISOString();
+    await saveSupabaseCrmSequences(sequences);
+
+    return res.json({ success: true, message: 'Sequence paused.' });
+  } catch (err: any) {
+    return res.status(500).json({ error: 'Failed to pause sequence' });
+  }
+});
+
+// POST /api/admin/lead-sequences/:id/resume - Resume sequence
+router.post('/admin/lead-sequences/:id/resume', requireAuth, requirePermission(Permission.MANAGE_CRM), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const sequences = await getSupabaseCrmSequences();
+    const seq = sequences.find(s => s.id === id);
+    if (!seq) {
+      return res.status(404).json({ error: 'Sequence not found' });
+    }
+
+    seq.status = 'Active';
+    seq.updated_at = new Date().toISOString();
+    await saveSupabaseCrmSequences(sequences);
+
+    return res.json({ success: true, message: 'Sequence resumed.' });
+  } catch (err: any) {
+    return res.status(500).json({ error: 'Failed to resume sequence' });
+  }
+});
+
+// POST /api/admin/lead-sequences/:id/stop-lead - Stop specific lead in sequence
+router.post('/admin/lead-sequences/:id/stop-lead', requireAuth, requirePermission(Permission.MANAGE_CRM), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { leadId, reason } = req.body || {};
+    const allSequenceLeads = await getSupabaseSequenceLeads();
+    const sl = allSequenceLeads.find(l => l.sequence_id === id && l.lead_id === leadId);
+    if (!sl) {
+      return res.status(404).json({ error: 'Lead sequence enrollment not found' });
+    }
+
+    sl.status = reason === 'Replied' ? 'Replied' : 'Stopped';
+    sl.updated_at = new Date().toISOString();
+    await saveSupabaseSequenceLeads(allSequenceLeads);
+
+    return res.json({ success: true, message: 'Lead sequence status updated.' });
+  } catch (err: any) {
+    return res.status(500).json({ error: 'Failed to stop lead in sequence' });
+  }
+});
+
+// POST /api/admin/lead-sequences/:id/test - Send sequence test email
+router.post('/api/admin/lead-sequences/:id/test', requireAuth, requirePermission(Permission.MANAGE_CRM), emailTestLimiter, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { stepNumber, testEmail, sampleLeadId } = req.body || {};
+    if (!testEmail || typeof testEmail !== 'string' || !testEmail.includes('@')) {
+      return res.status(400).json({ error: 'Valid test email address is required' });
+    }
+
+    const allSteps = await getSupabaseSequenceSteps();
+    const step = allSteps.find(s => s.sequence_id === id && Number(s.step_number) === Number(stepNumber));
+    if (!step) {
+      return res.status(404).json({ error: `Sequence step ${stepNumber} not found` });
+    }
+
+    const allLeads = await getSupabaseCrmLeads();
+    const sampleLead = (sampleLeadId && allLeads.find(l => l.id === sampleLeadId)) || allLeads[0] || {
+      company_name: 'Acme Enterprises',
+      contact_person: 'Executive Leader',
+      email: testEmail,
+      industry: 'Business Intelligence & Operations'
+    };
+
+    let personalizedSubject = `[TEST STEP ${stepNumber}] ${step.subject}`
+      .replace(/{{company_name}}/gi, sampleLead.company_name || 'Acme Enterprises')
+      .replace(/{{contact_person}}/gi, sampleLead.contact_person || 'Leader');
+
+    let personalizedHtml = (step.html_content || '')
+      .replace(/{{company_name}}/gi, sampleLead.company_name || 'Acme Enterprises')
+      .replace(/{{contact_person}}/gi, sampleLead.contact_person || 'Leader')
+      .replace(/{{industry}}/gi, sampleLead.industry || 'Business Intelligence');
+
+    const unsubToken = generateUnsubscribeToken(testEmail);
+    const reqProtocol = req.headers['x-forwarded-proto'] || req.protocol;
+    const reqHost = req.headers['x-forwarded-host'] || req.headers.host;
+    const unsubUrl = `${reqProtocol}://${reqHost}/api/newsletter/unsubscribe?token=${unsubToken}`;
+
+    const sendRes = await campaignEmailService.sendSingleRecipient({
+      toEmail: testEmail,
+      subject: personalizedSubject,
+      previewText: `Test delivery for Step ${stepNumber}`,
+      contentHtml: personalizedHtml,
+      unsubscribeUrl: unsubUrl
+    });
+
+    if (!sendRes.success) {
+      return res.status(500).json({ error: sendRes.error || 'Failed to dispatch test email' });
+    }
+
+    return res.json({
+      success: true,
+      message: `Test email for Step ${stepNumber} successfully sent to ${testEmail}`
+    });
+  } catch (err: any) {
+    console.error('[POST /api/admin/lead-sequences/:id/test Error]', err);
+    return res.status(500).json({ error: 'Failed to send sequence test email' });
+  }
+});
+
+// POST /api/admin/lead-sequences/process - Trigger queue evaluation
+router.post('/api/admin/lead-sequences/process', requireAuth, requirePermission(Permission.MANAGE_CRM), async (req, res) => {
+  try {
+    const sequences = await getSupabaseCrmSequences();
+    const allSequenceLeads = await getSupabaseSequenceLeads();
+    const activeLeads = allSequenceLeads.filter(l => l.status === 'Active');
+
+    return res.json({
+      success: true,
+      stats: {
+        totalSequences: sequences.length,
+        activeEnrollments: activeLeads.length,
+        processed: 0,
+        sent: 0
+      }
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: 'Failed to process sequences' });
+  }
+});
+
+// GET /api/admin/leads/:id/sequences - Get sequences for a specific lead
+router.get('/admin/leads/:id/sequences', requireAuth, requirePermission(Permission.MANAGE_CRM), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const allSequenceLeads = await getSupabaseSequenceLeads();
+    const sequences = await getSupabaseCrmSequences();
+    const leadEnrollments = allSequenceLeads.filter(sl => sl.lead_id === id);
+
+    const result = leadEnrollments.map(sl => {
+      const seq = sequences.find(s => s.id === sl.sequence_id);
+      return {
+        ...sl,
+        sequence_name: seq?.name || 'Unknown Sequence',
+        sequence_status: seq?.status || 'Unknown'
+      };
+    });
+
+    return res.json(result);
+  } catch (err: any) {
+    return res.status(503).json({ error: 'Failed to load lead sequences' });
+  }
+});
+
 export default router;

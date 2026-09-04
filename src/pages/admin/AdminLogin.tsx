@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Lock, Mail, ShieldCheck, ArrowRight, ArrowLeft, Key, Eye, EyeOff, Sun, Moon, AlertCircle } from 'lucide-react';
+import { Lock, Mail, ShieldCheck, ArrowRight, ArrowLeft, Key, Eye, EyeOff, Sun, Moon, AlertCircle, ExternalLink } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { PROBITIAN_LOGO_URL } from '../../constants/branding';
 
@@ -24,10 +24,12 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [cookieBlocked, setCookieBlocked] = useState(false);
 
   const handleAuthSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setCookieBlocked(false);
     setLoading(true);
 
     const userEmail = email.trim() || 'admin@probitian.com';
@@ -38,12 +40,21 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
-          body: JSON.stringify({ passkey: passkey.trim(), email: userEmail })
+          body: JSON.stringify({ passkey: passkey.trim() })
         });
 
         if (response.ok) {
-          const resData = await response.json();
-          onLoginSuccess(resData.email || userEmail);
+          // Confirm active session state before rendering protected admin portal
+          const sessionRes = await fetch('/api/admin/session', { credentials: 'include' });
+          if (sessionRes.ok) {
+            const sessionData = await sessionRes.json();
+            if (sessionData.authenticated && sessionData.email) {
+              onLoginSuccess(sessionData.email);
+              return;
+            }
+          }
+          setCookieBlocked(true);
+          setError('Admin Portal requires a first-party browser tab. This preview is embedded inside AI Studio, where browser privacy settings may block secure administrative session cookies.');
         } else {
           const errData = await response.json().catch(() => null);
           setError(errData?.error || 'Invalid credentials');
@@ -69,8 +80,16 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
           });
 
           if (sessionRes.ok) {
-            const resData = await sessionRes.json();
-            onLoginSuccess(resData.email || data.user.email || userEmail);
+            const verifyRes = await fetch('/api/admin/session', { credentials: 'include' });
+            if (verifyRes.ok) {
+              const verifyData = await verifyRes.json();
+              if (verifyData.authenticated && verifyData.email) {
+                onLoginSuccess(verifyData.email);
+                return;
+              }
+            }
+            setCookieBlocked(true);
+            setError('Admin Portal requires a first-party browser tab. This preview is embedded inside AI Studio, where browser privacy settings may block secure administrative session cookies.');
           } else {
             const errData = await sessionRes.json().catch(() => null);
             setError(errData?.error || 'Unauthorized administrator account');
@@ -226,27 +245,6 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
                     </button>
                   </div>
                 </div>
-
-                <div className="space-y-1.5">
-                  <label
-                    htmlFor="input-admin-email-optional"
-                    className="block text-xs font-semibold text-slate-700 dark:text-slate-300"
-                  >
-                    Admin Email <span className="text-slate-400 font-normal">(Optional)</span>
-                  </label>
-                  <div className="relative">
-                    <Mail className="w-4 h-4 text-slate-400 dark:text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                    <input
-                      id="input-admin-email-optional"
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      autoComplete="email"
-                      className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-purple-600 dark:focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 dark:focus:ring-purple-500/30 transition-all"
-                      placeholder="admin@probitian.com"
-                    />
-                  </div>
-                </div>
               </>
             ) : (
               <>
@@ -305,7 +303,39 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
               </>
             )}
 
-            {error && (
+            {cookieBlocked && (
+              <div
+                id="admin-cookie-blocked-notice"
+                className="p-4 rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 text-amber-900 dark:text-amber-200 space-y-3 text-xs"
+              >
+                <div className="flex items-start gap-2.5">
+                  <AlertCircle className="w-5 h-5 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
+                  <div className="space-y-1">
+                    <p className="font-bold text-sm text-amber-900 dark:text-amber-100">
+                      Admin Portal requires a first-party browser tab.
+                    </p>
+                    <p className="text-amber-700 dark:text-amber-300 leading-relaxed">
+                      This preview is embedded inside AI Studio, where browser privacy settings may block secure administrative session cookies.
+                    </p>
+                    <p className="text-amber-800 dark:text-amber-200 font-medium">
+                      Open Admin Portal in a new tab to continue.
+                    </p>
+                  </div>
+                </div>
+                <a
+                  id="btn-open-admin-new-tab"
+                  href="/admin"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center gap-2 w-full py-2.5 px-4 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-semibold shadow-sm transition-colors text-xs cursor-pointer"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  <span>Open Admin Portal in New Tab</span>
+                </a>
+              </div>
+            )}
+
+            {error && !cookieBlocked && (
               <div
                 id="login-error-alert"
                 className="p-3 rounded-xl bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 text-xs text-red-700 dark:text-red-400 font-semibold flex items-center gap-2"

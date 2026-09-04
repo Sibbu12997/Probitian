@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import crypto from 'crypto';
 import express from 'express';
 import { AdminSession, SessionTokenPayload, UserRole } from './types';
@@ -5,15 +6,32 @@ import { AdminSession, SessionTokenPayload, UserRole } from './types';
 export const adminSessions = new Map<string, AdminSession>();
 export const revokedSessions = new Set<string>();
 export const userRevocationTimestamps = new Map<string, number>();
+export let globalRevocationTimestamp: number = Date.now();
+
+export function revokeAllSessions(): void {
+  globalRevocationTimestamp = Date.now();
+  for (const [token] of adminSessions.entries()) {
+    revokedSessions.add(token);
+  }
+  adminSessions.clear();
+}
 
 export function parseCookies(req: express.Request): Record<string, string> {
   const list: Record<string, string> = {};
   const rc = req.headers?.cookie;
   if (rc) {
-    rc.split(';').forEach(cookie => {
+    const rawCookies = Array.isArray(rc) ? rc.join('; ') : rc;
+    rawCookies.split(';').forEach(cookie => {
       const parts = cookie.split('=');
       if (parts.length >= 2) {
-        list[parts.shift()!.trim()] = decodeURIComponent(parts.join('='));
+        const key = parts.shift()!.trim();
+        let val = parts.join('=');
+        try {
+          val = decodeURIComponent(val);
+        } catch {
+          // Fall back to raw string if decodeURIComponent fails on malformed encoding
+        }
+        list[key] = val;
       }
     });
   }
@@ -110,7 +128,7 @@ export function verifySignedSessionToken(token: string): AdminSession | null {
     const userRevokedAt = payload.userId ? userRevocationTimestamps.get(payload.userId) : undefined;
     const createdAt = payload.createdAt || Date.now();
 
-    if ((emailRevokedAt && createdAt <= emailRevokedAt) || (userRevokedAt && createdAt <= userRevokedAt)) {
+    if (createdAt <= globalRevocationTimestamp || (emailRevokedAt && createdAt <= emailRevokedAt) || (userRevokedAt && createdAt <= userRevokedAt)) {
       revokedSessions.add(token);
       return null;
     }
@@ -130,58 +148,140 @@ export function verifySignedSessionToken(token: string): AdminSession | null {
   }
 }
 
-export function getAdminCookieHeader(token: string, req: express.Request, maxAgeSeconds: number = 86400): string {
-  const isHttps = req.secure || 
-                  req.headers['x-forwarded-proto'] === 'https' ||
-                  req.headers['x-forwarded-ssl'] === 'on' ||
-                  Boolean(process.env.AIS_APPLET_ID) ||
-                  Boolean(process.env.AI_STUDIO_APPLET_ID) ||
-                  Boolean(process.env.DISABLE_HMR) ||
-                  process.env.NODE_ENV === 'production';
-
-  const secureFlag = isHttps ? '; Secure' : '';
-
-  if (maxAgeSeconds === 0) {
-    return `admin_session=; HttpOnly; Path=/; SameSite=Lax${secureFlag}; Max-Age=0`;
+export function isRequestHttps(req: express.Request): boolean {
+  if (req.secure) return true;
+  const protoHeader = req.headers['x-forwarded-proto'];
+  if (typeof protoHeader === 'string') {
+    const firstProto = protoHeader.split(',')[0].trim().toLowerCase();
+    if (firstProto === 'https') return true;
   }
-
-  return `admin_session=${token}; HttpOnly; Path=/; SameSite=Lax${secureFlag}; Max-Age=${maxAgeSeconds}`;
+  if (req.headers['x-forwarded-ssl'] === 'on') return true;
+  if (Boolean(process.env.AIS_APPLET_ID) || Boolean(process.env.AI_STUDIO_APPLET_ID)) return true;
+  if (process.env.NODE_ENV === 'production') return true;
+  return false;
 }
 
-export function getAdminSession(req: express.Request): AdminSession | null {
-  const cookies = parseCookies(req);
-  const token = cookies['admin_session'];
+export function determineSameSiteDirective(req: express.Request, isHttps: boolean): string {
+  // If explicitly overridden via environment variable
+  if (process.env.COOKIE_SAMESITE === 'none' && isHttps) {
+    return 'SameSite=None; Partitioned';
+  }
+  if (process.env.COOKIE_SAMESITE === 'lax') {
+    return 'SameSite=Lax';
+  }
 
-  if (!token) return null;
-  if (revokedSessions.has(token)) return null;
+  // Never use SameSite=None on insecure HTTP (browsers reject SameSite=None without Secure)
+  if (!isHttps) {
+    return 'SameSite=Lax';
+  }
 
-  const session = adminSessions.get(token);
-  if (session) {
-    if (Date.now() > session.expiresAt) {
+  const rawHost = (
+    (typeof req.get === 'function' ? (req.get('x-forwarded-host') || req.get('host')) : null) ||
+    req.headers?.['x-forwarded-host'] ||
+    req.headers?.['host'] ||
+    ''
+  );
+  const host = (Array.isArray(rawHost) ? rawHost[0] : String(rawHost)).toLowerCase().trim();
+
+  // Production ProBitian domains: always enforce standard first-party SameSite=Lax
+  if (host === 'probitian.com' || host === 'www.probitian.com' || host.endsWith('.probitian.com')) {
+    return 'SameSite=Lax';
+  }
+
+  // Unit tests and local development without remote container host: default to SameSite=Lax
+  if (!host || host === 'localhost' || host === '127.0.0.1' || host.startsWith('localhost:') || host.startsWith('127.0.0.1:')) {
+    return 'SameSite=Lax';
+  }
+
+  // Cloud Run / AI Studio preview environment: requires SameSite=None; Partitioned for embedded iframe
+  const origin = (typeof req.get === 'function' ? req.get('origin') : req.headers?.['origin']) || '';
+  const referer = (typeof req.get === 'function' ? req.get('referer') : req.headers?.['referer']) || '';
+  const isPreview = host.endsWith('.run.app') || 
+                    host.includes('aistudio') || 
+                    host.endsWith('.ai.studio') || 
+                    origin.includes('.run.app') || 
+                    referer.includes('.run.app') ||
+                    (Boolean(process.env.APP_URL) && process.env.APP_URL.includes('.run.app'));
+
+  if (isPreview) {
+    return 'SameSite=None; Partitioned';
+  }
+
+  return 'SameSite=Lax';
+}
+
+export function getAdminCookieHeader(token: string, req: express.Request, maxAgeSeconds: number = 86400): string {
+  const isHttps = isRequestHttps(req);
+  const secureFlag = isHttps ? '; Secure' : '';
+  const sameSiteDirective = determineSameSiteDirective(req, isHttps);
+
+  if (maxAgeSeconds === 0) {
+    return `admin_session=; HttpOnly; Path=/; ${sameSiteDirective}${secureFlag}; Max-Age=0`;
+  }
+
+  return `admin_session=${token}; HttpOnly; Path=/; ${sameSiteDirective}${secureFlag}; Max-Age=${maxAgeSeconds}`;
+}
+
+export type SessionValidationFailureReason =
+  | 'NO_COOKIE'
+  | 'REVOKED'
+  | 'EXPIRED'
+  | 'USER_REVOKED'
+  | 'INVALID_FORMAT'
+  | 'INVALID_SIGNATURE'
+  | 'NONE';
+
+export function getAdminSessionWithDiagnostic(req: express.Request): {
+  session: AdminSession | null;
+  reason: SessionValidationFailureReason;
+  hasCookie: boolean;
+} {
+  const parsedCookies = parseCookies(req);
+  const token = (req as any).cookies?.admin_session || parsedCookies['admin_session'];
+
+  if (!token) {
+    return { session: null, reason: 'NO_COOKIE', hasCookie: false };
+  }
+
+  if (revokedSessions.has(token)) {
+    return { session: null, reason: 'REVOKED', hasCookie: true };
+  }
+
+  const inMemory = adminSessions.get(token);
+  if (inMemory) {
+    if (Date.now() > inMemory.expiresAt) {
       adminSessions.delete(token);
-      return null;
+      return { session: null, reason: 'EXPIRED', hasCookie: true };
     }
 
-    const cleanEmail = session.email.toLowerCase().trim();
+    const cleanEmail = inMemory.email.toLowerCase().trim();
     const emailRevokedAt = userRevocationTimestamps.get(cleanEmail);
-    const userRevokedAt = session.userId ? userRevocationTimestamps.get(session.userId) : undefined;
-    if ((emailRevokedAt && session.createdAt <= emailRevokedAt) || (userRevokedAt && session.createdAt <= userRevokedAt)) {
+    const userRevokedAt = inMemory.userId ? userRevocationTimestamps.get(inMemory.userId) : undefined;
+    if (inMemory.createdAt <= globalRevocationTimestamp || (emailRevokedAt && inMemory.createdAt <= emailRevokedAt) || (userRevokedAt && inMemory.createdAt <= userRevokedAt)) {
       adminSessions.delete(token);
       revokedSessions.add(token);
-      return null;
+      return { session: null, reason: 'USER_REVOKED', hasCookie: true };
     }
 
-    return session;
+    return { session: inMemory, reason: 'NONE', hasCookie: true };
   }
 
   // Stateless cryptographic fallback for multi-instance deployments
+  if (!token.includes('.')) {
+    return { session: null, reason: 'INVALID_FORMAT', hasCookie: true };
+  }
+
   const verified = verifySignedSessionToken(token);
   if (verified) {
     adminSessions.set(token, verified);
-    return verified;
+    return { session: verified, reason: 'NONE', hasCookie: true };
   }
 
-  return null;
+  return { session: null, reason: 'INVALID_SIGNATURE', hasCookie: true };
+}
+
+export function getAdminSession(req: express.Request): AdminSession | null {
+  return getAdminSessionWithDiagnostic(req).session;
 }
 
 export function invalidateAdminSession(token: string): void {

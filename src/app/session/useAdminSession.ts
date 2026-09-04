@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { onAdminAuthRequired } from '../../services/cmsService';
 
 export interface AdminSessionState {
   adminUser: string | null;
@@ -12,6 +13,20 @@ export function useAdminSession(): AdminSessionState {
   const [adminUser, setAdminUser] = useState<string | null>(null);
   const [adminRole, setAdminRole] = useState<'admin' | 'editor' | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  // Clear session state if an active authenticated session receives 401 Unauthorized
+  useEffect(() => {
+    const unsubscribe = onAdminAuthRequired(() => {
+      setAdminUser(curr => {
+        if (curr) {
+          setAdminRole(null);
+          return null;
+        }
+        return curr;
+      });
+    });
+    return unsubscribe;
+  }, []);
 
   // Validate server-side admin session on load via HttpOnly cookie
   useEffect(() => {

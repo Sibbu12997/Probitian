@@ -16,7 +16,7 @@ import { campaignEmailService } from '../../src/services/campaignEmailService';
 const router = express.Router();
 
 // Public Newsletter Subscription
-router.post('/newsletter', newsletterLimiter, async (req, res) => {
+router.post(['/newsletter', '/newsletter/subscribe'], newsletterLimiter, async (req, res) => {
   const { email } = req.body;
   const cleanEmail = (email || '').trim().toLowerCase();
 

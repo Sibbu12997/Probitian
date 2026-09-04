@@ -42,12 +42,17 @@ export class DistributedRateLimitStore {
         this.hasLoggedProviderError = false;
         return result;
       } catch (err: any) {
-        // If RPC function is not found or remote database is unreachable, back off remote provider for 5 minutes
-        this.providerUnavailableUntil = now + 5 * 60 * 1000;
+        const isMissingFunction = err?.code === 'PGRST202' || err?.code === '42883' || String(err?.message || '').includes('schema cache');
+        // If RPC function is not found in schema cache, permanently disable remote provider for the process lifecycle; otherwise back off 5 minutes
+        this.providerUnavailableUntil = isMissingFunction ? Infinity : now + 5 * 60 * 1000;
         if (!this.hasLoggedProviderError) {
           this.hasLoggedProviderError = true;
-          const msg = err?.message || err?.code || 'Remote provider error';
-          console.info(`[RateLimitStore] Remote rate limit store unavailable (${msg}), seamlessly falling back to in-memory store.`);
+          if (isMissingFunction) {
+            console.info('[RateLimitStore] Remote RPC function public.increment_rate_limit is not provisioned in Supabase schema cache. Active rate limiting is enforced via high-performance in-memory store.');
+          } else {
+            const msg = err?.message || err?.code || 'Remote provider error';
+            console.info(`[RateLimitStore] Remote rate limit store unavailable (${msg}), seamlessly falling back to in-memory store.`);
+          }
         }
       }
     }

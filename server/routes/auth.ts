@@ -43,16 +43,7 @@ router.post('/admin/verify-passkey', loginLimiter, (req, res) => {
   const enteredPasskey = passkey.trim();
 
   if (constantTimeCompare(enteredPasskey, serverPasskey)) {
-    let adminEmail = OFFICIAL_ADMIN_EMAIL;
-    if (typeof email === 'string' && email.trim()) {
-      const cleanEmail = email.trim().toLowerCase();
-      if (CONFIGURED_ADMIN_EMAILS.includes(cleanEmail)) {
-        adminEmail = cleanEmail;
-      } else {
-        console.warn(`[SECURITY AUDIT] Unauthorized email override attempt '${cleanEmail}' during passkey login. Defaulted to official admin identity.`);
-      }
-    }
-
+    const adminEmail = OFFICIAL_ADMIN_EMAIL;
     const role = UserRole.ADMIN;
     const session = createAdminSession(adminEmail, role);
 
@@ -74,7 +65,7 @@ router.post('/admin/verify-passkey', loginLimiter, (req, res) => {
   }
 
   recordAuditLog(req, {
-    actor: typeof email === 'string' ? email : 'anonymous',
+    actor: 'anonymous',
     role: 'USER',
     action: 'LOGIN_PASSKEY_FAILED',
     resource: 'auth',

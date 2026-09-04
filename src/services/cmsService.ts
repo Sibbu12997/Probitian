@@ -31,6 +31,43 @@ import { PROBITIAN_LOGO_URL, PROBITIAN_X_URL, DEFAULT_SOCIAL_LINKS, DEFAULT_HOME
 import { PROJECTS, BLOG_ARTICLES, LEARN_TOPICS, YOUTUBE_VIDEOS } from '../data/mockData';
 
 /**
+ * Error raised when an authenticated session is missing, expired, or invalid (HTTP 401).
+ */
+export class AuthenticationError extends Error {
+  readonly isAuthError = true;
+  readonly status = 401;
+
+  constructor(message = 'Unauthorized: Authentication required') {
+    super(message);
+    this.name = 'AuthenticationError';
+    Object.setPrototypeOf(this, AuthenticationError.prototype);
+  }
+}
+
+type AuthRequiredListener = () => void;
+const authRequiredListeners = new Set<AuthRequiredListener>();
+
+export function onAdminAuthRequired(listener: AuthRequiredListener): () => void {
+  authRequiredListeners.add(listener);
+  return () => {
+    authRequiredListeners.delete(listener);
+  };
+}
+
+export function notifyAdminAuthRequired(): void {
+  for (const listener of authRequiredListeners) {
+    try {
+      listener();
+    } catch (err) {
+      console.warn('[cmsService] Error in auth required listener:', err);
+    }
+  }
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('admin:unauthorized'));
+  }
+}
+
+/**
  * Safe fetch helper for Express API routes (Single source of truth: Supabase via Express)
  * Includes retry mechanism for transient server boot / reverse proxy cold starts.
  * Relies strictly on browser HttpOnly cookie credentials without client-side token exposure.
@@ -63,6 +100,12 @@ async function safeFetchJson<T = any>(url: string, options?: RequestInit, maxRet
           errorText = await response.text();
         }
 
+        // Handle 401 Authentication Required without unhandled promise crashes
+        if (response.status === 401) {
+          notifyAdminAuthRequired();
+          throw new AuthenticationError(errorText || 'Unauthorized: Authentication required');
+        }
+
         // If the server is starting up or returning gateway errors, wait and retry
         if (attempt < maxRetries && (response.status === 502 || response.status === 503 || response.status === 504 || errorText.includes('Starting Server'))) {
           attempt++;
@@ -86,6 +129,9 @@ async function safeFetchJson<T = any>(url: string, options?: RequestInit, maxRet
 
       return (await response.json()) as T;
     } catch (err: any) {
+      if (err instanceof AuthenticationError || err?.isAuthError) {
+        throw err;
+      }
       if (attempt < maxRetries && (err?.name === 'TypeError' || err?.message?.includes('Failed to fetch') || err?.message?.includes('Starting Server') || err?.message?.includes('Expected JSON'))) {
         attempt++;
         await new Promise(r => setTimeout(r, 500 * attempt));
@@ -512,26 +558,35 @@ export const cmsService = {
 
   // --- CONTACT MESSAGES / REAL ENQUIRIES ---
   async getMessages(): Promise<ContactMessage[]> {
-    const data = await safeFetchJson<any[]>('/api/cms/messages');
-    if (Array.isArray(data)) {
-      return data.map((m: any) => ({
-        id: String(m.id || ('msg-' + m.created_at)),
-        name: m.name || '',
-        email: m.email || '',
-        phone: m.phone || m.phone_number || '',
-        course_interested: m.course_interested || m.course || '',
-        subject: m.subject || '',
-        message: m.message || '',
-        status: m.status || 'new',
-        admin_notes: m.admin_notes || '',
-        reply_message: m.reply_message || '',
-        replied_at: m.replied_at || '',
-        reply_status: m.reply_status || (m.status === 'replied' ? 'sent' : 'none'),
-        email_sent_status: m.email_sent_status || '',
-        created_at: m.created_at || new Date().toISOString()
-      }));
+    try {
+      const data = await safeFetchJson<any[]>('/api/cms/messages');
+      if (Array.isArray(data)) {
+        return data.map((m: any) => ({
+          id: String(m.id || ('msg-' + m.created_at)),
+          name: m.name || '',
+          email: m.email || '',
+          phone: m.phone || m.phone_number || '',
+          course_interested: m.course_interested || m.course || '',
+          subject: m.subject || '',
+          message: m.message || '',
+          status: m.status || 'new',
+          admin_notes: m.admin_notes || '',
+          reply_message: m.reply_message || '',
+          replied_at: m.replied_at || '',
+          reply_status: m.reply_status || (m.status === 'replied' ? 'sent' : 'none'),
+          email_sent_status: m.email_sent_status || '',
+          created_at: m.created_at || new Date().toISOString()
+        }));
+      }
+      return [];
+    } catch (e: any) {
+      if (e instanceof AuthenticationError || e?.isAuthError) {
+        console.warn('[cmsService] Authentication required for contact messages');
+      } else {
+        console.warn('Failed to fetch contact messages via API:', e?.message || e);
+      }
+      return [];
     }
-    return [];
   },
 
   async submitContactMessage(msg: {
@@ -607,11 +662,20 @@ export const cmsService = {
 
   // --- NEWSLETTER SUBSCRIBERS ---
   async getNewsletterSubscribers(): Promise<NewsletterSubscriber[]> {
-    const data = await safeFetchJson<NewsletterSubscriber[]>('/api/cms/subscribers');
-    if (Array.isArray(data)) {
-      return data as NewsletterSubscriber[];
+    try {
+      const data = await safeFetchJson<NewsletterSubscriber[]>('/api/cms/subscribers');
+      if (Array.isArray(data)) {
+        return data as NewsletterSubscriber[];
+      }
+      return [];
+    } catch (e: any) {
+      if (e instanceof AuthenticationError || e?.isAuthError) {
+        console.warn('[cmsService] Authentication required for newsletter subscribers');
+      } else {
+        console.warn('Failed to fetch subscribers via API:', e?.message || e);
+      }
+      return [];
     }
-    return [];
   },
 
   async subscribeNewsletter(email: string): Promise<{ success: boolean; message: string }> {
@@ -652,11 +716,20 @@ export const cmsService = {
   },
 
   async getCampaigns(): Promise<EmailCampaign[]> {
-    const data = await safeFetchJson<EmailCampaign[]>('/api/admin/email-campaigns');
-    if (Array.isArray(data)) {
-      return data as EmailCampaign[];
+    try {
+      const data = await safeFetchJson<EmailCampaign[]>('/api/admin/email-campaigns');
+      if (Array.isArray(data)) {
+        return data as EmailCampaign[];
+      }
+      return [];
+    } catch (e: any) {
+      if (e instanceof AuthenticationError || e?.isAuthError) {
+        console.warn('[cmsService] Authentication required for email campaigns');
+      } else {
+        console.warn('Failed to fetch email campaigns via API:', e?.message || e);
+      }
+      return [];
     }
-    return [];
   },
 
   async getCampaignById(id: string): Promise<(EmailCampaign & { recipients?: EmailCampaignRecipient[] }) | null> {
@@ -1167,33 +1240,42 @@ export const cmsService = {
 
   // --- SOCIAL LINKS ---
   async getSocialLinks(): Promise<SocialLinkItem[]> {
-    const data = await safeFetchJson<any[]>('/api/cms/social');
-    if (Array.isArray(data) && data.length > 0) {
-      const items: SocialLinkItem[] = data.map((s: any) => ({
-        id: String(s.id),
-        platform: s.platform || 'youtube',
-        url: s.url || '',
-        icon: s.icon || 'Youtube',
-        is_active: s.is_active !== false,
-        display_order: s.display_order ?? 0
-      }));
+    try {
+      const data = await safeFetchJson<any[]>('/api/cms/social');
+      if (Array.isArray(data) && data.length > 0) {
+        const items: SocialLinkItem[] = data.map((s: any) => ({
+          id: String(s.id),
+          platform: s.platform || 'youtube',
+          url: s.url || '',
+          icon: s.icon || 'Youtube',
+          is_active: s.is_active !== false,
+          display_order: s.display_order ?? 0
+        }));
 
-      // Ensure X is always present if missing from database
-      const hasX = items.some((s) => s.platform && (s.platform.toLowerCase() === 'x' || s.platform.toLowerCase() === 'twitter'));
-      if (!hasX) {
-        items.push({
-          id: 'default_x_link',
-          platform: 'x',
-          url: PROBITIAN_X_URL,
-          icon: 'X',
-          is_active: true,
-          display_order: 7
-        });
+        // Ensure X is always present if missing from database
+        const hasX = items.some((s) => s.platform && (s.platform.toLowerCase() === 'x' || s.platform.toLowerCase() === 'twitter'));
+        if (!hasX) {
+          items.push({
+            id: 'default_x_link',
+            platform: 'x',
+            url: PROBITIAN_X_URL,
+            icon: 'X',
+            is_active: true,
+            display_order: 7
+          });
+        }
+
+        return items.sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
       }
-
-      return items.sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
+      return DEFAULT_SOCIAL_LINKS;
+    } catch (e: any) {
+      if (e instanceof AuthenticationError || e?.isAuthError) {
+        console.warn('[cmsService] Authentication required for social links');
+      } else {
+        console.warn('Failed to fetch social links via API:', e?.message || e);
+      }
+      return DEFAULT_SOCIAL_LINKS;
     }
-    return DEFAULT_SOCIAL_LINKS;
   },
 
   async saveSocialLink(item: SocialLinkItem): Promise<boolean> {
@@ -1215,18 +1297,27 @@ export const cmsService = {
 
   // --- NAVIGATION ---
   async getNavigation(): Promise<NavigationItem[]> {
-    const data = await safeFetchJson<any[]>('/api/cms/navigation');
-    if (Array.isArray(data)) {
-      return data.map((n: any) => ({
-        id: String(n.id),
-        label: n.label || '',
-        path: n.path || '',
-        icon: n.icon || 'Home',
-        display_order: n.display_order ?? 0,
-        is_visible: n.is_visible !== false
-      }));
+    try {
+      const data = await safeFetchJson<any[]>('/api/cms/navigation');
+      if (Array.isArray(data)) {
+        return data.map((n: any) => ({
+          id: String(n.id),
+          label: n.label || '',
+          path: n.path || '',
+          icon: n.icon || 'Home',
+          display_order: n.display_order ?? 0,
+          is_visible: n.is_visible !== false
+        }));
+      }
+      return [];
+    } catch (e: any) {
+      if (e instanceof AuthenticationError || e?.isAuthError) {
+        console.warn('[cmsService] Authentication required for navigation');
+      } else {
+        console.warn('Failed to fetch navigation via API:', e?.message || e);
+      }
+      return [];
     }
-    return [];
   },
 
   async saveNavigation(items: NavigationItem[]): Promise<boolean> {
@@ -1288,26 +1379,35 @@ export const cmsService = {
   },
 
   async getMediaItems(): Promise<MediaItem[]> {
-    const data = await safeFetchJson<any[]>('/api/cms/media');
-    if (Array.isArray(data)) {
-      return data.map((m: any) => ({
-        id: String(m.id),
-        filename: m.filename || 'asset',
-        original_filename: m.original_filename || m.filename,
-        storage_path: m.storage_path,
-        public_url: m.public_url || m.url || '',
-        url: m.url || m.public_url || '',
-        size_bytes: m.size_bytes || m.file_size || 0,
-        file_size: m.file_size || m.size_bytes || 0,
-        mime_type: m.mime_type || 'image/png',
-        alt_text: m.alt_text || m.filename,
-        category: m.category || m.folder || 'general',
-        folder: m.folder || m.category || 'general',
-        uploaded_at: m.uploaded_at || m.created_at || new Date().toISOString(),
-        created_at: m.created_at || new Date().toISOString()
-      }));
+    try {
+      const data = await safeFetchJson<any[]>('/api/cms/media');
+      if (Array.isArray(data)) {
+        return data.map((m: any) => ({
+          id: String(m.id),
+          filename: m.filename || 'asset',
+          original_filename: m.original_filename || m.filename,
+          storage_path: m.storage_path,
+          public_url: m.public_url || m.url || '',
+          url: m.url || m.public_url || '',
+          size_bytes: m.size_bytes || m.file_size || 0,
+          file_size: m.file_size || m.size_bytes || 0,
+          mime_type: m.mime_type || 'image/png',
+          alt_text: m.alt_text || m.filename,
+          category: m.category || m.folder || 'general',
+          folder: m.folder || m.category || 'general',
+          uploaded_at: m.uploaded_at || m.created_at || new Date().toISOString(),
+          created_at: m.created_at || new Date().toISOString()
+        }));
+      }
+      return [];
+    } catch (e: any) {
+      if (e instanceof AuthenticationError || e?.isAuthError) {
+        console.warn('[cmsService] Authentication required for media items');
+      } else {
+        console.warn('Failed to fetch media items via API:', e?.message || e);
+      }
+      return [];
     }
-    return [];
   },
 
   async addMediaItem(item: Omit<MediaItem, 'id' | 'created_at'>): Promise<MediaItem> {
@@ -1340,17 +1440,26 @@ export const cmsService = {
 
   // --- CATEGORIES ---
   async getCategories(): Promise<CategoryItem[]> {
-    const data = await safeFetchJson<any[]>('/api/cms/categories');
-    if (Array.isArray(data)) {
-      return data.map((c: any) => ({
-        id: String(c.id),
-        name: c.name || '',
-        type: c.type || 'project',
-        slug: c.slug || (c.name ? c.name.toLowerCase().replace(/[^a-z0-9]+/g, '-') : 'category'),
-        description: c.description || ''
-      }));
+    try {
+      const data = await safeFetchJson<any[]>('/api/cms/categories');
+      if (Array.isArray(data)) {
+        return data.map((c: any) => ({
+          id: String(c.id),
+          name: c.name || '',
+          type: c.type || 'project',
+          slug: c.slug || (c.name ? c.name.toLowerCase().replace(/[^a-z0-9]+/g, '-') : 'category'),
+          description: c.description || ''
+        }));
+      }
+      return [];
+    } catch (e: any) {
+      if (e instanceof AuthenticationError || e?.isAuthError) {
+        console.warn('[cmsService] Authentication required for categories');
+      } else {
+        console.warn('Failed to fetch categories via API:', e?.message || e);
+      }
+      return [];
     }
-    return [];
   },
 
   async saveCategory(cat: CategoryItem): Promise<boolean> {

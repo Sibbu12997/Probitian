@@ -1,6 +1,6 @@
 import express from 'express';
 import { Permission, UserRole, AdminSession } from './types';
-import { getAdminSession } from './session';
+import { getAdminSession, getAdminSessionWithDiagnostic } from './session';
 import { CONFIGURED_ADMIN_EMAILS } from '../config/constants';
 import { serverSupabase } from '../services/supabase';
 
@@ -73,8 +73,9 @@ export async function resolveUserRole(
 }
 
 export function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
-  const session = getAdminSession(req);
+  const { session, reason, hasCookie } = getAdminSessionWithDiagnostic(req);
   if (!session) {
+    console.warn(`[AUTH] requireAuth 401 on ${req.method} ${req.path} - admin_session present: ${hasCookie}, reason: ${reason}`);
     return res.status(401).json({ error: 'Unauthorized: Authentication required' });
   }
   (req as any).adminSession = session;
@@ -84,8 +85,9 @@ export function requireAuth(req: express.Request, res: express.Response, next: e
 
 export function requireRole(minimumRole: UserRole) {
   return (req: express.Request, res: express.Response, next: express.NextFunction) => {
-    const session = getAdminSession(req);
+    const { session, reason, hasCookie } = getAdminSessionWithDiagnostic(req);
     if (!session) {
+      console.warn(`[AUTH] requireRole 401 on ${req.method} ${req.path} - admin_session present: ${hasCookie}, reason: ${reason}`);
       return res.status(401).json({ error: 'Unauthorized: Authentication required' });
     }
 
@@ -105,8 +107,9 @@ export function requireRole(minimumRole: UserRole) {
 
 export function requirePermission(permission: Permission) {
   return (req: express.Request, res: express.Response, next: express.NextFunction) => {
-    const session = getAdminSession(req);
+    const { session, reason, hasCookie } = getAdminSessionWithDiagnostic(req);
     if (!session) {
+      console.warn(`[AUTH] requirePermission 401 on ${req.method} ${req.path} - admin_session present: ${hasCookie}, reason: ${reason}`);
       return res.status(401).json({ error: 'Unauthorized: Authentication required' });
     }
 

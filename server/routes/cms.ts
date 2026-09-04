@@ -574,8 +574,8 @@ router.get('/cms/messages', requireAuth, requirePermission(Permission.VIEW_ANALY
   }
 });
 
-// POST /api/cms/messages (Public Contact Form)
-router.post('/cms/messages', contactLimiter, async (req, res) => {
+// POST /api/cms/messages, /api/contact, /api/contact/submit (Public Contact Form)
+router.post(['/cms/messages', '/contact', '/contact/submit'], contactLimiter, async (req, res) => {
   const { name, email, phone, course_interested, subject, message } = req.body;
   if (!name || !email || !message) {
     return res.status(400).json({ error: 'Name, email, and message are required.' });
@@ -592,16 +592,18 @@ router.post('/cms/messages', contactLimiter, async (req, res) => {
         course_interested: (course_interested || '').trim(),
         subject: (subject || 'General Inquiry').trim(),
         message: message.trim(),
-        status: 'unread',
+        status: 'new',
         created_at: new Date().toISOString()
       };
 
       const { data, error } = await serverSupabase.from('messages').insert(dbPayload).select().single();
       if (error) {
+        console.error('[CMS] Contact message insert error:', error);
         return res.status(500).json({ error: 'Failed to send message' });
       }
       savedMsg = data;
     } catch (err) {
+      console.error('[CMS] Contact message exception:', err);
       return res.status(500).json({ error: 'Failed to send message' });
     }
   } else {
@@ -613,7 +615,7 @@ router.post('/cms/messages', contactLimiter, async (req, res) => {
       course_interested: course_interested || '',
       subject: subject || 'General Inquiry',
       message,
-      status: 'unread',
+      status: 'new',
       created_at: new Date().toISOString()
     };
     const data = readCmsData();
