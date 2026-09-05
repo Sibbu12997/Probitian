@@ -8,6 +8,7 @@ import {
   createSignedSessionToken, 
   createAdminSession, 
   getAdminSession, 
+  getAdminSessionWithDiagnostic,
   invalidateAdminSession, 
   invalidateUserSessions,
   revokeAllSessions,
@@ -154,13 +155,20 @@ router.post('/admin/verify-supabase-session', loginLimiter, async (req, res) => 
 
 // GET /api/admin/session
 router.get('/admin/session', async (req, res) => {
-  const session = await getAdminSession(req);
-  if (session) {
+  const diagnostic = await getAdminSessionWithDiagnostic(req);
+  if (diagnostic.session) {
     return res.json({ 
       authenticated: true, 
-      email: session.email, 
-      role: session.role,
-      userId: session.userId
+      email: diagnostic.session.email, 
+      role: diagnostic.session.role,
+      userId: diagnostic.session.userId
+    });
+  }
+  if (diagnostic.reason === 'STORE_UNAVAILABLE' || diagnostic.reason === 'REVOCATION_CHECK_FAILED') {
+    return res.status(500).json({
+      authenticated: false,
+      error: 'Authentication service temporarily unavailable: session revocation status could not be verified',
+      code: 'AUTH_STORE_UNAVAILABLE'
     });
   }
   return res.json({ authenticated: false });
@@ -183,7 +191,11 @@ router.post('/admin/logout', async (req, res) => {
   }
 
   if (token) {
-    await invalidateAdminSession(token, 'LOGOUT');
+    try {
+      await invalidateAdminSession(token, 'LOGOUT');
+    } catch (err) {
+      console.warn('[Admin Logout] Database revocation error (cookie will still be cleared):', err);
+    }
   }
   res.setHeader('Set-Cookie', getAdminCookieHeader('', req, 0));
   return res.json({ success: true });
@@ -282,7 +294,15 @@ router.post('/admin/roles/assign', requireAuth, requireRole(UserRole.ADMIN), asy
       });
 
       // Immediately invalidate any active sessions belonging to the modified user
-      await invalidateUserSessions({ userId: data?.id || userId, email: data?.email || email }, 'ROLE_CHANGED');
+      try {
+        await invalidateUserSessions({ userId: data?.id || userId, email: data?.email || email }, 'ROLE_CHANGED');
+      } catch (err: any) {
+        console.error('[Role Assignment Session Revocation Error]', err);
+        return res.status(500).json({ 
+          error: 'User role updated, but failed to invalidate prior sessions in authoritative database',
+          code: 'REVOCATION_WRITE_FAILED'
+        });
+      }
 
       return res.json({ success: true, profile: data });
     } catch (err: any) {
@@ -292,7 +312,15 @@ router.post('/admin/roles/assign', requireAuth, requireRole(UserRole.ADMIN), asy
   }
 
   // Fallback mode: invalidate any active sessions for this user
-  await invalidateUserSessions({ userId, email }, 'ROLE_CHANGED');
+  try {
+    await invalidateUserSessions({ userId, email }, 'ROLE_CHANGED');
+  } catch (err: any) {
+    console.error('[Role Assignment Fallback Revocation Error]', err);
+    return res.status(500).json({ 
+      error: 'Failed to invalidate prior user sessions in authoritative database',
+      code: 'REVOCATION_WRITE_FAILED'
+    });
+  }
   return res.json({ success: true, message: `Role ${role} simulated for ${userId || email}` });
 });
 
@@ -306,7 +334,15 @@ router.post('/admin/revoke-session', requireAuth, requireRole(UserRole.ADMIN), a
     return res.status(400).json({ error: 'Valid session token is required to revoke' });
   }
 
-  await invalidateAdminSession(tokenToRevoke, 'ADMIN_MANUAL_REVOCATION');
+  try {
+    await invalidateAdminSession(tokenToRevoke, 'ADMIN_MANUAL_REVOCATION');
+  } catch (err: any) {
+    console.error('[Admin Revoke Session DB Write Error]', err);
+    return res.status(500).json({ 
+      error: 'Failed to record session revocation in authoritative database',
+      code: 'REVOCATION_WRITE_FAILED'
+    });
+  }
 
   recordAuditLog(req, {
     actor: currentSession?.email || 'admin',
@@ -331,7 +367,15 @@ router.post('/admin/revoke-user-sessions', requireAuth, requireRole(UserRole.ADM
     return res.status(400).json({ error: 'Must provide either email or userId to revoke sessions' });
   }
 
-  await invalidateUserSessions({ email, userId }, 'ADMIN_USER_REVOCATION');
+  try {
+    await invalidateUserSessions({ email, userId }, 'ADMIN_USER_REVOCATION');
+  } catch (err: any) {
+    console.error('[Admin Revoke User Sessions DB Write Error]', err);
+    return res.status(500).json({ 
+      error: 'Failed to record user revocation in authoritative database',
+      code: 'REVOCATION_WRITE_FAILED'
+    });
+  }
 
   recordAuditLog(req, {
     actor: currentSession?.email || 'admin',
@@ -349,7 +393,15 @@ router.post('/admin/revoke-user-sessions', requireAuth, requireRole(UserRole.ADM
 router.post('/admin/revoke-all-sessions', requireAuth, requireRole(UserRole.ADMIN), async (req, res) => {
   const currentSession = (req as any).adminSession || (await getAdminSession(req));
 
-  await revokeAllSessions('ADMIN_GLOBAL_REVOCATION');
+  try {
+    await revokeAllSessions('ADMIN_GLOBAL_REVOCATION');
+  } catch (err: any) {
+    console.error('[Admin Revoke All Sessions DB Write Error]', err);
+    return res.status(500).json({ 
+      error: 'Failed to record global revocation in authoritative database',
+      code: 'REVOCATION_WRITE_FAILED'
+    });
+  }
 
   recordAuditLog(req, {
     actor: currentSession?.email || 'admin',

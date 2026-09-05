@@ -1,4 +1,4 @@
-import { test, describe } from 'node:test';
+import { test, describe, before, after, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import DOMPurify from 'isomorphic-dompurify';
@@ -19,6 +19,9 @@ import {
   userRevocationTimestamps as serverUserRevocationTimestamps,
   globalRevocationTimestamp as serverGlobalRevocationTimestamp,
   MemorySessionRevocationStore,
+  SupabaseSessionRevocationStore,
+  SessionRevocationError,
+  createMockSupabaseClient,
   setRevocationStore,
   resetRevocationStore,
   getAdminSessionWithDiagnostic as getServerAdminSessionWithDiagnostic
@@ -949,6 +952,23 @@ describe('9. Distributed Rate-Limit Store, Concurrency & Fail-Safe Architecture'
 });
 
 describe('10. Server RBAC, Authentication & Session Hardening Verification', () => {
+  let memoryStore: MemorySessionRevocationStore;
+
+  beforeEach(() => {
+    memoryStore = new MemorySessionRevocationStore();
+    setRevocationStore(memoryStore);
+    serverAdminSessions.clear();
+    serverRevokedSessions.clear();
+    serverUserRevocationTimestamps.clear();
+  });
+
+  afterEach(() => {
+    resetRevocationStore();
+    serverAdminSessions.clear();
+    serverRevokedSessions.clear();
+    serverUserRevocationTimestamps.clear();
+  });
+
   function createMockRequest(headers: Record<string, string> = {}, cookies: Record<string, string> = {}) {
     return {
       headers: { ...headers },
@@ -1405,5 +1425,226 @@ describe('10. Server RBAC, Authentication & Session Hardening Verification', () 
     assert.strictEqual(resValid.reason, 'NONE');
     assert.strictEqual(resValid.hasCookie, true);
     assert.ok(resValid.session);
+  });
+
+  test('22. Fail-Closed: Supabase store with null client fails closed on verification and write', async () => {
+    const nullStore = new SupabaseSessionRevocationStore(null);
+    setRevocationStore(nullStore);
+
+    const validSession = createServerAdminSession('test-null-store@probitian.com', ServerUserRole.ADMIN);
+    const token = validSession.token;
+
+    // 1. Direct check must return verified: false and STORE_UNAVAILABLE
+    const checkResult = await nullStore.isRevoked(token);
+    assert.strictEqual(checkResult.revoked, true);
+    assert.strictEqual(checkResult.verified, false);
+    assert.strictEqual(checkResult.reason, 'STORE_UNAVAILABLE');
+
+    // 2. requireAuth must fail closed with 500 and REVOCATION_STORE_ERROR
+    const req = createMockRequest({ cookie: `admin_session=${token}` });
+    const res = createMockResponse();
+    let nextCalled = false;
+    await serverRequireAuth(req, res as any, () => { nextCalled = true; });
+
+    assert.strictEqual(nextCalled, false, 'requireAuth must NOT call next() when revocation store is unavailable');
+    assert.strictEqual(res.getStatus(), 500);
+    assert.strictEqual(res.getBody()?.code, 'REVOCATION_STORE_ERROR');
+
+    // 3. requireRole must fail closed with 500 and REVOCATION_STORE_ERROR
+    const resRole = createMockResponse();
+    let nextRoleCalled = false;
+    await serverRequireRole(ServerUserRole.ADMIN)(req, resRole as any, () => { nextRoleCalled = true; });
+
+    assert.strictEqual(nextRoleCalled, false);
+    assert.strictEqual(resRole.getStatus(), 500);
+    assert.strictEqual(resRole.getBody()?.code, 'REVOCATION_STORE_ERROR');
+
+    // 4. requirePermission must fail closed with 500
+    const resPerm = createMockResponse();
+    let nextPermCalled = false;
+    await serverRequirePermission(ServerPermission.MANAGE_SYSTEM)(req, resPerm as any, () => { nextPermCalled = true; });
+
+    assert.strictEqual(nextPermCalled, false);
+    assert.strictEqual(resPerm.getStatus(), 500);
+    assert.strictEqual(resPerm.getBody()?.code, 'REVOCATION_STORE_ERROR');
+
+    // 5. Invalidation writes must reject with SessionRevocationError
+    await assert.rejects(
+      async () => invalidateServerAdminSession(token, 'TEST'),
+      (err: any) => err instanceof SessionRevocationError && err.code === 'STORE_UNAVAILABLE'
+    );
+    await assert.rejects(
+      async () => invalidateServerUserSessions({ email: 'test@probitian.com' }, 'TEST'),
+      (err: any) => err instanceof SessionRevocationError && err.code === 'STORE_UNAVAILABLE'
+    );
+    await assert.rejects(
+      async () => revokeServerAllSessions('TEST'),
+      (err: any) => err instanceof SessionRevocationError && err.code === 'STORE_UNAVAILABLE'
+    );
+  });
+
+  test('23. Fail-Closed: Query failure in SupabaseSessionRevocationStore blocks authentication with 500', async () => {
+    const mockFailingClient = createMockSupabaseClient({
+      queryError: { message: 'Database connection timeout: could not reach PostgreSQL replica' }
+    });
+    const store = new SupabaseSessionRevocationStore(mockFailingClient);
+    setRevocationStore(store);
+
+    const validSession = createServerAdminSession('db-fail@probitian.com', ServerUserRole.ADMIN);
+    const token = validSession.token;
+
+    // Direct check must report verified: false and REVOCATION_CHECK_FAILED
+    const checkResult = await store.isRevoked(token);
+    assert.strictEqual(checkResult.revoked, true, 'Must report revoked=true on DB query failure');
+    assert.strictEqual(checkResult.verified, false, 'Must report verified=false on DB query failure');
+    assert.strictEqual(checkResult.reason, 'REVOCATION_CHECK_FAILED');
+
+    // getAdminSessionWithDiagnostic must propagate failure
+    const diag = await getServerAdminSessionWithDiagnostic(createMockRequest({ cookie: `admin_session=${token}` }));
+    assert.strictEqual(diag.session, null);
+    assert.strictEqual(diag.reason, 'REVOCATION_CHECK_FAILED');
+
+    // Middleware must block with 500 Internal Server Error
+    const req = createMockRequest({ cookie: `admin_session=${token}` });
+    const res = createMockResponse();
+    let nextCalled = false;
+    await serverRequireAuth(req, res as any, () => { nextCalled = true; });
+
+    assert.strictEqual(nextCalled, false);
+    assert.strictEqual(res.getStatus(), 500);
+    assert.strictEqual(res.getBody()?.code, 'REVOCATION_STORE_ERROR');
+  });
+
+  test('24. Fail-Closed: DB write failure on revocation throws and does NOT falsely report success', async () => {
+    const mockWriteFailClient = createMockSupabaseClient({
+      writeError: { message: 'FATAL: disk full on primary database node' }
+    });
+    const store = new SupabaseSessionRevocationStore(mockWriteFailClient);
+    setRevocationStore(store);
+
+    const validSession = createServerAdminSession('write-fail@probitian.com', ServerUserRole.ADMIN);
+    const token = validSession.token;
+
+    // Token revocation fails
+    await assert.rejects(
+      async () => store.revokeToken(token, 'WRITE_FAIL_TEST'),
+      (err: any) => err instanceof SessionRevocationError && err.code === 'WRITE_FAILED'
+    );
+
+    // User revocation fails
+    await assert.rejects(
+      async () => store.revokeUser({ email: 'write-fail@probitian.com' }, 'WRITE_FAIL_TEST'),
+      (err: any) => err instanceof SessionRevocationError && err.code === 'WRITE_FAILED'
+    );
+
+    // Global revocation fails
+    await assert.rejects(
+      async () => store.revokeAll('WRITE_FAIL_TEST'),
+      (err: any) => err instanceof SessionRevocationError && err.code === 'WRITE_FAILED'
+    );
+
+    // Through wrapper
+    await assert.rejects(
+      async () => invalidateServerAdminSession(token),
+      (err: any) => err instanceof SessionRevocationError && err.code === 'WRITE_FAILED'
+    );
+  });
+
+  test('25. Distributed Authoritative Lifecycle: Healthy mock Supabase client persists revocations across stores', async () => {
+    const sharedMockClient = createMockSupabaseClient();
+    const instance1Store = new SupabaseSessionRevocationStore(sharedMockClient);
+    const instance2Store = new SupabaseSessionRevocationStore(sharedMockClient);
+
+    // Instance 1 issues session
+    const session = createServerAdminSession('healthy-lifecycle@probitian.com', ServerUserRole.ADMIN, 'user-hl-1');
+    const token = session.token;
+
+    // Instance 2 verifies session
+    setRevocationStore(instance2Store);
+    const initialCheck = await instance2Store.isRevoked(token);
+    assert.strictEqual(initialCheck.revoked, false);
+    assert.strictEqual(initialCheck.verified, true);
+    assert.strictEqual(initialCheck.reason, 'NONE');
+
+    const req = createMockRequest({ cookie: `admin_session=${token}` });
+    const res = createMockResponse();
+    let nextCalled = false;
+    await serverRequireAuth(req, res as any, () => { nextCalled = true; });
+    assert.strictEqual(nextCalled, true);
+    assert.strictEqual(res.getStatus(), 200);
+
+    // Instance 1 revokes the token in the shared DB
+    await instance1Store.revokeToken(token, 'LOGOUT_FROM_INSTANCE_1');
+
+    // Instance 2 (simulate process-local cache clear)
+    instance2Store.clearLocalCache();
+
+    // Instance 2 checks again -> now revoked!
+    const revokedCheck = await instance2Store.isRevoked(token);
+    assert.strictEqual(revokedCheck.revoked, true);
+    assert.strictEqual(revokedCheck.verified, true);
+    assert.strictEqual(revokedCheck.reason, 'REVOKED');
+
+    const resRevoked = createMockResponse();
+    let nextRevokedCalled = false;
+    await serverRequireAuth(req, resRevoked as any, () => { nextRevokedCalled = true; });
+    assert.strictEqual(nextRevokedCalled, false);
+    assert.strictEqual(resRevoked.getStatus(), 401);
+  });
+
+  test('26. Distributed Authoritative User Revocation: Revoking user on Instance 1 invalidates user on Instance 2', async () => {
+    const sharedMockClient = createMockSupabaseClient();
+    const instance1Store = new SupabaseSessionRevocationStore(sharedMockClient);
+    const instance2Store = new SupabaseSessionRevocationStore(sharedMockClient);
+
+    const userASession = createServerAdminSession('alice@probitian.com', ServerUserRole.EDITOR, 'user-alice');
+    const userBSession = createServerAdminSession('bob@probitian.com', ServerUserRole.ADMIN, 'user-bob');
+
+    // Instance 1 revokes Alice's sessions
+    await instance1Store.revokeUser({ email: 'alice@probitian.com', userId: 'user-alice' }, 'ROLE_DOWNGRADED');
+
+    // Instance 2 checks
+    setRevocationStore(instance2Store);
+    instance2Store.clearLocalCache();
+
+    const aliceCheck = await instance2Store.isRevoked(userASession.token);
+    assert.strictEqual(aliceCheck.revoked, true);
+    assert.strictEqual(aliceCheck.verified, true);
+    assert.strictEqual(aliceCheck.reason, 'USER_REVOKED');
+
+    const bobCheck = await instance2Store.isRevoked(userBSession.token);
+    assert.strictEqual(bobCheck.revoked, false);
+    assert.strictEqual(bobCheck.verified, true);
+    assert.strictEqual(bobCheck.reason, 'NONE');
+  });
+
+  test('27. Distributed Authoritative Global Revocation: Revoking all on Instance 1 invalidates prior tokens on Instance 2', async () => {
+    const sharedMockClient = createMockSupabaseClient();
+    const instance1Store = new SupabaseSessionRevocationStore(sharedMockClient);
+    const instance2Store = new SupabaseSessionRevocationStore(sharedMockClient);
+
+    const sessionBefore = createServerAdminSession('global-test@probitian.com', ServerUserRole.ADMIN, 'user-gt');
+    await new Promise((r) => setTimeout(r, 5));
+
+    // Instance 1 triggers global revocation
+    await instance1Store.revokeAll('GLOBAL_EMERGENCY_REVOKE');
+
+    // Instance 2 checks token issued before revocation
+    setRevocationStore(instance2Store);
+    instance2Store.clearLocalCache();
+
+    const checkBefore = await instance2Store.isRevoked(sessionBefore.token);
+    assert.strictEqual(checkBefore.revoked, true);
+    assert.strictEqual(checkBefore.verified, true);
+    assert.strictEqual(checkBefore.reason, 'REVOKED');
+
+    // Token issued AFTER the global revocation should be valid
+    // Wait 2ms to ensure timestamp is strictly greater
+    await new Promise((r) => setTimeout(r, 5));
+    const sessionAfter = createServerAdminSession('global-test-after@probitian.com', ServerUserRole.ADMIN, 'user-gt-after');
+    const checkAfter = await instance2Store.isRevoked(sessionAfter.token);
+    assert.strictEqual(checkAfter.revoked, false);
+    assert.strictEqual(checkAfter.verified, true);
+    assert.strictEqual(checkAfter.reason, 'NONE');
   });
 });

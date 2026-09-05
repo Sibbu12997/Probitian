@@ -145,6 +145,32 @@ export interface MediaItem {
   updated_at?: string;
 }
 
+export interface MediaReference {
+  location: string;
+  type: string;
+  details: string;
+}
+
+export interface MediaReferencesResponse {
+  success: boolean;
+  media_id: string;
+  filename: string;
+  in_use: boolean;
+  reference_count: number;
+  references: MediaReference[];
+}
+
+export interface MediaBulkDeleteResult {
+  success: boolean;
+  total_requested: number;
+  deleted_count: number;
+  skipped_count: number;
+  failed_count: number;
+  deleted: Array<{ id: string; filename: string }>;
+  skipped: Array<{ id: string; filename: string; reason: string; references: MediaReference[] }>;
+  failed: Array<{ id: string; filename?: string; error: string }>;
+}
+
 export interface SocialLinkItem {
   id: string;
   platform: string;

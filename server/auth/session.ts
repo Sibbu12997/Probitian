@@ -15,7 +15,26 @@ export type SessionValidationFailureReason =
   | 'USER_REVOKED'
   | 'INVALID_FORMAT'
   | 'INVALID_SIGNATURE'
+  | 'STORE_UNAVAILABLE'
+  | 'REVOCATION_CHECK_FAILED'
   | 'NONE';
+
+export class SessionRevocationError extends Error {
+  public readonly code: 'STORE_UNAVAILABLE' | 'WRITE_FAILED' | 'REVOCATION_CHECK_FAILED';
+  public readonly cause?: any;
+
+  constructor(
+    message: string,
+    code: 'STORE_UNAVAILABLE' | 'WRITE_FAILED' | 'REVOCATION_CHECK_FAILED',
+    cause?: any
+  ) {
+    super(message);
+    this.name = 'SessionRevocationError';
+    this.code = code;
+    this.cause = cause;
+    Object.setPrototypeOf(this, SessionRevocationError.prototype);
+  }
+}
 
 export interface RevocationCheckParams {
   tokenHash: string;
@@ -28,138 +47,225 @@ export interface RevocationCheckParams {
 export interface RevocationCheckResult {
   revoked: boolean;
   reason?: SessionValidationFailureReason;
+  verified: boolean;
+  error?: string;
 }
 
 export interface SessionRevocationStore {
-  isRevoked(check: RevocationCheckParams): Promise<RevocationCheckResult>;
-  revokeToken(token: string, tokenHash: string, expiresAt?: number, reason?: string): Promise<void>;
+  isRevoked(check: RevocationCheckParams | string): Promise<RevocationCheckResult>;
+  revokeToken(token: string, tokenHash?: string, expiresAt?: number, reason?: string): Promise<void>;
   revokeUser(identifier: { email?: string; userId?: string }, reason?: string): Promise<void>;
   revokeAll(reason?: string): Promise<void>;
   getGlobalRevocationTimestamp(): Promise<number>;
   clearLocalState?(): void;
+  clearLocalCache?(): void;
 }
 
 /**
  * Production-ready PostgreSQL/Supabase-backed distributed revocation store.
- * Ensures consistent session invalidation across all Cloud Run instances.
+ * Ensures authoritative session invalidation across all Cloud Run instances.
+ * 
+ * FAIL-CLOSED SECURITY GUARANTEES:
+ * 1. If Supabase is unavailable, offline, or returns a query error, authentication
+ *    FAILS CLOSED (verified: false, revoked: true). Access is rejected with a safe error.
+ * 2. Revocation write operations (token, user, all) throw SessionRevocationError on DB failure.
+ * 3. Local caches serve ONLY as immutable optimizations for confirmed revocations;
+ *    they NEVER override or replace authoritative database state.
  */
 export class SupabaseSessionRevocationStore implements SessionRevocationStore {
   private localRevokedHashes = new Set<string>();
   private localUserRevocations = new Map<string, number>();
   private localGlobalRevocationTimestamp: number = 0;
-  private lastDbErrorTime: number = 0;
+  private client: any;
 
-  async isRevoked(check: RevocationCheckParams): Promise<RevocationCheckResult> {
-    // 1. Process-local fast path (catches locally revoked tokens immediately)
+  constructor(client?: any) {
+    // If client is explicitly passed (including null), respect it.
+    // Otherwise default to the shared serverSupabase client.
+    this.client = client !== undefined ? client : serverSupabase;
+  }
+
+  getClient(): any {
+    return this.client;
+  }
+
+  async isRevoked(checkOrToken: RevocationCheckParams | string): Promise<RevocationCheckResult> {
+    let check: RevocationCheckParams;
+    if (typeof checkOrToken === 'string') {
+      const token = checkOrToken;
+      const tokenHash = hashSessionToken(token);
+      let email: string | undefined;
+      let userId: string | undefined;
+      let createdAt = Date.now();
+      try {
+        const parts = token.split('.');
+        if (parts[0]) {
+          const payload = JSON.parse(Buffer.from(parts[0], 'base64url').toString('utf-8'));
+          if (payload.email) email = payload.email.toLowerCase().trim();
+          if (payload.userId) userId = payload.userId.trim();
+          if (payload.createdAt) createdAt = Number(payload.createdAt);
+        }
+      } catch {
+        // payload parse fallback
+      }
+      check = { token, tokenHash, email, userId, createdAt };
+    } else {
+      check = checkOrToken;
+    }
+
+    // 1. Process-local fast path for confirmed revocations only (immutable negative cache optimization)
     if (this.localRevokedHashes.has(check.tokenHash) || this.localRevokedHashes.has(check.token)) {
-      return { revoked: true, reason: 'REVOKED' };
+      return { revoked: true, verified: true, reason: 'REVOKED' };
     }
     if (this.localGlobalRevocationTimestamp > 0 && check.createdAt <= this.localGlobalRevocationTimestamp) {
-      return { revoked: true, reason: 'REVOKED' };
+      return { revoked: true, verified: true, reason: 'REVOKED' };
     }
     if (check.email) {
       const emailRevokedAt = this.localUserRevocations.get(`email:${check.email.toLowerCase().trim()}`);
       if (emailRevokedAt && check.createdAt <= emailRevokedAt) {
-        return { revoked: true, reason: 'USER_REVOKED' };
+        return { revoked: true, verified: true, reason: 'USER_REVOKED' };
       }
     }
     if (check.userId) {
       const userRevokedAt = this.localUserRevocations.get(`id:${check.userId.trim()}`);
       if (userRevokedAt && check.createdAt <= userRevokedAt) {
-        return { revoked: true, reason: 'USER_REVOKED' };
+        return { revoked: true, verified: true, reason: 'USER_REVOKED' };
       }
     }
 
-    // 2. Query Supabase PostgreSQL for distributed state across all instances
-    if (serverSupabase) {
-      try {
-        const targets: string[] = [check.tokenHash, 'GLOBAL'];
-        if (check.email) {
-          targets.push(`user:email:${check.email.toLowerCase().trim()}`);
-        }
-        if (check.userId) {
-          targets.push(`user:id:${check.userId.trim()}`);
-        }
-
-        const { data, error } = await serverSupabase
-          .from('admin_session_revocations')
-          .select('target, revocation_type, revoked_at')
-          .in('target', targets);
-
-        if (error) {
-          const now = Date.now();
-          if (now - this.lastDbErrorTime > 30000) {
-            this.lastDbErrorTime = now;
-            console.warn('[Admin Session Revocation] Supabase query warning, using local verification fallback:', error.message);
-          }
-          return { revoked: false };
-        }
-
-        if (data && data.length > 0) {
-          for (const row of data) {
-            const revokedAt = Number(row.revoked_at);
-            if (row.target === check.tokenHash) {
-              this.localRevokedHashes.add(check.tokenHash);
-              return { revoked: true, reason: 'REVOKED' };
-            }
-            if (row.target === 'GLOBAL') {
-              this.localGlobalRevocationTimestamp = Math.max(this.localGlobalRevocationTimestamp, revokedAt);
-              if (check.createdAt <= revokedAt) {
-                return { revoked: true, reason: 'REVOKED' };
-              }
-            }
-            if (row.target.startsWith('user:email:')) {
-              const email = row.target.replace('user:email:', '');
-              this.localUserRevocations.set(`email:${email}`, Math.max(this.localUserRevocations.get(`email:${email}`) || 0, revokedAt));
-              if (check.createdAt <= revokedAt) {
-                return { revoked: true, reason: 'USER_REVOKED' };
-              }
-            }
-            if (row.target.startsWith('user:id:')) {
-              const userId = row.target.replace('user:id:', '');
-              this.localUserRevocations.set(`id:${userId}`, Math.max(this.localUserRevocations.get(`id:${userId}`) || 0, revokedAt));
-              if (check.createdAt <= revokedAt) {
-                return { revoked: true, reason: 'USER_REVOKED' };
-              }
-            }
-          }
-        }
-      } catch (err) {
-        console.warn('[Admin Session Revocation] Unexpected query error:', err);
-      }
+    // 2. Query authoritative Supabase PostgreSQL for distributed state across all instances
+    const client = this.getClient();
+    if (!client) {
+      // FAIL-CLOSED: Database client is missing or unconfigured
+      return {
+        revoked: true,
+        verified: false,
+        reason: 'STORE_UNAVAILABLE',
+        error: 'Authoritative database client is not configured or unavailable'
+      };
     }
 
-    return { revoked: false };
+    try {
+      const targets: string[] = [check.tokenHash, 'GLOBAL'];
+      if (check.email) {
+        targets.push(`user:email:${check.email.toLowerCase().trim()}`);
+      }
+      if (check.userId) {
+        targets.push(`user:id:${check.userId.trim()}`);
+      }
+
+      const { data, error } = await client
+        .from('admin_session_revocations')
+        .select('target, revocation_type, revoked_at')
+        .in('target', targets);
+
+      if (error) {
+        // FAIL-CLOSED: Query error MUST NOT fall back to allowed/not-revoked!
+        return {
+          revoked: true,
+          verified: false,
+          reason: 'REVOCATION_CHECK_FAILED',
+          error: `Authoritative revocation query failed: ${error.message || String(error)}`
+        };
+      }
+
+      if (data && data.length > 0) {
+        for (const row of data) {
+          const revokedAt = Number(row.revoked_at);
+          if (row.target === check.tokenHash) {
+            this.localRevokedHashes.add(check.tokenHash);
+            return { revoked: true, verified: true, reason: 'REVOKED' };
+          }
+          if (row.target === 'GLOBAL') {
+            this.localGlobalRevocationTimestamp = Math.max(this.localGlobalRevocationTimestamp, revokedAt);
+            if (check.createdAt <= revokedAt) {
+              return { revoked: true, verified: true, reason: 'REVOKED' };
+            }
+          }
+          if (row.target.startsWith('user:email:')) {
+            const email = row.target.replace('user:email:', '');
+            this.localUserRevocations.set(`email:${email}`, Math.max(this.localUserRevocations.get(`email:${email}`) || 0, revokedAt));
+            if (check.createdAt <= revokedAt) {
+              return { revoked: true, verified: true, reason: 'USER_REVOKED' };
+            }
+          }
+          if (row.target.startsWith('user:id:')) {
+            const userId = row.target.replace('user:id:', '');
+            this.localUserRevocations.set(`id:${userId}`, Math.max(this.localUserRevocations.get(`id:${userId}`) || 0, revokedAt));
+            if (check.createdAt <= revokedAt) {
+              return { revoked: true, verified: true, reason: 'USER_REVOKED' };
+            }
+          }
+        }
+      }
+
+      // Authoritative database confirms no matching revocation record
+      return { revoked: false, verified: true, reason: 'NONE' };
+    } catch (err: any) {
+      // FAIL-CLOSED: Exception while querying database
+      return {
+        revoked: true,
+        verified: false,
+        reason: 'REVOCATION_CHECK_FAILED',
+        error: `Unexpected error during revocation check: ${err?.message || String(err)}`
+      };
+    }
   }
 
-  async revokeToken(token: string, tokenHash: string, expiresAt?: number, reason: string = 'REVOKED'): Promise<void> {
-    const now = Date.now();
-    this.localRevokedHashes.add(tokenHash);
-    this.localRevokedHashes.add(token);
-
-    if (serverSupabase) {
-      try {
-        const { error } = await serverSupabase
-          .from('admin_session_revocations')
-          .upsert({
-            revocation_type: 'SESSION',
-            target: tokenHash,
-            revoked_at: now,
-            expires_at: expiresAt || null,
-            reason,
-            created_at: new Date().toISOString()
-          }, { onConflict: 'target' });
-
-        if (error) {
-          console.warn('[Admin Session Revocation] Supabase revokeToken upsert error:', error.message);
-        }
-      } catch (err) {
-        console.warn('[Admin Session Revocation] Supabase revokeToken exception:', err);
-      }
+  async revokeToken(
+    token: string,
+    tokenHashOrReason?: string,
+    expiresAtOrReason?: number | string,
+    reasonParam: string = 'REVOKED'
+  ): Promise<void> {
+    const client = this.getClient();
+    if (!client) {
+      throw new SessionRevocationError(
+        'Cannot revoke session: authoritative database client is unavailable',
+        'STORE_UNAVAILABLE'
+      );
     }
+
+    const isHash = typeof tokenHashOrReason === 'string' && /^[a-f0-9]{64}$/i.test(tokenHashOrReason);
+    const effectiveHash = isHash ? tokenHashOrReason : hashSessionToken(token);
+    const effectiveReason = isHash
+      ? (typeof expiresAtOrReason === 'string' ? expiresAtOrReason : reasonParam)
+      : (tokenHashOrReason || 'REVOKED');
+    const effectiveExpiresAt = typeof expiresAtOrReason === 'number' ? expiresAtOrReason : undefined;
+
+    const now = Date.now();
+    const { error } = await client
+      .from('admin_session_revocations')
+      .upsert({
+        revocation_type: 'SESSION',
+        target: effectiveHash,
+        revoked_at: now,
+        expires_at: effectiveExpiresAt || null,
+        reason: effectiveReason,
+        created_at: new Date().toISOString()
+      }, { onConflict: 'target' });
+
+    if (error) {
+      throw new SessionRevocationError(
+        `Failed to record session revocation in database: ${error.message || String(error)}`,
+        'WRITE_FAILED',
+        error
+      );
+    }
+
+    // Update local cache ONLY AFTER authoritative DB write succeeds
+    this.localRevokedHashes.add(effectiveHash);
+    this.localRevokedHashes.add(token);
   }
 
   async revokeUser(identifier: { email?: string; userId?: string }, reason: string = 'USER_REVOKED'): Promise<void> {
+    const client = this.getClient();
+    if (!client) {
+      throw new SessionRevocationError(
+        'Cannot revoke user sessions: authoritative database client is unavailable',
+        'STORE_UNAVAILABLE'
+      );
+    }
+
     const now = Date.now();
     const rows: Array<{
       revocation_type: 'USER';
@@ -171,7 +277,6 @@ export class SupabaseSessionRevocationStore implements SessionRevocationStore {
 
     if (identifier.email) {
       const cleanEmail = identifier.email.toLowerCase().trim();
-      this.localUserRevocations.set(`email:${cleanEmail}`, now);
       rows.push({
         revocation_type: 'USER',
         target: `user:email:${cleanEmail}`,
@@ -183,7 +288,6 @@ export class SupabaseSessionRevocationStore implements SessionRevocationStore {
 
     if (identifier.userId) {
       const cleanId = identifier.userId.trim();
-      this.localUserRevocations.set(`id:${cleanId}`, now);
       rows.push({
         revocation_type: 'USER',
         target: `user:id:${cleanId}`,
@@ -193,50 +297,68 @@ export class SupabaseSessionRevocationStore implements SessionRevocationStore {
       });
     }
 
-    if (serverSupabase && rows.length > 0) {
-      try {
-        const { error } = await serverSupabase
-          .from('admin_session_revocations')
-          .upsert(rows, { onConflict: 'target' });
+    if (rows.length === 0) {
+      return;
+    }
 
-        if (error) {
-          console.warn('[Admin Session Revocation] Supabase revokeUser upsert error:', error.message);
-        }
-      } catch (err) {
-        console.warn('[Admin Session Revocation] Supabase revokeUser exception:', err);
-      }
+    const { error } = await client
+      .from('admin_session_revocations')
+      .upsert(rows, { onConflict: 'target' });
+
+    if (error) {
+      throw new SessionRevocationError(
+        `Failed to record user revocation in database: ${error.message || String(error)}`,
+        'WRITE_FAILED',
+        error
+      );
+    }
+
+    // Update local cache on successful write
+    if (identifier.email) {
+      this.localUserRevocations.set(`email:${identifier.email.toLowerCase().trim()}`, now);
+    }
+    if (identifier.userId) {
+      this.localUserRevocations.set(`id:${identifier.userId.trim()}`, now);
     }
   }
 
   async revokeAll(reason: string = 'GLOBAL_REVOCATION'): Promise<void> {
-    const now = Date.now();
-    this.localGlobalRevocationTimestamp = now;
-
-    if (serverSupabase) {
-      try {
-        const { error } = await serverSupabase
-          .from('admin_session_revocations')
-          .upsert({
-            revocation_type: 'GLOBAL',
-            target: 'GLOBAL',
-            revoked_at: now,
-            reason,
-            created_at: new Date().toISOString()
-          }, { onConflict: 'target' });
-
-        if (error) {
-          console.warn('[Admin Session Revocation] Supabase revokeAll upsert error:', error.message);
-        }
-      } catch (err) {
-        console.warn('[Admin Session Revocation] Supabase revokeAll exception:', err);
-      }
+    const client = this.getClient();
+    if (!client) {
+      throw new SessionRevocationError(
+        'Cannot revoke all sessions: authoritative database client is unavailable',
+        'STORE_UNAVAILABLE'
+      );
     }
+
+    const now = Date.now();
+    const { error } = await client
+      .from('admin_session_revocations')
+      .upsert({
+        revocation_type: 'GLOBAL',
+        target: 'GLOBAL',
+        revoked_at: now,
+        reason,
+        created_at: new Date().toISOString()
+      }, { onConflict: 'target' });
+
+    if (error) {
+      throw new SessionRevocationError(
+        `Failed to record global revocation in database: ${error.message || String(error)}`,
+        'WRITE_FAILED',
+        error
+      );
+    }
+
+    // Update local cache on successful write
+    this.localGlobalRevocationTimestamp = now;
   }
 
   async getGlobalRevocationTimestamp(): Promise<number> {
-    if (serverSupabase) {
+    const client = this.getClient();
+    if (client) {
       try {
-        const { data, error } = await serverSupabase
+        const { data, error } = await client
           .from('admin_session_revocations')
           .select('revoked_at')
           .eq('target', 'GLOBAL')
@@ -246,7 +368,7 @@ export class SupabaseSessionRevocationStore implements SessionRevocationStore {
           this.localGlobalRevocationTimestamp = Math.max(this.localGlobalRevocationTimestamp, Number(data.revoked_at));
         }
       } catch {
-        // Fall back to local
+        // Return cached
       }
     }
     return this.localGlobalRevocationTimestamp;
@@ -256,6 +378,10 @@ export class SupabaseSessionRevocationStore implements SessionRevocationStore {
     this.localRevokedHashes.clear();
     this.localUserRevocations.clear();
     this.localGlobalRevocationTimestamp = 0;
+  }
+
+  clearLocalCache(): void {
+    this.clearLocalState();
   }
 }
 
@@ -268,30 +394,60 @@ export class MemorySessionRevocationStore implements SessionRevocationStore {
   private userRevocations = new Map<string, number>();
   private globalRevocationTimestamp: number = 0;
 
-  async isRevoked(check: RevocationCheckParams): Promise<RevocationCheckResult> {
+  async isRevoked(checkOrToken: RevocationCheckParams | string): Promise<RevocationCheckResult> {
+    let check: RevocationCheckParams;
+    if (typeof checkOrToken === 'string') {
+      const token = checkOrToken;
+      const tokenHash = hashSessionToken(token);
+      let email: string | undefined;
+      let userId: string | undefined;
+      let createdAt = Date.now();
+      try {
+        const parts = token.split('.');
+        if (parts[0]) {
+          const payload = JSON.parse(Buffer.from(parts[0], 'base64url').toString('utf-8'));
+          if (payload.email) email = payload.email.toLowerCase().trim();
+          if (payload.userId) userId = payload.userId.trim();
+          if (payload.createdAt) createdAt = Number(payload.createdAt);
+        }
+      } catch {
+        // payload parse fallback
+      }
+      check = { token, tokenHash, email, userId, createdAt };
+    } else {
+      check = checkOrToken;
+    }
+
     if (this.revokedTokens.has(check.tokenHash) || this.revokedTokens.has(check.token)) {
-      return { revoked: true, reason: 'REVOKED' };
+      return { revoked: true, verified: true, reason: 'REVOKED' };
     }
     if (this.globalRevocationTimestamp > 0 && check.createdAt <= this.globalRevocationTimestamp) {
-      return { revoked: true, reason: 'REVOKED' };
+      return { revoked: true, verified: true, reason: 'REVOKED' };
     }
     if (check.email) {
       const emailRevokedAt = this.userRevocations.get(`email:${check.email.toLowerCase().trim()}`);
       if (emailRevokedAt && check.createdAt <= emailRevokedAt) {
-        return { revoked: true, reason: 'USER_REVOKED' };
+        return { revoked: true, verified: true, reason: 'USER_REVOKED' };
       }
     }
     if (check.userId) {
       const userRevokedAt = this.userRevocations.get(`id:${check.userId.trim()}`);
       if (userRevokedAt && check.createdAt <= userRevokedAt) {
-        return { revoked: true, reason: 'USER_REVOKED' };
+        return { revoked: true, verified: true, reason: 'USER_REVOKED' };
       }
     }
-    return { revoked: false };
+    return { revoked: false, verified: true, reason: 'NONE' };
   }
 
-  async revokeToken(token: string, tokenHash: string): Promise<void> {
-    this.revokedTokens.add(tokenHash);
+  async revokeToken(
+    token: string,
+    tokenHashOrReason?: string,
+    expiresAtOrReason?: number | string,
+    reasonParam: string = 'REVOKED'
+  ): Promise<void> {
+    const isHash = typeof tokenHashOrReason === 'string' && /^[a-f0-9]{64}$/i.test(tokenHashOrReason);
+    const effectiveHash = isHash ? tokenHashOrReason : hashSessionToken(token);
+    this.revokedTokens.add(effectiveHash);
     this.revokedTokens.add(token);
   }
 
@@ -318,6 +474,95 @@ export class MemorySessionRevocationStore implements SessionRevocationStore {
     this.userRevocations.clear();
     this.globalRevocationTimestamp = 0;
   }
+}
+
+export interface MockSupabaseOptions {
+  queryError?: { message: string; code?: string } | Error | null;
+  writeError?: { message: string; code?: string } | Error | null;
+  initialRecords?: Array<{
+    target: string;
+    revocation_type: string;
+    revoked_at: number;
+    expires_at?: number | null;
+    reason?: string;
+  }>;
+}
+
+/**
+ * Creates a mock Supabase client backed by an in-memory table store.
+ * Allows simulating database unavailable, query failures, write failures, and multi-instance sharing.
+ */
+export function createMockSupabaseClient(options: MockSupabaseOptions = {}): any {
+  const store = new Map<string, {
+    target: string;
+    revocation_type: string;
+    revoked_at: number;
+    expires_at?: number | null;
+    reason?: string;
+  }>();
+
+  if (options.initialRecords) {
+    for (const rec of options.initialRecords) {
+      store.set(rec.target, { ...rec });
+    }
+  }
+
+  let queryError = options.queryError || null;
+  let writeError = options.writeError || null;
+
+  return {
+    _store: store,
+    setQueryError(err: any) { queryError = err; },
+    setWriteError(err: any) { writeError = err; },
+    from(tableName: string) {
+      return {
+        select(cols?: string) {
+          return {
+            in(columnName: string, values: string[]) {
+              if (queryError) {
+                return Promise.resolve({ data: null, error: queryError });
+              }
+              const matching: any[] = [];
+              for (const val of values) {
+                const rec = store.get(val);
+                if (rec) {
+                  matching.push({ ...rec });
+                }
+              }
+              return Promise.resolve({ data: matching, error: null });
+            },
+            eq(columnName: string, val: any) {
+              return {
+                maybeSingle() {
+                  if (queryError) {
+                    return Promise.resolve({ data: null, error: queryError });
+                  }
+                  const rec = store.get(val);
+                  return Promise.resolve({ data: rec ? { ...rec } : null, error: null });
+                }
+              };
+            }
+          };
+        },
+        upsert(records: any, upsertOpts?: any) {
+          if (writeError) {
+            return Promise.resolve({ data: null, error: writeError });
+          }
+          const recArray = Array.isArray(records) ? records : [records];
+          for (const r of recArray) {
+            store.set(r.target, {
+              target: r.target,
+              revocation_type: r.revocation_type,
+              revoked_at: Number(r.revoked_at),
+              expires_at: r.expires_at || null,
+              reason: r.reason || ''
+            });
+          }
+          return Promise.resolve({ data: recArray, error: null });
+        }
+      };
+    }
+  };
 }
 
 // Active singleton store instance (defaults to Supabase-backed store)
@@ -540,9 +785,12 @@ export async function verifySignedSessionTokenAsync(token: string): Promise<Admi
       createdAt
     });
 
-    if (result.revoked) {
-      revokedSessions.add(token);
-      revokedSessions.add(tokenHash);
+    // Fail-closed: If revocation cannot be authoritatively verified, fail closed!
+    if (result.revoked || result.verified === false) {
+      if (result.revoked && result.verified) {
+        revokedSessions.add(token);
+        revokedSessions.add(tokenHash);
+      }
       return null;
     }
 
@@ -707,6 +955,15 @@ export async function getAdminSessionWithDiagnostic(req: express.Request): Promi
       createdAt
     });
 
+    // FAIL-CLOSED: If the authoritative store cannot be contacted or queried, reject with failure reason
+    if (checkResult.verified === false) {
+      return {
+        session: null,
+        reason: checkResult.reason || 'STORE_UNAVAILABLE',
+        hasCookie: true
+      };
+    }
+
     if (checkResult.revoked) {
       revokedSessions.add(token);
       revokedSessions.add(tokenHash);
@@ -834,9 +1091,6 @@ export function getAdminSessionSync(req: express.Request): AdminSession | null {
 export async function invalidateAdminSession(token: string, reason: string = 'LOGOUT'): Promise<void> {
   if (!token || typeof token !== 'string') return;
   const tokenHash = hashSessionToken(token);
-  revokedSessions.add(token);
-  revokedSessions.add(tokenHash);
-  adminSessions.delete(token);
 
   let expiresAt: number | undefined;
   if (token.includes('.')) {
@@ -849,17 +1103,27 @@ export async function invalidateAdminSession(token: string, reason: string = 'LO
     }
   }
 
+  // Authoritative write to shared database FIRST (propagates error if DB write fails)
   await activeRevocationStore.revokeToken(token, tokenHash, expiresAt, reason);
+
+  // Update process-local cache only after authoritative write succeeds
+  revokedSessions.add(token);
+  revokedSessions.add(tokenHash);
+  adminSessions.delete(token);
 }
 
 export async function invalidateUserSessions(
   identifier: { email?: string; userId?: string },
   reason: string = 'USER_REVOKED'
 ): Promise<void> {
-  const now = Date.now();
   const cleanEmail = identifier.email ? identifier.email.toLowerCase().trim() : undefined;
   const userId = identifier.userId ? identifier.userId.trim() : undefined;
 
+  // Authoritative write to shared database FIRST (propagates error if DB write fails)
+  await activeRevocationStore.revokeUser(identifier, reason);
+
+  // Update process-local cache only after authoritative write succeeds
+  const now = Date.now();
   if (cleanEmail) {
     userRevocationTimestamps.set(cleanEmail, now);
   }
@@ -877,11 +1141,13 @@ export async function invalidateUserSessions(
       adminSessions.delete(token);
     }
   }
-
-  await activeRevocationStore.revokeUser(identifier, reason);
 }
 
 export async function revokeAllSessions(reason: string = 'ALL_SESSIONS_REVOKED'): Promise<void> {
+  // Authoritative write to shared database FIRST (propagates error if DB write fails)
+  await activeRevocationStore.revokeAll(reason);
+
+  // Update process-local cache only after authoritative write succeeds
   const now = Date.now();
   globalRevocationTimestamp = now;
 
@@ -891,8 +1157,6 @@ export async function revokeAllSessions(reason: string = 'ALL_SESSIONS_REVOKED')
     revokedSessions.add(tokenHash);
   }
   adminSessions.clear();
-
-  await activeRevocationStore.revokeAll(reason);
 }
 
 export const revokeSession = invalidateAdminSession;

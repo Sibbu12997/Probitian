@@ -3,7 +3,12 @@ import assert from 'node:assert/strict';
 import express from 'express';
 import http from 'node:http';
 import analyticsRouter from '../server/routes/analytics';
-import { createSignedSessionToken } from '../server/auth/session';
+import { 
+  createSignedSessionToken, 
+  setRevocationStore, 
+  resetRevocationStore, 
+  MemorySessionRevocationStore 
+} from '../server/auth/session';
 import { UserRole } from '../server/auth/types';
 
 describe('Analytics API Routes Verification', () => {
@@ -16,6 +21,7 @@ describe('Analytics API Routes Verification', () => {
   let authCookie: string;
 
   before(async () => {
+    setRevocationStore(new MemorySessionRevocationStore());
     const token = createSignedSessionToken('admin@probitian.com', UserRole.ADMIN);
     authCookie = `admin_session=${token}`;
 
@@ -29,6 +35,7 @@ describe('Analytics API Routes Verification', () => {
   });
 
   after(async () => {
+    resetRevocationStore();
     if (server) {
       if ((server as any).closeAllConnections) (server as any).closeAllConnections();
       await new Promise<void>((resolve) => server.close(() => resolve()));

@@ -3,7 +3,12 @@ import assert from 'node:assert/strict';
 import express from 'express';
 import http from 'node:http';
 import cmsRouter from '../server/routes/cms';
-import { createSignedSessionToken } from '../server/auth/session';
+import { 
+  createSignedSessionToken,
+  setRevocationStore,
+  resetRevocationStore,
+  MemorySessionRevocationStore
+} from '../server/auth/session';
 import { UserRole } from '../server/auth/types';
 
 describe('Public CMS Endpoints Resiliency & Production Regression Tests', () => {
@@ -15,6 +20,7 @@ describe('Public CMS Endpoints Resiliency & Production Regression Tests', () => 
   let baseUrl: string;
 
   before(async () => {
+    setRevocationStore(new MemorySessionRevocationStore());
     await new Promise<void>((resolve) => {
       server = app.listen(0, '127.0.0.1', () => {
         const port = (server.address() as any).port;
@@ -25,6 +31,7 @@ describe('Public CMS Endpoints Resiliency & Production Regression Tests', () => 
   });
 
   after(async () => {
+    resetRevocationStore();
     if (server) {
       if ((server as any).closeAllConnections) (server as any).closeAllConnections();
       await new Promise<void>((resolve) => server.close(() => resolve()));
