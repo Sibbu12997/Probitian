@@ -72,8 +72,8 @@ export async function resolveUserRole(
   return UserRole.USER;
 }
 
-export function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
-  const { session, reason, hasCookie } = getAdminSessionWithDiagnostic(req);
+export async function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const { session, reason, hasCookie } = await getAdminSessionWithDiagnostic(req);
   if (!session) {
     console.warn(`[AUTH] requireAuth 401 on ${req.method} ${req.path} - admin_session present: ${hasCookie}, reason: ${reason}`);
     return res.status(401).json({ error: 'Unauthorized: Authentication required' });
@@ -84,8 +84,8 @@ export function requireAuth(req: express.Request, res: express.Response, next: e
 }
 
 export function requireRole(minimumRole: UserRole) {
-  return (req: express.Request, res: express.Response, next: express.NextFunction) => {
-    const { session, reason, hasCookie } = getAdminSessionWithDiagnostic(req);
+  return async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const { session, reason, hasCookie } = await getAdminSessionWithDiagnostic(req);
     if (!session) {
       console.warn(`[AUTH] requireRole 401 on ${req.method} ${req.path} - admin_session present: ${hasCookie}, reason: ${reason}`);
       return res.status(401).json({ error: 'Unauthorized: Authentication required' });
@@ -106,8 +106,8 @@ export function requireRole(minimumRole: UserRole) {
 }
 
 export function requirePermission(permission: Permission) {
-  return (req: express.Request, res: express.Response, next: express.NextFunction) => {
-    const { session, reason, hasCookie } = getAdminSessionWithDiagnostic(req);
+  return async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const { session, reason, hasCookie } = await getAdminSessionWithDiagnostic(req);
     if (!session) {
       console.warn(`[AUTH] requirePermission 401 on ${req.method} ${req.path} - admin_session present: ${hasCookie}, reason: ${reason}`);
       return res.status(401).json({ error: 'Unauthorized: Authentication required' });

@@ -401,6 +401,59 @@ END;
 $$;
 
 -- ============================================================
+-- 4.2 DISTRIBUTED ADMIN SESSION REVOCATIONS & GOVERNANCE
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS public.admin_session_revocations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    revocation_type TEXT NOT NULL CHECK (revocation_type IN ('SESSION', 'USER', 'GLOBAL')),
+    target TEXT NOT NULL,
+    revoked_at BIGINT NOT NULL,
+    expires_at BIGINT,
+    reason TEXT,
+    metadata JSONB DEFAULT '{}'::jsonb,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_admin_revocations_target ON public.admin_session_revocations (target);
+CREATE INDEX IF NOT EXISTS idx_admin_revocations_lookup ON public.admin_session_revocations (revocation_type, target);
+CREATE INDEX IF NOT EXISTS idx_admin_revocations_expires_at ON public.admin_session_revocations (expires_at) WHERE expires_at IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS public.audit_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    actor TEXT NOT NULL,
+    role TEXT NOT NULL,
+    action TEXT NOT NULL,
+    resource TEXT NOT NULL,
+    resource_id TEXT,
+    ip_address TEXT,
+    user_agent TEXT,
+    result TEXT NOT NULL DEFAULT 'SUCCESS',
+    metadata JSONB DEFAULT '{}'::jsonb,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_audit_logs_actor ON public.audit_logs (actor);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON public.audit_logs (action);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_resource ON public.audit_logs (resource, resource_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON public.audit_logs (created_at DESC);
+
+CREATE TABLE IF NOT EXISTS public.content_revisions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    content_type TEXT NOT NULL,
+    content_id TEXT NOT NULL,
+    version_number INT NOT NULL DEFAULT 1,
+    title TEXT,
+    status TEXT NOT NULL DEFAULT 'DRAFT',
+    author TEXT,
+    data JSONB NOT NULL DEFAULT '{}'::jsonb,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_content_revisions_lookup ON public.content_revisions (content_type, content_id, version_number DESC);
+CREATE INDEX IF NOT EXISTS idx_content_revisions_created_at ON public.content_revisions (created_at DESC);
+
+-- ============================================================
 -- 5. PERFORMANCE INDEXES
 -- ============================================================
 
@@ -444,6 +497,9 @@ ALTER TABLE public.sequence_steps ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.lead_sequence_progress ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.email_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.rate_limits ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.admin_session_revocations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.audit_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.content_revisions ENABLE ROW LEVEL SECURITY;
 
 -- Revoke all table privileges from untrusted client roles
 REVOKE ALL ON ALL TABLES IN SCHEMA public FROM anon, authenticated;
@@ -511,6 +567,9 @@ CREATE POLICY "Service role all sequence_steps" ON public.sequence_steps FOR ALL
 CREATE POLICY "Service role all lead_sequence_progress" ON public.lead_sequence_progress FOR ALL TO service_role USING (true) WITH CHECK (true);
 CREATE POLICY "Service role all email_logs" ON public.email_logs FOR ALL TO service_role USING (true) WITH CHECK (true);
 CREATE POLICY "Service role all rate_limits" ON public.rate_limits FOR ALL TO service_role USING (true) WITH CHECK (true);
+CREATE POLICY "Service role all admin_session_revocations" ON public.admin_session_revocations FOR ALL TO service_role USING (true) WITH CHECK (true);
+CREATE POLICY "Service role all audit_logs" ON public.audit_logs FOR ALL TO service_role USING (true) WITH CHECK (true);
+CREATE POLICY "Service role all content_revisions" ON public.content_revisions FOR ALL TO service_role USING (true) WITH CHECK (true);
 
 -- ============================================================
 -- 7. INITIAL SEED DATA

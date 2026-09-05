@@ -11,11 +11,17 @@ import {
   getAdminSession as getServerAdminSession,
   invalidateAdminSession as invalidateServerAdminSession,
   invalidateUserSessions as invalidateServerUserSessions,
+  revokeAllSessions as revokeServerAllSessions,
   getAdminCookieHeader as getServerAdminCookieHeader,
   validateSessionSecretConfig,
   adminSessions as serverAdminSessions,
   revokedSessions as serverRevokedSessions,
-  userRevocationTimestamps as serverUserRevocationTimestamps
+  userRevocationTimestamps as serverUserRevocationTimestamps,
+  globalRevocationTimestamp as serverGlobalRevocationTimestamp,
+  MemorySessionRevocationStore,
+  setRevocationStore,
+  resetRevocationStore,
+  getAdminSessionWithDiagnostic as getServerAdminSessionWithDiagnostic
 } from '../server/auth/session';
 import { APP_VERSION } from '../server/config/constants';
 import { 
@@ -974,60 +980,60 @@ describe('10. Server RBAC, Authentication & Session Hardening Verification', () 
     };
   }
 
-  test('1. Unauthenticated request without cookie -> 401', () => {
+  test('1. Unauthenticated request without cookie -> 401', async () => {
     const req = createMockRequest();
     const res = createMockResponse();
     let nextCalled = false;
 
-    serverRequireAuth(req, res as any, () => { nextCalled = true; });
+    await serverRequireAuth(req, res as any, () => { nextCalled = true; });
 
     assert.strictEqual(res.getStatus(), 401);
     assert.strictEqual(nextCalled, false);
     assert.ok(res.getBody()?.error?.includes('Unauthorized'));
   });
 
-  test('2. USER accessing admin endpoint via cookie -> 403', () => {
+  test('2. USER accessing admin endpoint via cookie -> 403', async () => {
     const userSession = createServerAdminSession('normaluser@example.com', ServerUserRole.USER, 'user-id-123');
     const req = createMockRequest({ cookie: `admin_session=${userSession.token}` });
     const res = createMockResponse();
     let nextCalled = false;
 
     const adminMiddleware = serverRequireRole(ServerUserRole.ADMIN);
-    adminMiddleware(req, res as any, () => { nextCalled = true; });
+    await adminMiddleware(req, res as any, () => { nextCalled = true; });
 
     assert.strictEqual(res.getStatus(), 403);
     assert.strictEqual(nextCalled, false);
     assert.ok(res.getBody()?.error?.includes('Administrator privilege required'));
   });
 
-  test('3. EDITOR accessing admin-only endpoint via cookie -> 403', () => {
+  test('3. EDITOR accessing admin-only endpoint via cookie -> 403', async () => {
     const editorSession = createServerAdminSession('editoruser@example.com', ServerUserRole.EDITOR, 'editor-id-456');
     const req = createMockRequest({ cookie: `admin_session=${editorSession.token}` });
     const res = createMockResponse();
     let nextCalled = false;
 
     const adminMiddleware = serverRequireRole(ServerUserRole.ADMIN);
-    adminMiddleware(req, res as any, () => { nextCalled = true; });
+    await adminMiddleware(req, res as any, () => { nextCalled = true; });
 
     assert.strictEqual(res.getStatus(), 403);
     assert.strictEqual(nextCalled, false);
     assert.ok(res.getBody()?.error?.includes('Administrator privilege required'));
   });
 
-  test('4. ADMIN accessing admin endpoint via cookie -> success (calls next)', () => {
+  test('4. ADMIN accessing admin endpoint via cookie -> success (calls next)', async () => {
     const adminSession = createServerAdminSession('adminuser@example.com', ServerUserRole.ADMIN, 'admin-id-789');
     const req = createMockRequest({ cookie: `admin_session=${adminSession.token}` });
     const res = createMockResponse();
     let nextCalled = false;
 
     const adminMiddleware = serverRequireRole(ServerUserRole.ADMIN);
-    adminMiddleware(req, res as any, () => { nextCalled = true; });
+    await adminMiddleware(req, res as any, () => { nextCalled = true; });
 
     assert.strictEqual(nextCalled, true);
     assert.strictEqual((req as any).userRole, ServerUserRole.ADMIN);
   });
 
-  test('5. Role downgrade invalidates/rejects elevated access immediately', () => {
+  test('5. Role downgrade invalidates/rejects elevated access immediately', async () => {
     const testEmail = 'downgrade-test@probitian.com';
     const testUserId = 'downgrade-user-uuid-999';
 
@@ -1039,18 +1045,18 @@ describe('10. Server RBAC, Authentication & Session Hardening Verification', () 
     const req1 = createMockRequest({ cookie: `admin_session=${initialToken}` });
     const res1 = createMockResponse();
     let nextCalled1 = false;
-    serverRequireRole(ServerUserRole.ADMIN)(req1, res1 as any, () => { nextCalled1 = true; });
+    await serverRequireRole(ServerUserRole.ADMIN)(req1, res1 as any, () => { nextCalled1 = true; });
     assert.strictEqual(nextCalled1, true);
 
     // Step 3: Authoritative role downgrade happens (e.g. demoted to USER)
     // Server invalidates active user sessions for this email/userId
-    invalidateServerUserSessions({ userId: testUserId, email: testEmail });
+    await invalidateServerUserSessions({ userId: testUserId, email: testEmail });
 
     // Step 4: Reuse the SAME existing session token
     const req2 = createMockRequest({ cookie: `admin_session=${initialToken}` });
     const res2 = createMockResponse();
     let nextCalled2 = false;
-    serverRequireRole(ServerUserRole.ADMIN)(req2, res2 as any, () => { nextCalled2 = true; });
+    await serverRequireRole(ServerUserRole.ADMIN)(req2, res2 as any, () => { nextCalled2 = true; });
 
     // Step 5: Old session is rejected immediately with 401 Unauthorized
     assert.strictEqual(res2.getStatus(), 401);
@@ -1062,7 +1068,7 @@ describe('10. Server RBAC, Authentication & Session Hardening Verification', () 
     serverUserRevocationTimestamps.delete(testUserId);
   });
 
-  test('6. Tampered session cookie -> 401', () => {
+  test('6. Tampered session cookie -> 401', async () => {
     const legitSession = createServerAdminSession('tamper-test@probitian.com', ServerUserRole.ADMIN);
     const [payloadStr, sig] = legitSession.token.split('.');
     const decoded = JSON.parse(Buffer.from(payloadStr, 'base64url').toString('utf-8'));
@@ -1074,75 +1080,72 @@ describe('10. Server RBAC, Authentication & Session Hardening Verification', () 
     const res = createMockResponse();
     let nextCalled = false;
 
-    serverRequireAuth(req, res as any, () => { nextCalled = true; });
+    await serverRequireAuth(req, res as any, () => { nextCalled = true; });
     assert.strictEqual(res.getStatus(), 401);
     assert.strictEqual(nextCalled, false);
   });
 
-  test('7. Expired session cookie -> 401', () => {
+  test('7. Expired session cookie -> 401', async () => {
     // Mint token with negative maxAge (expired in the past)
     const expiredToken = createServerSignedSessionToken('expired-user@probitian.com', ServerUserRole.ADMIN, 'exp-id', -10000);
     const req = createMockRequest({ cookie: `admin_session=${expiredToken}` });
     const res = createMockResponse();
     let nextCalled = false;
 
-    serverRequireAuth(req, res as any, () => { nextCalled = true; });
+    await serverRequireAuth(req, res as any, () => { nextCalled = true; });
     assert.strictEqual(res.getStatus(), 401);
     assert.strictEqual(nextCalled, false);
   });
 
-  test('8. Logged-out session -> 401', () => {
+  test('8. Logged-out session -> 401', async () => {
     const session = createServerAdminSession('logout-test@probitian.com', ServerUserRole.ADMIN);
     const token = session.token;
 
     // User logs out -> invalidate session token
-    invalidateServerAdminSession(token);
+    await invalidateServerAdminSession(token);
 
     const req = createMockRequest({ cookie: `admin_session=${token}` });
     const res = createMockResponse();
     let nextCalled = false;
 
-    serverRequireAuth(req, res as any, () => { nextCalled = true; });
+    await serverRequireAuth(req, res as any, () => { nextCalled = true; });
     assert.strictEqual(res.getStatus(), 401);
     assert.strictEqual(nextCalled, false);
   });
 
-  test('9. Revoked session -> 401', () => {
+  test('9. Revoked session -> 401', async () => {
     const session = createServerAdminSession('revoked-test@probitian.com', ServerUserRole.ADMIN);
     const token = session.token;
 
-    serverRevokedSessions.add(token);
+    await invalidateServerAdminSession(token, 'MANUAL_REVOCATION');
 
     const req = createMockRequest({ cookie: `admin_session=${token}` });
     const res = createMockResponse();
     let nextCalled = false;
 
-    serverRequireRole(ServerUserRole.ADMIN)(req, res as any, () => { nextCalled = true; });
+    await serverRequireRole(ServerUserRole.ADMIN)(req, res as any, () => { nextCalled = true; });
     assert.strictEqual(res.getStatus(), 401);
     assert.strictEqual(nextCalled, false);
-
-    // Clean up
-    serverRevokedSessions.delete(token);
   });
 
-  test('10. Sending Authorization Bearer <token> WITHOUT cookie fails with 401', () => {
+  test('10. Sending Authorization Bearer <token> WITHOUT cookie fails with 401', async () => {
     const adminSession = createServerAdminSession('bearer-test@probitian.com', ServerUserRole.ADMIN);
     const req = createMockRequest({ authorization: `Bearer ${adminSession.token}` });
     const res = createMockResponse();
     let nextCalled = false;
 
-    serverRequireAuth(req, res as any, () => { nextCalled = true; });
+    await serverRequireAuth(req, res as any, () => { nextCalled = true; });
     assert.strictEqual(res.getStatus(), 401);
     assert.strictEqual(nextCalled, false);
   });
 
-  test('11. Sending x-admin-token <token> WITHOUT cookie fails with 401', () => {
+  test('11. Sending x-admin-token <token> WITHOUT cookie fails with 401', async () => {
     const adminSession = createServerAdminSession('header-test@probitian.com', ServerUserRole.ADMIN);
     const req = createMockRequest({ 'x-admin-token': adminSession.token });
     const res = createMockResponse();
     let nextCalled = false;
 
-    serverRequireAuth(req, res as any, () => { nextCalled = true; });
+    await serverRequireAuth(req, res as any, () => { nextCalled = true; });
     assert.strictEqual(res.getStatus(), 401);
     assert.strictEqual(nextCalled, false);
   });
@@ -1223,5 +1226,184 @@ describe('10. Server RBAC, Authentication & Session Hardening Verification', () 
         delete process.env.SESSION_SECRET;
       }
     }
+  });
+
+  test('16. Multi-instance simulation: Instance 1 creates session, Instance 2 verifies it statelessly without instance-local memory', async () => {
+    // Instance 1 creates a session
+    const instance1Session = createServerAdminSession('multi-instance@probitian.com', ServerUserRole.ADMIN, 'user-multi-1');
+    const token = instance1Session.token;
+
+    // Simulate Instance 2: clear instance-local cache completely
+    serverAdminSessions.delete(token);
+    serverRevokedSessions.delete(token);
+
+    const instance2Req = createMockRequest({ cookie: `admin_session=${token}` });
+    const instance2Res = createMockResponse();
+    let nextCalled = false;
+
+    await serverRequireRole(ServerUserRole.ADMIN)(instance2Req, instance2Res as any, () => { nextCalled = true; });
+
+    assert.strictEqual(nextCalled, true);
+    assert.strictEqual(instance2Res.getStatus(), 200);
+    assert.strictEqual((instance2Req as any).userRole, ServerUserRole.ADMIN);
+  });
+
+  test('17. Multi-instance simulation: Instance 2 startup does NOT invalidate legitimate sessions created earlier by Instance 1', async () => {
+    // Instance 1 creates a session at T0
+    const sessionT0 = createServerAdminSession('instance1-survivor@probitian.com', ServerUserRole.ADMIN, 'user-inst1');
+    const token = sessionT0.token;
+
+    // Verify globalRevocationTimestamp is 0 on boot and not initialized to Date.now()
+    assert.strictEqual(serverGlobalRevocationTimestamp, 0, 'Server startup must NOT set globalRevocationTimestamp to Date.now()');
+
+    // Simulate Instance 2 processing a request from Instance 1
+    const req = createMockRequest({ cookie: `admin_session=${token}` });
+    const res = createMockResponse();
+    let nextCalled = false;
+
+    await serverRequireAuth(req, res as any, () => { nextCalled = true; });
+
+    assert.strictEqual(nextCalled, true);
+    assert.strictEqual(res.getStatus(), 200);
+  });
+
+  test('18. Multi-instance simulation: Logout on Instance 1 immediately revokes session on Instance 2', async () => {
+    // Shared revocation store across instances
+    const sharedStore = new MemorySessionRevocationStore();
+    setRevocationStore(sharedStore);
+
+    try {
+      // Instance 1 issues a session
+      const session = createServerAdminSession('shared-logout@probitian.com', ServerUserRole.ADMIN, 'user-logout-id');
+      const token = session.token;
+
+      // Instance 2 verifies session initially passes
+      const reqBefore = createMockRequest({ cookie: `admin_session=${token}` });
+      const resBefore = createMockResponse();
+      let nextBefore = false;
+      await serverRequireAuth(reqBefore, resBefore as any, () => { nextBefore = true; });
+      assert.strictEqual(nextBefore, true);
+
+      // Instance 1 handles logout
+      await invalidateServerAdminSession(token);
+
+      // Instance 2 (clearing any local instance memory) verifies that request is now REJECTED
+      serverAdminSessions.delete(token);
+      const reqAfter = createMockRequest({ cookie: `admin_session=${token}` });
+      const resAfter = createMockResponse();
+      let nextAfter = false;
+      await serverRequireAuth(reqAfter, resAfter as any, () => { nextAfter = true; });
+
+      assert.strictEqual(nextAfter, false);
+      assert.strictEqual(resAfter.getStatus(), 401);
+    } finally {
+      resetRevocationStore();
+    }
+  });
+
+  test('19. Multi-instance simulation: User revocation on Instance 1 immediately invalidates all active sessions for that user on Instance 2', async () => {
+    const sharedStore = new MemorySessionRevocationStore();
+    setRevocationStore(sharedStore);
+
+    try {
+      const targetEmail = 'revoked-user-multi@probitian.com';
+      const targetUserId = 'uuid-multi-revoked-user';
+
+      // Instance 1 creates two active sessions for the same user (e.g. desktop and mobile)
+      const sessionA = createServerAdminSession(targetEmail, ServerUserRole.ADMIN, targetUserId);
+      const sessionB = createServerAdminSession(targetEmail, ServerUserRole.ADMIN, targetUserId);
+
+      // Both pass on Instance 2
+      const reqA1 = createMockRequest({ cookie: `admin_session=${sessionA.token}` });
+      const resA1 = createMockResponse();
+      let nextA1 = false;
+      await serverRequireAuth(reqA1, resA1 as any, () => { nextA1 = true; });
+      assert.strictEqual(nextA1, true);
+
+      // Instance 1 revokes all sessions for this user (e.g. password reset or admin ban)
+      await invalidateServerUserSessions({ userId: targetUserId, email: targetEmail });
+
+      // Instance 2 receives requests for both sessions - both MUST be rejected
+      const reqA2 = createMockRequest({ cookie: `admin_session=${sessionA.token}` });
+      const resA2 = createMockResponse();
+      let nextA2 = false;
+      await serverRequireAuth(reqA2, resA2 as any, () => { nextA2 = true; });
+      assert.strictEqual(nextA2, false);
+      assert.strictEqual(resA2.getStatus(), 401);
+
+      const reqB2 = createMockRequest({ cookie: `admin_session=${sessionB.token}` });
+      const resB2 = createMockResponse();
+      let nextB2 = false;
+      await serverRequireAuth(reqB2, resB2 as any, () => { nextB2 = true; });
+      assert.strictEqual(nextB2, false);
+      assert.strictEqual(resB2.getStatus(), 401);
+    } finally {
+      resetRevocationStore();
+    }
+  });
+
+  test('20. Multi-instance simulation: Global revocation on Instance 1 invalidates prior sessions on Instance 2, while new sessions remain valid', async () => {
+    const sharedStore = new MemorySessionRevocationStore();
+    setRevocationStore(sharedStore);
+
+    try {
+      // Prior session created before global revocation
+      const oldSession = createServerAdminSession('before-global@probitian.com', ServerUserRole.ADMIN, 'user-old');
+
+      // Instance 1 executes global revocation (e.g. security emergency)
+      await revokeServerAllSessions('SECURITY_EMERGENCY');
+
+      // Old session checked on Instance 2 MUST be rejected
+      const reqOld = createMockRequest({ cookie: `admin_session=${oldSession.token}` });
+      const resOld = createMockResponse();
+      let nextOld = false;
+      await serverRequireAuth(reqOld, resOld as any, () => { nextOld = true; });
+      assert.strictEqual(nextOld, false);
+      assert.strictEqual(resOld.getStatus(), 401);
+
+      // Newly issued session AFTER global revocation MUST succeed
+      // Ensure timestamp is strictly after revocation
+      await new Promise(resolve => setTimeout(resolve, 10));
+      const newSession = createServerAdminSession('after-global@probitian.com', ServerUserRole.ADMIN, 'user-new');
+      const reqNew = createMockRequest({ cookie: `admin_session=${newSession.token}` });
+      const resNew = createMockResponse();
+      let nextNew = false;
+      await serverRequireAuth(reqNew, resNew as any, () => { nextNew = true; });
+      assert.strictEqual(nextNew, true);
+      assert.strictEqual(resNew.getStatus(), 200);
+    } finally {
+      resetRevocationStore();
+    }
+  });
+
+  test('21. Diagnostic validation categorizes all session failure reasons accurately', async () => {
+    // 1. NO_COOKIE
+    const resNoCookie = await getServerAdminSessionWithDiagnostic(createMockRequest());
+    assert.strictEqual(resNoCookie.reason, 'NO_COOKIE');
+    assert.strictEqual(resNoCookie.hasCookie, false);
+
+    // 2. INVALID_FORMAT
+    const resInvalidFormat = await getServerAdminSessionWithDiagnostic(createMockRequest({ cookie: 'admin_session=invalid-format-no-dots' }));
+    assert.strictEqual(resInvalidFormat.reason, 'INVALID_FORMAT');
+    assert.strictEqual(resInvalidFormat.hasCookie, true);
+
+    // 3. INVALID_SIGNATURE
+    const valid = createServerAdminSession('sig-test@probitian.com', ServerUserRole.ADMIN);
+    const [payload] = valid.token.split('.');
+    const resBadSig = await getServerAdminSessionWithDiagnostic(createMockRequest({ cookie: `admin_session=${payload}.invalidsignature` }));
+    assert.strictEqual(resBadSig.reason, 'INVALID_SIGNATURE');
+    assert.strictEqual(resBadSig.hasCookie, true);
+
+    // 4. EXPIRED
+    const expiredToken = createServerSignedSessionToken('exp-test@probitian.com', ServerUserRole.ADMIN, 'exp-id', -5000);
+    const resExpired = await getServerAdminSessionWithDiagnostic(createMockRequest({ cookie: `admin_session=${expiredToken}` }));
+    assert.strictEqual(resExpired.reason, 'EXPIRED');
+    assert.strictEqual(resExpired.hasCookie, true);
+
+    // 5. NONE (Valid)
+    const resValid = await getServerAdminSessionWithDiagnostic(createMockRequest({ cookie: `admin_session=${valid.token}` }));
+    assert.strictEqual(resValid.reason, 'NONE');
+    assert.strictEqual(resValid.hasCookie, true);
+    assert.ok(resValid.session);
   });
 });

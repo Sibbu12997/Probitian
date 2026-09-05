@@ -10,6 +10,7 @@ import {
   getAdminSession, 
   invalidateAdminSession, 
   invalidateUserSessions,
+  revokeAllSessions,
   getAdminCookieHeader,
   parseCookies 
 } from '../auth/session';
@@ -152,8 +153,8 @@ router.post('/admin/verify-supabase-session', loginLimiter, async (req, res) => 
 });
 
 // GET /api/admin/session
-router.get('/admin/session', (req, res) => {
-  const session = getAdminSession(req);
+router.get('/admin/session', async (req, res) => {
+  const session = await getAdminSession(req);
   if (session) {
     return res.json({ 
       authenticated: true, 
@@ -166,8 +167,8 @@ router.get('/admin/session', (req, res) => {
 });
 
 // POST /api/admin/logout
-router.post('/admin/logout', (req, res) => {
-  const session = getAdminSession(req);
+router.post('/admin/logout', async (req, res) => {
+  const session = await getAdminSession(req);
   const cookies = parseCookies(req);
   const token = cookies['admin_session'];
 
@@ -182,7 +183,7 @@ router.post('/admin/logout', (req, res) => {
   }
 
   if (token) {
-    invalidateAdminSession(token);
+    await invalidateAdminSession(token, 'LOGOUT');
   }
   res.setHeader('Set-Cookie', getAdminCookieHeader('', req, 0));
   return res.json({ success: true });
@@ -243,7 +244,7 @@ router.get('/admin/roles', requireAuth, requireRole(UserRole.ADMIN), async (req,
 
 // POST /api/admin/roles/assign - Assign role to user (Admin only)
 router.post('/admin/roles/assign', requireAuth, requireRole(UserRole.ADMIN), async (req, res) => {
-  const currentSession = getAdminSession(req);
+  const currentSession = (req as any).adminSession || (await getAdminSession(req));
   const { userId, email, role } = req.body || {};
 
   if (!role || !Object.values(UserRole).includes(role)) {
@@ -281,7 +282,7 @@ router.post('/admin/roles/assign', requireAuth, requireRole(UserRole.ADMIN), asy
       });
 
       // Immediately invalidate any active sessions belonging to the modified user
-      invalidateUserSessions({ userId: data?.id || userId, email: data?.email || email });
+      await invalidateUserSessions({ userId: data?.id || userId, email: data?.email || email }, 'ROLE_CHANGED');
 
       return res.json({ success: true, profile: data });
     } catch (err: any) {
@@ -290,9 +291,75 @@ router.post('/admin/roles/assign', requireAuth, requireRole(UserRole.ADMIN), asy
     }
   }
 
-  // Fallback mode: invalidate any active in-memory sessions for this user
-  invalidateUserSessions({ userId, email });
+  // Fallback mode: invalidate any active sessions for this user
+  await invalidateUserSessions({ userId, email }, 'ROLE_CHANGED');
   return res.json({ success: true, message: `Role ${role} simulated for ${userId || email}` });
+});
+
+// POST /api/admin/revoke-session - Revoke specific session or current caller session across all instances
+router.post('/admin/revoke-session', requireAuth, requireRole(UserRole.ADMIN), async (req, res) => {
+  const currentSession = (req as any).adminSession || (await getAdminSession(req));
+  const { token } = req.body || {};
+  const tokenToRevoke = token || currentSession?.token;
+
+  if (!tokenToRevoke || typeof tokenToRevoke !== 'string') {
+    return res.status(400).json({ error: 'Valid session token is required to revoke' });
+  }
+
+  await invalidateAdminSession(tokenToRevoke, 'ADMIN_MANUAL_REVOCATION');
+
+  recordAuditLog(req, {
+    actor: currentSession?.email || 'admin',
+    role: currentSession?.role || UserRole.ADMIN,
+    action: 'SESSION_REVOKED',
+    resource: 'auth',
+    result: 'SUCCESS',
+    metadata: {
+      targetTokenPrefix: tokenToRevoke.slice(0, 10) + '...'
+    }
+  });
+
+  return res.json({ success: true, message: 'Session revoked successfully across all instances' });
+});
+
+// POST /api/admin/revoke-user-sessions - Revoke all sessions for a specific user across all instances
+router.post('/admin/revoke-user-sessions', requireAuth, requireRole(UserRole.ADMIN), async (req, res) => {
+  const currentSession = (req as any).adminSession || (await getAdminSession(req));
+  const { email, userId } = req.body || {};
+
+  if (!email && !userId) {
+    return res.status(400).json({ error: 'Must provide either email or userId to revoke sessions' });
+  }
+
+  await invalidateUserSessions({ email, userId }, 'ADMIN_USER_REVOCATION');
+
+  recordAuditLog(req, {
+    actor: currentSession?.email || 'admin',
+    role: currentSession?.role || UserRole.ADMIN,
+    action: 'USER_SESSIONS_REVOKED',
+    resource: 'auth',
+    result: 'SUCCESS',
+    metadata: { target_email: email, target_user_id: userId }
+  });
+
+  return res.json({ success: true, message: 'User sessions revoked successfully across all instances' });
+});
+
+// POST /api/admin/revoke-all-sessions - Invalidate all active admin sessions globally across all instances
+router.post('/admin/revoke-all-sessions', requireAuth, requireRole(UserRole.ADMIN), async (req, res) => {
+  const currentSession = (req as any).adminSession || (await getAdminSession(req));
+
+  await revokeAllSessions('ADMIN_GLOBAL_REVOCATION');
+
+  recordAuditLog(req, {
+    actor: currentSession?.email || 'admin',
+    role: currentSession?.role || UserRole.ADMIN,
+    action: 'ALL_SESSIONS_REVOKED',
+    resource: 'auth',
+    result: 'SUCCESS'
+  });
+
+  return res.json({ success: true, message: 'All active admin sessions revoked successfully across all instances' });
 });
 
 export default router;

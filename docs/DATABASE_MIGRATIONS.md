@@ -49,7 +49,9 @@ supabase/
     ├── 0010_grant_crm_table_permissions.sql    # service_role grants for leads & campaign_leads
     ├── 0011_harden_crm_and_sensitive_rls.sql   # Strict private RLS for CRM & campaign logs
     ├── 0012_add_x_social_link.sql              # Official X (@Probitian) social link configuration
-    └── 0013_atomic_rate_limiting.sql           # Atomic PostgreSQL RPC for distributed rate limiting
+    ├── 0013_atomic_rate_limiting.sql           # Atomic PostgreSQL RPC for distributed rate limiting
+    ├── 0014_governance_and_audit_logs.sql       # Administrative audit logs and content revision history
+    └── 0015_distributed_admin_session_revocation.sql # Multi-instance distributed admin session revocation
 ```
 
 ---
