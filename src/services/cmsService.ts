@@ -14,6 +14,9 @@ import {
   SocialLinkItem,
   NavigationItem,
   MediaItem,
+  MediaReference,
+  MediaReferencesResponse,
+  MediaBulkDeleteResult,
   CategoryItem,
   Lead,
   LeadCampaign,
@@ -1420,13 +1423,24 @@ export const cmsService = {
     throw new Error('Failed to create media record');
   },
 
-  async deleteMediaItem(id: string): Promise<{ success: boolean; error?: string }> {
+  async deleteMediaItem(id: string): Promise<{
+    success: boolean;
+    error?: string;
+    in_use?: boolean;
+    references?: MediaReference[];
+  }> {
     try {
-      const resData = await safeFetchJson<{ success?: boolean; error?: string }>(`/api/cms/media/${id}`, { method: 'DELETE' });
-      if (resData && resData.success === false) {
+      const response = await fetch(`/api/cms/media/${id}`, {
+        method: 'DELETE',
+        credentials: 'include'
+      });
+      const resData = await response.json().catch(() => null);
+      if (!response.ok || (resData && resData.success === false)) {
         return {
           success: false,
-          error: resData.error || 'Failed to delete media asset.'
+          error: resData?.error || `Failed to delete media asset (HTTP ${response.status})`,
+          in_use: Boolean(resData?.in_use),
+          references: resData?.references || []
         };
       }
       return { success: true };
@@ -1436,6 +1450,24 @@ export const cmsService = {
         error: e?.message || 'Network error deleting media item.'
       };
     }
+  },
+
+  async checkMediaReferences(id: string): Promise<MediaReferencesResponse> {
+    return await safeFetchJson<MediaReferencesResponse>(`/api/cms/media/${id}/references`);
+  },
+
+  async bulkDeleteMedia(ids: string[]): Promise<MediaBulkDeleteResult> {
+    const response = await fetch('/api/cms/media/bulk-delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ ids })
+    });
+    const resData = await response.json().catch(() => null);
+    if (!response.ok || !resData) {
+      throw new Error(resData?.error || `Bulk delete failed with status ${response.status}`);
+    }
+    return resData as MediaBulkDeleteResult;
   },
 
   // --- CATEGORIES ---

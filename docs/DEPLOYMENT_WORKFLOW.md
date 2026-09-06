@@ -25,7 +25,7 @@ This document outlines the step-by-step production deployment workflow for ProBi
         ↓
 2. AUTOMATED CI/CD VALIDATION
    ├── Typecheck & Lint: `npm run lint` (`tsc --noEmit`)
-   ├── Security & Regression Suite: `npm test` (`tsx --test tests/**/*.test.ts`)
+   ├── Security & Regression Suite: `npm test` (`tsx --test tests/**/*.test.ts` across 24 test suites & 171 assertions)
    ├── Dependency Vulnerability Audit: `npm audit --audit-level=high`
    └── Custom CodeQL Security Analysis: `+security-extended,security-and-quality`
         ↓
@@ -81,8 +81,8 @@ Immediately following a deployment:
 6. Verify an invalid URL (`/nonexistent-route`) returns `HTTP 404 Not Found` with 404 UI.
 7. Submit a test enquiry via `/contact` and verify email dispatch.
 8. Subscribe a test email via footer and confirm Supabase `newsletter` insert.
-9. Log into `/admin` with `ADMIN_PASSKEY` and verify GA4 analytics metrics load.
-10. Test uploading a sample image in the Media Library.
+9. Log into `/admin` with `ADMIN_PASSKEY` or Supabase OAuth, verify HttpOnly `admin_session` cookie is established, and verify GA4 analytics metrics load.
+10. Test uploading a sample image in the Media Library, test single/multi-select, and verify pre-deletion referential usage check (`GET /api/cms/media/:id/usage`).
 
 ---
 

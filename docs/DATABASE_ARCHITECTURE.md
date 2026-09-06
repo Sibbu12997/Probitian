@@ -43,7 +43,7 @@ If Supabase PostgreSQL is unreachable or returns a database error, Express APIs 
 
 ## 3. Major Production Database Tables
 
-The Supabase PostgreSQL database schema comprises 15 primary tables:
+The Supabase PostgreSQL database schema comprises 18 primary tables:
 
 | Table Name | Description | Key Fields |
 | :--- | :--- | :--- |
@@ -63,6 +63,22 @@ The Supabase PostgreSQL database schema comprises 15 primary tables:
 | **`email_campaigns`** | Email newsletter campaigns | `id`, `name`, `subject`, `preview_text`, `content`, `status`, `scheduled_at`, `sent_at`, `total_recipients`, `successful_count`, `failed_count`, `created_at` |
 | **`email_campaign_recipients`**| Newsletter delivery log per recipient | `id`, `campaign_id`, `subscriber_id`, `email`, `status`, `provider_message_id`, `error_message`, `sent_at` |
 | **`rate_limits`** | Distributed atomic rate limit counters | `key`, `count`, `reset_time`, `updated_at` |
+| **`audit_logs`** | Administrative governance & security audit trail | `id`, `actor`, `role`, `action`, `resource`, `resource_id`, `ip_address`, `user_agent`, `result`, `metadata`, `created_at` |
+| **`content_revisions`** | Version history & rollbacks for CMS content | `id`, `content_type`, `content_id`, `version_number`, `title`, `status`, `author`, `data`, `created_at` |
+| **`admin_session_revocations`** | Multi-instance distributed session revocation | `id`, `revocation_type`, `target`, `revoked_at`, `expires_at`, `reason`, `metadata`, `created_at` |
+
+---
+
+## 4. Distributed Session Revocation Architecture (`public.admin_session_revocations`)
+
+To support multi-instance horizontal scaling on Cloud Run without stale in-memory session drift:
+- **`admin_session_revocations`** acts as the cluster-wide revocation registry.
+- **Granular Revocation Types**:
+  - `SESSION`: Revokes an individual session token by its SHA-256 hash.
+  - `USER`: Revokes all sessions for a specific admin user/email created prior to `revoked_at`.
+  - `GLOBAL`: Emergency cluster-wide revocation invalidating all sessions issued prior to `revoked_at`.
+- **Fail-Closed Verification**: Every incoming administrative request checks the session token against `admin_session_revocations`. If a database read error occurs in production, the system fails closed with HTTP 500 (`AUTH_STORE_UNAVAILABLE`), preventing unauthorized bypasses. During local development or schema-cache transition where the remote table is not yet provisioned (`PGRST205`), the revocation store gracefully falls back to memory tracking.
+- **Automated Pruning**: Expired revocation tombstones can be safely cleaned via the database maintenance function `public.prune_expired_session_revocations(current_epoch_ms)`.
 
 ---
 

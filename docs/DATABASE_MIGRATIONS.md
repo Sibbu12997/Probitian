@@ -60,6 +60,24 @@ supabase/
 
 > 🚨 **IMPORTANT**: The existence of a `.sql` file in `supabase/migrations/` does **NOT** automatically mean it is applied to the production database. Each migration must be explicitly executed in the Supabase Dashboard SQL Editor or via the Supabase CLI, and verified against the live PostgreSQL instance.
 
+| Migration | Name | Description | Key Objects Created / Altered |
+| :--- | :--- | :--- | :--- |
+| `0001` | `initial_schema.sql` | Baseline CMS schema & initial RLS policies | `projects`, `blogs`, `courses`, `videos`, `categories`, `pages`, `settings`, `messages`, `newsletter`, `media` |
+| `0002` | `add_message_fields.sql` | Contact enquiry reply, phone, & status fields | `messages.phone`, `messages.status`, `messages.reply_message`, `messages.replied_at` |
+| `0003` | `add_campaign_tables.sql` | Email campaign & recipient tracking tables | `email_campaigns`, `email_campaign_recipients` |
+| `0004` | `grant_table_permissions.sql`| Table grants & service_role permissions | Explicit `GRANT ALL` on CMS tables to `service_role` |
+| `0005` | `upgrade_media_storage.sql` | Media metadata schema & storage bucket | Upgraded `media` metadata and storage configuration |
+| `0006` | `fix_newsletter_permissions.sql` | Harden newsletter RLS and grants | `newsletter` RLS insert-only for public, full for `service_role` |
+| `0007` | `harden_security_and_least_privilege.sql` | Security hardening & least privilege | Hardened RLS policies across all public tables |
+| `0008` | `add_linkedin_social_link.sql` | Official LinkedIn social channel | Seeds LinkedIn URL in `settings` |
+| `0009` | `add_lead_outreach_tables.sql`| B2B CRM leads & outreach tables | `leads`, `lead_campaigns`, `campaign_leads` |
+| `0010` | `grant_crm_table_permissions.sql`| CRM table grants for backend | `GRANT ALL` on CRM tables to `service_role` |
+| `0011` | `harden_crm_and_sensitive_rls.sql`| Strict private RLS for CRM data | Restricts CRM & delivery logs strictly to `service_role` |
+| `0012` | `add_x_social_link.sql` | Official X (@Probitian) social link | Seeds X link in `settings` |
+| `0013` | `atomic_rate_limiting.sql` | Atomic PostgreSQL RPC rate limiting | `rate_limits` table and RPC `increment_rate_limit()` |
+| `0014` | `governance_and_audit_logs.sql` | Administrative audit logs & revisions | `audit_logs` and `content_revisions` tables |
+| `0015` | `distributed_admin_session_revocation.sql` | Multi-instance session revocation | `admin_session_revocations` table and pruning function |
+
 ---
 
 ## 4. Standard Migration Workflow

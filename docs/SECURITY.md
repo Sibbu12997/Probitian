@@ -38,16 +38,39 @@ Probitian is designed with a defense-in-depth, zero-trust security architecture 
 
 ## 2. Authentication & Admin Authorization Model
 
-### Passkey Authentication & Identity Binding
-- **Timing Attack Defense:** Passkeys are validated via `crypto.timingSafeEqual` against constant-time SHA-256 digests.
-- **Admin Identity Binding:** Client-supplied email parameters cannot override the administrator identity. All passkey authentications are strictly bound to the configured administrator identity allowlist (`OFFICIAL_ADMIN_EMAIL`, `CONFIGURED_ADMIN_EMAILS`).
-- **Cryptographic Session Tokens:** Sessions use HMAC-SHA-256 signatures over base64url payloads containing random cryptographic nonces, creation timestamps, and explicit expiry timestamps.
-- **Revocation & Logout:** Logging out immediately invalidates tokens in the active session map and registers them in the `revokedSessions` blocklist.
-- **Multi-Instance Support:** Stateless cryptographic signature verification enables resilient zero-downtime horizontal scaling across Cloud Run container instances.
+### HttpOnly Cookie Transport & Session Lifecycle
+- **HttpOnly Cookie Isolation:** The administrative session token is transported strictly inside an `HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/` cookie named `admin_session`. The session token is intentionally omitted from login JSON response bodies, neutralizing Cross-Site Scripting (XSS) credential theft.
+- **Top-Level Browser vs. Embedded Iframe Context:**
+  - In a standard top-level browser tab (`window.self === window.top`), the browser natively sends and persists first-party HttpOnly cookies on every administrative API request with zero third-party cookie restrictions or warnings.
+  - In an embedded preview iframe (`window.self !== window.top`), third-party cookie blocking in modern browsers (Safari, Chrome, Firefox) can prevent cookie persistence. The client detects actual iframe embedding, attempts the standard session flow first, and presents clear guidance with an "Open in New Tab" action without blocking legitimate credentials.
+- **Session Verification & Diagnostic Endpoint:** `GET /api/admin/session` parses the `admin_session` cookie, verifies cryptographic validity, validates against the distributed revocation registry, and returns the authenticated user profile (`authenticated: true`, `role`, `email`, `authMethod: 'cookie'`). If invalid, detailed diagnostics explain the exact reason (`NO_COOKIE`, `EXPIRED`, `REVOKED`, `USER_REVOKED`, `INVALID_SIGNATURE`).
+- **Clean Logout Flow:** `POST /api/admin/logout` invalidates the token in the distributed revocation registry and clears the cookie via `res.clearCookie('admin_session')`.
 
-### Supabase Admin Session Verification
-- Access tokens are verified server-side with Supabase Auth (`getUser(accessToken)`).
-- Authorization requires explicit administrative status: verified email in `CONFIGURED_ADMIN_EMAILS`, `profiles.role === 'admin'`, or `app_metadata.role === 'admin'`.
+### Cryptographic HMAC-SHA-256 Signed Sessions
+- **Signature Integrity:** Session tokens are created via HMAC-SHA-256 signatures (`crypto.createHmac`) over base64url-encoded JSON payloads.
+- **Payload Structure:** Each token payload encapsulates `email`, `role`, `userId`, `createdAt`, `expiresAt` (8-hour sliding lifetime), and a random 16-byte cryptographic `nonce`.
+- **Timing Attack Defense:** Passkeys and session signatures are validated using constant-time comparisons (`crypto.timingSafeEqual`) against SHA-256 digests, eliminating side-channel timing leaks.
+- **Admin Identity Binding:** Client-supplied email parameters cannot override the administrator identity. All passkey authentications are strictly bound to configured administrator identities (`OFFICIAL_ADMIN_EMAIL`, `CONFIGURED_ADMIN_EMAILS`).
+
+### Distributed Session Revocation (`public.admin_session_revocations`)
+- **Multi-Instance Cloud Run Synchronization:** ProBitian implements `SupabaseSessionRevocationStore` backed by the PostgreSQL table `public.admin_session_revocations`. When a session is logged out or revoked, all instances across the cluster observe the revocation immediately.
+- **Granular Revocation Scopes:**
+  - `SESSION`: Revokes an individual session token by its SHA-256 hash.
+  - `USER`: Revokes all sessions for a specific user/email issued prior to the revocation timestamp.
+  - `GLOBAL`: Cluster-wide emergency revocation invalidating all sessions issued before `revoked_at`.
+- **Fail-Closed Verification in Production:** If the database or revocation check fails in production, the authentication middleware fails closed (`verified: false`, `reason: 'STORE_UNAVAILABLE'`), returning HTTP 500 (`AUTH_STORE_UNAVAILABLE`) to prevent unauthorized bypasses.
+- **Resilient Development Fallback:** If the remote table is not yet provisioned in a local development or test environment (`PGRST205` schema cache error), the store logs a single warning and gracefully falls back to memory tracking, ensuring seamless test execution.
+
+### Server-Authoritative Role-Based Access Control (RBAC)
+- **Role Hierarchy:**
+  - `ADMIN`: Full operational access across all 22 modules (`MANAGE_SYSTEM`, `MANAGE_CRM`, `PUBLISH_CONTENT`, `EDIT_CONTENT`, `MEDIA_UPLOAD`, `MEDIA_DELETE`, `VIEW_ANALYTICS`, `CONTENT_WRITE`, `CONTENT_READ`).
+  - `EDITOR`: Content authoring, editing, media management, and analytics review (`CONTENT_READ`, `CONTENT_WRITE`, `EDIT_CONTENT`, `MEDIA_UPLOAD`, `MEDIA_DELETE`, `VIEW_ANALYTICS`).
+  - `USER`: Read-only access to published public content (`CONTENT_READ`).
+- **Server Enforcement Middleware:** Routes enforce access through `requireAdmin`, `requireRole(role)`, or `requirePermission(permission)`. Client-side UI role checks serve strictly as navigational aids; all access control decisions are strictly enforced server-side.
+
+### Supabase OAuth Admin Session Verification
+- Administrative users may also authenticate via Supabase Auth OAuth/SSO (`POST /api/admin/verify-supabase-session`).
+- The server validates the bearer access token directly with Supabase (`getUser(accessToken)`), verifies that the verified email matches `CONFIGURED_ADMIN_EMAILS` or has `profiles.role === 'admin'`, and issues a signed `admin_session` HttpOnly cookie for subsequent requests.
 
 ---
 
@@ -66,9 +89,9 @@ Rate limiters protect critical endpoints from brute force, distributed scanning,
 
 | Limiter | Window | Max Requests | Target Routes |
 |---|---|---|---|
-| `loginLimiter` | 15 min | 10 | `/api/admin/login`, `/api/admin/verify-*` |
-| `contactLimiter` | 15 min | 10 | `/api/messages` |
-| `newsletterLimiter` | 15 min | 10 | `/api/newsletter` |
+| `loginLimiter` | 15 min | 15 | `/api/admin/login`, `/api/admin/verify-*` |
+| `contactLimiter` | 15 min | 15 | `/api/messages` |
+| `newsletterLimiter` | 15 min | 15 | `/api/newsletter` |
 | `unsubscribeLimiter` | 15 min | 20 | `/api/newsletter/unsubscribe` |
 | `emailSendLimiter` | 15 min | 5 | Campaign bulk dispatches |
 | `emailTestLimiter` | 15 min | 10 | Test email triggers |
@@ -96,7 +119,7 @@ Rate limiters protect critical endpoints from brute force, distributed scanning,
 The continuous integration pipeline validates code quality, type safety, regression suites, dependency integrity, and production build readiness on every push and pull request:
 1. **Clean Installation:** `npm ci` (verifies synchronized dependency tree in `package-lock.json`).
 2. **Typecheck & Static Analysis:** `npm run lint` (`tsc --noEmit`).
-3. **Security & Regression Tests:** `npm test` (`tsx --test tests/**/*.test.ts` across all 18 test suites and 83 automated assertions).
+3. **Security & Regression Tests:** `npm test` (`tsx --test tests/**/*.test.ts` across all 24 test suites and 171 automated assertions).
 4. **Vulnerability Audit:** `npm audit --audit-level=high` (verifies zero high/critical severity dependency advisories).
 5. **Production Build:** `npm run build` (compiles Vite React SPA and bundles `server.ts` with `esbuild`).
 

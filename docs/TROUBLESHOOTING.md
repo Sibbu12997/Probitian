@@ -111,13 +111,13 @@ Official LinkedIn: [https://www.linkedin.com/company/probitian/](https://www.lin
 
 ---
 
-### 10. Admin Page Data Missing
+### 10. Admin Page Data Missing or Unauthorized (HTTP 401)
 
-- **Problem**: Navigating to an Admin Control Center module displays blank tables or empty inputs.
-- **Cause**: Expired or missing Admin Passkey session token (`x-admin-token`), or database query returned empty results.
-- **How to Verify**: Open browser DevTools Network tab and check API response status code (`401 Unauthorized`).
-- **Solution**: Log out of the Admin Portal and re-authenticate using the correct `ADMIN_PASSKEY`.
-- **Prevention**: Set clear session expiry notices in the UI.
+- **Problem**: Navigating to an Admin Control Center module displays blank tables, unauthorized alerts, or redirects to the login screen.
+- **Cause**: Expired, missing, or revoked `admin_session` HttpOnly cookie, or database query returned empty results.
+- **How to Verify**: Inspect DevTools Network tab for requests to `GET /api/admin/session`. Check whether the `admin_session` cookie is attached in request headers and inspect the diagnostic failure reason in the response (`NO_COOKIE`, `EXPIRED`, `REVOKED`, `USER_REVOKED`, `STORE_UNAVAILABLE`).
+- **Solution**: Log out and re-authenticate using the authorized Admin Passkey or Supabase OAuth. If testing inside an embedded preview iframe where third-party cookies are blocked, open the portal in a direct top-level browser tab.
+- **Prevention**: The server maintains an 8-hour sliding session lifetime and provides clear session diagnostics.
 
 ---
 
@@ -343,6 +343,24 @@ Official LinkedIn: [https://www.linkedin.com/company/probitian/](https://www.lin
 - **How to Verify**: Inspect response headers for `RateLimit-Limit`, `RateLimit-Remaining: 0`, and `Retry-After: <seconds>`.
 - **Solution**: Wait for the duration indicated by `Retry-After` before re-attempting. For automated jobs, implement exponential backoff respecting the `Retry-After` header.
 - **Architecture Note**: ProBitian uses atomic PostgreSQL RPC rate limiting (`public.increment_rate_limit`) with automatic fail-safe in-memory fallback. If the database is temporarily unreachable, local memory rate limiting continues to enforce protection.
+
+---
+
+### 34. Admin Login Warning in Embedded Preview Iframes vs. Top-Level Tabs
+- **Problem**: The Admin Login displays the informational notice: "Admin Portal requires a first-party browser tab".
+- **Cause**: The application is being viewed inside an embedded preview iframe (`window.self !== window.top`) such as an IDE or container preview wrapper. Modern web browsers (Chrome, Edge, Safari) apply strict partition and storage-access policies on third-party iframes, blocking cross-origin HttpOnly session cookies from persisting.
+- **How to Verify**: Check `window.self !== window.top` in DevTools console. In a normal top-level browser tab (`window.self === window.top`), this warning will NEVER appear because first-party cookies operate without partition restrictions.
+- **Solution**: Click **Open in New Tab** to launch ProBitian in a dedicated top-level browser tab. Authentication will immediately persist the `admin_session` cookie cleanly.
+- **Prevention**: The client executes the normal authentication/session verification flow first and only displays the iframe advisory when embedded context is confirmed and cookie persistence is blocked.
+
+---
+
+### 35. Media Deletion Blocked Due to Active Content References
+- **Problem**: Deleting a file in the Media Library fails or prompts a warning stating that the asset is in use.
+- **Cause**: ProBitian enforces pre-deletion referential integrity (`GET /api/cms/media/:id/usage`). Assets referenced in site branding (logo/banner), blog article covers or content, project demos/datasets, course curriculum, founder messages, or page sections cannot be silently deleted, preventing broken links.
+- **How to Verify**: Review the usage modal dialog displayed in the Media Library, which lists every referencing entity and table.
+- **Solution**: Reassign or replace the asset reference in the corresponding CMS module (e.g. choose a different cover image for the blog post), then retry the deletion. Alternatively, confirm intentional force removal if available.
+- **Prevention**: The Media Library provides pre-deletion verification and preserves the active selection state if an operation is blocked.
 
 ---
 

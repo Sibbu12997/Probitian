@@ -3,6 +3,19 @@ import { Lock, Mail, ShieldCheck, ArrowRight, ArrowLeft, Key, Eye, EyeOff, Sun, 
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { PROBITIAN_LOGO_URL } from '../../constants/branding';
 
+/**
+ * Accurately detects whether the current page is genuinely running embedded inside an iframe.
+ * Never falsely classifies a normal top-level browser tab as embedded.
+ */
+export function isRunningInIframe(): boolean {
+  try {
+    return typeof window !== 'undefined' && window.self !== window.top;
+  } catch {
+    // Cross-origin restriction when accessing window.top confirms iframe containment
+    return true;
+  }
+}
+
 interface AdminLoginProps {
   onLoginSuccess: (userEmail: string) => void;
   onNavigateHome?: () => void;
@@ -43,21 +56,48 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
           body: JSON.stringify({ passkey: passkey.trim() })
         });
 
-        if (response.ok) {
-          // Confirm active session state before rendering protected admin portal
-          const sessionRes = await fetch('/api/admin/session', { credentials: 'include' });
-          if (sessionRes.ok) {
-            const sessionData = await sessionRes.json();
-            if (sessionData.authenticated && sessionData.email) {
-              onLoginSuccess(sessionData.email);
-              return;
-            }
-          }
-          setCookieBlocked(true);
-          setError('Admin Portal requires a first-party browser tab. This preview is embedded inside AI Studio, where browser privacy settings may block secure administrative session cookies.');
-        } else {
+        if (!response.ok) {
           const errData = await response.json().catch(() => null);
           setError(errData?.error || 'Invalid credentials');
+          setLoading(false);
+          return;
+        }
+
+        // Passkey verification succeeded and set the HttpOnly admin_session cookie.
+        // Confirm active session state before rendering protected admin portal.
+        const sessionRes = await fetch('/api/admin/session', { credentials: 'include' });
+        const sessionData = await sessionRes.json().catch(() => null);
+
+        if (sessionRes.ok && sessionData?.authenticated && sessionData?.email) {
+          onLoginSuccess(sessionData.email);
+          return;
+        }
+
+        // If backend session verification encountered a server-side error (500 or revocation store error),
+        // display the actual service error instead of assuming an iframe cookie block.
+        if (sessionRes.status >= 500 || sessionData?.code === 'AUTH_STORE_UNAVAILABLE' || sessionData?.code === 'REVOCATION_STORE_ERROR') {
+          setError(sessionData?.error || 'Authentication service temporarily unavailable. Please try again later.');
+          setCookieBlocked(false);
+          setLoading(false);
+          return;
+        }
+
+        // If unauthorized or forbidden account
+        if (sessionRes.status === 401 || sessionRes.status === 403) {
+          setError(sessionData?.error || 'Unauthorized administrator account');
+          setCookieBlocked(false);
+          setLoading(false);
+          return;
+        }
+
+        // Credentials were valid, but session cookie could not be established.
+        // Only trigger the embedded-preview warning when genuinely running inside an iframe.
+        if (isRunningInIframe()) {
+          setCookieBlocked(true);
+          setError('Admin Portal requires a first-party browser tab. This preview is embedded inside an iframe, where browser privacy settings may block secure administrative session cookies.');
+        } else {
+          setCookieBlocked(false);
+          setError(sessionData?.error || 'Session could not be established. Please ensure cookies are enabled in your browser and try again.');
         }
       } else {
         if (!isSupabaseConfigured()) {
@@ -79,23 +119,37 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
             body: JSON.stringify({ accessToken: data.session.access_token })
           });
 
-          if (sessionRes.ok) {
-            const verifyRes = await fetch('/api/admin/session', { credentials: 'include' });
-            if (verifyRes.ok) {
-              const verifyData = await verifyRes.json();
-              if (verifyData.authenticated && verifyData.email) {
-                onLoginSuccess(verifyData.email);
-                return;
-              }
-            }
-            setCookieBlocked(true);
-            setError('Admin Portal requires a first-party browser tab. This preview is embedded inside AI Studio, where browser privacy settings may block secure administrative session cookies.');
-          } else {
+          if (!sessionRes.ok) {
             const errData = await sessionRes.json().catch(() => null);
             setError(errData?.error || 'Unauthorized administrator account');
+            setLoading(false);
+            return;
+          }
+
+          const verifyRes = await fetch('/api/admin/session', { credentials: 'include' });
+          const verifyData = await verifyRes.json().catch(() => null);
+
+          if (verifyRes.ok && verifyData?.authenticated && verifyData?.email) {
+            onLoginSuccess(verifyData.email);
+            return;
+          }
+
+          if (verifyRes.status >= 500 || verifyData?.code === 'AUTH_STORE_UNAVAILABLE' || verifyData?.code === 'REVOCATION_STORE_ERROR') {
+            setError(verifyData?.error || 'Authentication service temporarily unavailable. Please try again later.');
+            setCookieBlocked(false);
+            setLoading(false);
+            return;
+          }
+
+          if (isRunningInIframe()) {
+            setCookieBlocked(true);
+            setError('Admin Portal requires a first-party browser tab. This preview is embedded inside an iframe, where browser privacy settings may block secure administrative session cookies.');
+          } else {
+            setCookieBlocked(false);
+            setError(verifyData?.error || 'Session could not be established. Please ensure cookies are enabled in your browser and try again.');
           }
         } else {
-          setError('Invalid credentials');
+          setError(authError?.message || 'Invalid credentials');
         }
       }
     } catch {
@@ -303,7 +357,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
               </>
             )}
 
-            {cookieBlocked && (
+            {cookieBlocked && isRunningInIframe() && (
               <div
                 id="admin-cookie-blocked-notice"
                 className="p-4 rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 text-amber-900 dark:text-amber-200 space-y-3 text-xs"
@@ -315,7 +369,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
                       Admin Portal requires a first-party browser tab.
                     </p>
                     <p className="text-amber-700 dark:text-amber-300 leading-relaxed">
-                      This preview is embedded inside AI Studio, where browser privacy settings may block secure administrative session cookies.
+                      This preview is embedded inside an iframe, where browser privacy settings may block secure administrative session cookies.
                     </p>
                     <p className="text-amber-800 dark:text-amber-200 font-medium">
                       Open Admin Portal in a new tab to continue.
@@ -335,7 +389,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
               </div>
             )}
 
-            {error && !cookieBlocked && (
+            {error && (!cookieBlocked || !isRunningInIframe()) && (
               <div
                 id="login-error-alert"
                 className="p-3 rounded-xl bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 text-xs text-red-700 dark:text-red-400 font-semibold flex items-center gap-2"

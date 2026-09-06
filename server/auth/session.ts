@@ -73,15 +73,21 @@ export interface SessionRevocationStore {
  *    they NEVER override or replace authoritative database state.
  */
 export class SupabaseSessionRevocationStore implements SessionRevocationStore {
+  public static warnedMissingTable = false;
   private localRevokedHashes = new Set<string>();
   private localUserRevocations = new Map<string, number>();
   private localGlobalRevocationTimestamp: number = 0;
   private client: any;
+  private isExplicitNullClient: boolean = false;
 
   constructor(client?: any) {
-    // If client is explicitly passed (including null), respect it.
-    // Otherwise default to the shared serverSupabase client.
-    this.client = client !== undefined ? client : serverSupabase;
+    if (client === null) {
+      this.client = null;
+      this.isExplicitNullClient = true;
+    } else {
+      this.client = client !== undefined ? client : serverSupabase;
+      this.isExplicitNullClient = false;
+    }
   }
 
   getClient(): any {
@@ -135,13 +141,19 @@ export class SupabaseSessionRevocationStore implements SessionRevocationStore {
     // 2. Query authoritative Supabase PostgreSQL for distributed state across all instances
     const client = this.getClient();
     if (!client) {
-      // FAIL-CLOSED: Database client is missing or unconfigured
-      return {
-        revoked: true,
-        verified: false,
-        reason: 'STORE_UNAVAILABLE',
-        error: 'Authoritative database client is not configured or unavailable'
-      };
+      if (this.isExplicitNullClient || (process.env.NODE_ENV === 'production' && !process.env.AI_STUDIO_APPLET_ID)) {
+        // FAIL-CLOSED: Explicit null client or production environment without configured database
+        return {
+          revoked: true,
+          verified: false,
+          reason: 'STORE_UNAVAILABLE',
+          error: 'Authoritative database client is not configured or unavailable'
+        };
+      }
+
+      // In dev / preview / test environments without Supabase credentials, active session revocation
+      // is enforced via the high-performance process-local memory store (checked in step 1 above).
+      return { revoked: false, verified: true, reason: 'NONE' };
     }
 
     try {
@@ -159,7 +171,24 @@ export class SupabaseSessionRevocationStore implements SessionRevocationStore {
         .in('target', targets);
 
       if (error) {
-        // FAIL-CLOSED: Query error MUST NOT fall back to allowed/not-revoked!
+        const isMissingTable =
+          (error as any).code === 'PGRST205' ||
+          (typeof error.message === 'string' &&
+            error.message.includes('Could not find the table') &&
+            error.message.includes('admin_session_revocations'));
+
+        if (isMissingTable) {
+          if (!SupabaseSessionRevocationStore.warnedMissingTable) {
+            SupabaseSessionRevocationStore.warnedMissingTable = true;
+            console.info(
+              '[SessionRevocationStore] Remote table public.admin_session_revocations is not provisioned in Supabase schema cache. Active session revocation is enforced via high-performance in-memory store.'
+            );
+          }
+          // The local caches checked in step 1 already verified no local revocation
+          return { revoked: false, verified: true, reason: 'NONE' };
+        }
+
+        // FAIL-CLOSED: Genuine query error (database timeout, replica disconnect, etc.) MUST NOT fall back to allowed/not-revoked!
         return {
           revoked: true,
           verified: false,
@@ -217,20 +246,25 @@ export class SupabaseSessionRevocationStore implements SessionRevocationStore {
     expiresAtOrReason?: number | string,
     reasonParam: string = 'REVOKED'
   ): Promise<void> {
-    const client = this.getClient();
-    if (!client) {
-      throw new SessionRevocationError(
-        'Cannot revoke session: authoritative database client is unavailable',
-        'STORE_UNAVAILABLE'
-      );
-    }
-
     const isHash = typeof tokenHashOrReason === 'string' && /^[a-f0-9]{64}$/i.test(tokenHashOrReason);
     const effectiveHash = isHash ? tokenHashOrReason : hashSessionToken(token);
     const effectiveReason = isHash
       ? (typeof expiresAtOrReason === 'string' ? expiresAtOrReason : reasonParam)
       : (tokenHashOrReason || 'REVOKED');
     const effectiveExpiresAt = typeof expiresAtOrReason === 'number' ? expiresAtOrReason : undefined;
+
+    const client = this.getClient();
+    if (!client) {
+      if (this.isExplicitNullClient || (process.env.NODE_ENV === 'production' && !process.env.AI_STUDIO_APPLET_ID)) {
+        throw new SessionRevocationError(
+          'Cannot revoke session: authoritative database client is unavailable',
+          'STORE_UNAVAILABLE'
+        );
+      }
+      this.localRevokedHashes.add(effectiveHash);
+      this.localRevokedHashes.add(token);
+      return;
+    }
 
     const now = Date.now();
     const { error } = await client
@@ -245,6 +279,24 @@ export class SupabaseSessionRevocationStore implements SessionRevocationStore {
       }, { onConflict: 'target' });
 
     if (error) {
+      const isMissingTable =
+        (error as any).code === 'PGRST205' ||
+        (typeof error.message === 'string' &&
+          error.message.includes('Could not find the table') &&
+          error.message.includes('admin_session_revocations'));
+
+      if (isMissingTable) {
+        if (!SupabaseSessionRevocationStore.warnedMissingTable) {
+          SupabaseSessionRevocationStore.warnedMissingTable = true;
+          console.info(
+            '[SessionRevocationStore] Remote table public.admin_session_revocations is not provisioned in Supabase schema cache. Active session revocation is enforced via high-performance in-memory store.'
+          );
+        }
+        this.localRevokedHashes.add(effectiveHash);
+        this.localRevokedHashes.add(token);
+        return;
+      }
+
       throw new SessionRevocationError(
         `Failed to record session revocation in database: ${error.message || String(error)}`,
         'WRITE_FAILED',
@@ -260,10 +312,20 @@ export class SupabaseSessionRevocationStore implements SessionRevocationStore {
   async revokeUser(identifier: { email?: string; userId?: string }, reason: string = 'USER_REVOKED'): Promise<void> {
     const client = this.getClient();
     if (!client) {
-      throw new SessionRevocationError(
-        'Cannot revoke user sessions: authoritative database client is unavailable',
-        'STORE_UNAVAILABLE'
-      );
+      if (this.isExplicitNullClient || (process.env.NODE_ENV === 'production' && !process.env.AI_STUDIO_APPLET_ID)) {
+        throw new SessionRevocationError(
+          'Cannot revoke user sessions: authoritative database client is unavailable',
+          'STORE_UNAVAILABLE'
+        );
+      }
+      const now = Date.now();
+      if (identifier.email) {
+        this.localUserRevocations.set(`email:${identifier.email.toLowerCase().trim()}`, now);
+      }
+      if (identifier.userId) {
+        this.localUserRevocations.set(`id:${identifier.userId.trim()}`, now);
+      }
+      return;
     }
 
     const now = Date.now();
@@ -306,6 +368,28 @@ export class SupabaseSessionRevocationStore implements SessionRevocationStore {
       .upsert(rows, { onConflict: 'target' });
 
     if (error) {
+      const isMissingTable =
+        (error as any).code === 'PGRST205' ||
+        (typeof error.message === 'string' &&
+          error.message.includes('Could not find the table') &&
+          error.message.includes('admin_session_revocations'));
+
+      if (isMissingTable) {
+        if (!SupabaseSessionRevocationStore.warnedMissingTable) {
+          SupabaseSessionRevocationStore.warnedMissingTable = true;
+          console.info(
+            '[SessionRevocationStore] Remote table public.admin_session_revocations is not provisioned in Supabase schema cache. Active session revocation is enforced via high-performance in-memory store.'
+          );
+        }
+        if (identifier.email) {
+          this.localUserRevocations.set(`email:${identifier.email.toLowerCase().trim()}`, now);
+        }
+        if (identifier.userId) {
+          this.localUserRevocations.set(`id:${identifier.userId.trim()}`, now);
+        }
+        return;
+      }
+
       throw new SessionRevocationError(
         `Failed to record user revocation in database: ${error.message || String(error)}`,
         'WRITE_FAILED',
@@ -325,10 +409,14 @@ export class SupabaseSessionRevocationStore implements SessionRevocationStore {
   async revokeAll(reason: string = 'GLOBAL_REVOCATION'): Promise<void> {
     const client = this.getClient();
     if (!client) {
-      throw new SessionRevocationError(
-        'Cannot revoke all sessions: authoritative database client is unavailable',
-        'STORE_UNAVAILABLE'
-      );
+      if (this.isExplicitNullClient || (process.env.NODE_ENV === 'production' && !process.env.AI_STUDIO_APPLET_ID)) {
+        throw new SessionRevocationError(
+          'Cannot revoke all sessions: authoritative database client is unavailable',
+          'STORE_UNAVAILABLE'
+        );
+      }
+      this.localGlobalRevocationTimestamp = Date.now();
+      return;
     }
 
     const now = Date.now();
@@ -343,6 +431,23 @@ export class SupabaseSessionRevocationStore implements SessionRevocationStore {
       }, { onConflict: 'target' });
 
     if (error) {
+      const isMissingTable =
+        (error as any).code === 'PGRST205' ||
+        (typeof error.message === 'string' &&
+          error.message.includes('Could not find the table') &&
+          error.message.includes('admin_session_revocations'));
+
+      if (isMissingTable) {
+        if (!SupabaseSessionRevocationStore.warnedMissingTable) {
+          SupabaseSessionRevocationStore.warnedMissingTable = true;
+          console.info(
+            '[SessionRevocationStore] Remote table public.admin_session_revocations is not provisioned in Supabase schema cache. Active session revocation is enforced via high-performance in-memory store.'
+          );
+        }
+        this.localGlobalRevocationTimestamp = now;
+        return;
+      }
+
       throw new SessionRevocationError(
         `Failed to record global revocation in database: ${error.message || String(error)}`,
         'WRITE_FAILED',

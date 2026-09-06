@@ -35,17 +35,17 @@ The ProBitian documentation follows a strict source-of-truth build pipeline:
 - 👤 **[ProBitian Website User Guide](PROBITIAN_USER_GUIDE.md)**  
   Comprehensive user guide for public learners navigating courses, portfolio projects, technical articles, and enquiry forms.
 - 🛠 **[Admin Control Center User Guide](PROBITIAN_ADMIN_CONTROL_CENTER_USER_GUIDE.md)**  
-  Administrator manual covering all 20 CMS & CRM modules, B2B Lead CRM, Email Sequences, Lead Outreach Campaigns, home page editing, message handling, branding, and GA4 analytics.
+  Administrator manual covering all 22 CMS & CRM modules across 5 navigation sections, B2B Lead CRM, Email Sequences, Lead Outreach Campaigns, home page editing, message handling, branding, and GA4 analytics.
 - 🎯 **[B2B Lead CRM & Automated Email Sequences Workflow](LEAD_OUTREACH_AND_SEQUENCES_WORKFLOW.md)**  
   Complete operational specification for B2B Lead CRM, CSV Import pipeline, Outreach Campaigns, Multi-step Email Sequences, Selective Lead Enrollment, and Background Worker.
 
 ### 🗄 Database & Storage Architecture
 - 🏛 **[Database Architecture Specification](DATABASE_ARCHITECTURE.md)**  
-  Detailed specification of Supabase PostgreSQL as the single authoritative production database, table schema references (`leads`, `lead_campaigns`, `campaign_leads`), and RLS policies.
+  Detailed specification of Supabase PostgreSQL as the single authoritative production database, 18 primary table schemas (including `audit_logs`, `content_revisions`, `admin_session_revocations`), distributed revocation, and RLS policies.
 - 🔄 **[Database Migrations & Schema Management](DATABASE_MIGRATIONS.md)**  
-  Sequential migration log (`0001` to `0013`), non-destructive schema rules, and migration execution procedures.
+  Sequential migration log (`0001` to `0015`), non-destructive schema rules, and migration execution procedures.
 - 🖼 **[Media Library & Supabase Storage Specification](MEDIA_LIBRARY.md)**  
-  Supabase Storage (`probitian-media` bucket) architecture, folder organization, upload API, and SVG DOMPurify sanitization.
+  Supabase Storage (`probitian-media` bucket) architecture, folder organization, upload API, multi-select, bulk delete, pre-deletion referential usage check, and SVG DOMPurify sanitization.
 
 ### ✉️ Email, Outreach & Automated Sequences
 - 📬 **[Newsletter Subscription Workflow](NEWSLETTER_WORKFLOW.md)**  
@@ -65,7 +65,7 @@ The ProBitian documentation follows a strict source-of-truth build pipeline:
 - 🧪 **[SEO User Acceptance Testing (UAT) Report](SEO_UAT.md)**  
   Comprehensive production verification report across 22 test checkpoints, production URL matrix, and post-deployment search console guide.
 - 🛡 **[Security & Secret Isolation Architecture](SECURITY.md)**  
-  Passkey authentication, Row Level Security (RLS) enforcement, service role isolation, and input sanitization.
+  HttpOnly cookie transport, HMAC-SHA-256 session signatures, distributed session revocation, constant-time passkey validation, Row Level Security (RLS) enforcement, service role isolation, and input sanitization.
 
 ### 🚀 Operations & Deployment
 - 🔄 **[Production Deployment Workflow](DEPLOYMENT_WORKFLOW.md)**  

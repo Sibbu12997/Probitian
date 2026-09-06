@@ -223,7 +223,6 @@ export async function findMediaReferences(media: MediaItemLike): Promise<MediaRe
         }
       }
 
-      return references;
     } catch (err) {
       console.warn('[mediaReferenceService] Supabase query encountered error, checking fallback:', err);
     }
@@ -348,5 +347,16 @@ export async function findMediaReferences(media: MediaItemLike): Promise<MediaRe
     console.warn('[mediaReferenceService] Local fallback scan error:', err);
   }
 
-  return references;
+  // Deduplicate references
+  const seenKeys = new Set<string>();
+  const uniqueReferences: MediaReference[] = [];
+  for (const ref of references) {
+    const key = `${ref.type}:${ref.location}`;
+    if (!seenKeys.has(key)) {
+      seenKeys.add(key);
+      uniqueReferences.push(ref);
+    }
+  }
+
+  return uniqueReferences;
 }

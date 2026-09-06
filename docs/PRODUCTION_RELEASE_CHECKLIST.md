@@ -17,13 +17,22 @@ Prior to releasing a new deployment or major update, ensure every item below is 
 ### 1. Database & Infrastructure
 - [x] **Supabase Project Verified**: Target reference `dlaehchzzkjsrarktfsf.supabase.co` online.
 - [x] **Supabase Credentials Configured**: `SUPABASE_SECRET_KEY` configured in server environment; `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` configured in client.
-- [x] **Database Schema Verified**: All 16 primary tables (`projects`, `blogs`, `courses`, `videos`, `categories`, `pages`, `settings`, `messages`, `newsletter`, `media`, `email_campaigns`, `email_campaign_recipients`, `leads`, `lead_campaigns`, `campaign_leads`, `rate_limits`) present in Supabase PostgreSQL.
+- [x] **Database Schema Verified**: All 18 primary tables (`projects`, `blogs`, `courses`, `videos`, `categories`, `pages`, `settings`, `messages`, `newsletter`, `media`, `email_campaigns`, `email_campaign_recipients`, `leads`, `lead_campaigns`, `campaign_leads`, `rate_limits`, `audit_logs`, `content_revisions`, `admin_session_revocations`) present in Supabase PostgreSQL across all 15 sequential migrations (`0001` through `0015`).
 - [x] **RLS Verified**: Row Level Security enabled on all tables; direct public postgREST access blocked (HTTP 403).
 - [x] **Backend CMS Permissions Verified**: Service role grants executed strictly for backend Express API (`GRANT ALL ON ALL TABLES IN SCHEMA public TO service_role;`).
+- [x] **Distributed Revocation Verified**: `admin_session_revocations` table operational with cluster-wide multi-instance session invalidation and automatic pruning.
 - [x] **Firebase Absent**: Zero active code, imports, or dependencies on Firebase in production.
 - [x] **Cloud SQL Disabled**: Zero active code, imports, or dependencies on Cloud SQL in production.
 
-### 2. Email, Lead Outreach & Automated Sequences
+### 2. Authentication, RBAC & Admin Session Security
+- [x] **HttpOnly Cookie Transport**: Session token transmitted strictly inside `admin_session` cookie (`HttpOnly`, `Secure`, `SameSite=Lax`); omitted from JSON response bodies.
+- [x] **HMAC-SHA-256 Signatures**: Tamper-proof session payloads containing user ID, role, timestamps, and cryptographic nonces.
+- [x] **Distributed Revocation Check**: Server verifies token against `public.admin_session_revocations` with fail-closed security in production (`STORE_UNAVAILABLE`).
+- [x] **Server-Authoritative RBAC**: `requireAdmin`, `requireRole`, and `requirePermission` enforced on all protected API endpoints.
+- [x] **Timing Attack Defense**: Constant-time passkey validation via `crypto.timingSafeEqual`.
+- [x] **Top-Level vs Iframe Context**: Native top-level browser tabs persist HttpOnly cookies cleanly without warnings; embedded preview iframes provide informative guidance and "Open in New Tab" navigation.
+
+### 3. Email, Lead Outreach & Automated Sequences
 - [x] **Newsletter Subscriptions Tested**: `POST /api/newsletter` saves subscribers to Supabase.
 - [x] **Welcome Email Tested**: Welcome email dispatched via Gmail SMTP (`probitianofficial@gmail.com`) only after DB persistence.
 - [x] **Contact Form Tested**: Visitor enquiries saved to Supabase `messages` table and alert emails sent.
@@ -39,18 +48,20 @@ Prior to releasing a new deployment or major update, ensure every item below is 
 - [x] **Automatic Safety Stop Tested**: Sequence halts immediately when a lead transitions to terminal status (`Replied`, `Interested`, `Converted`, `Do Not Contact`, `Bounced`).
 - [x] **Lead Drawer Inspection Tested**: Real-time sequence progress and manual single-lead Stop button tested.
 
-### 3. Media & Storage
+### 4. Media & Storage
 - [x] **Media Upload Tested**: Files uploaded to Supabase Storage `probitian-media` bucket and metadata written to `public.media`.
-- [x] **Media Deletion Tested**: Files removed from Supabase Storage and metadata deleted from database.
-- [x] **SVG Security Verified**: DOMPurify sanitization strips scripts from uploaded SVG graphics.
+- [x] **Single & Multi-Select Tested**: Checkbox selection, Select All / Deselect All, and dynamic selected counter verified.
+- [x] **Pre-Deletion Usage Verification Tested**: Pre-check endpoint (`GET /api/cms/media/:id/usage`) detects asset usage across settings, blogs, projects, courses, and pages before deletion.
+- [x] **Bulk Deletion Tested**: Batch removal (`POST /api/cms/media/bulk-delete`) removes storage files and database metadata with confirmation modal dialogs and non-destructive failure handling.
+- [x] **SVG Security Verified**: DOMPurify sanitization strips scripts and malicious XML entities from uploaded SVG graphics.
 - [x] **Branding Tested**: Logo and banner assets selectable from Media Library and rendered globally.
 
-### 4. Analytics, Routing & Security
+### 5. Analytics, Routing & Security
 - [x] **GA4 Verified**: Google Analytics 4 Measurement ID configured and client events firing.
 - [x] **API 404 Handling Verified**: Catch-all `app.all('/api/*', ...)` returns JSON `404` errors before SPA fallback.
 - [x] **Secrets Isolated**: Zero client exposures of `SUPABASE_SECRET_KEY`, `GMAIL_APP_PASSWORD`, `ADMIN_PASSKEY`, or `GEMINI_API_KEY`.
 
-### 5. SEO, Crawling & Metadata Verification
+### 6. SEO, Crawling & Metadata Verification
 - [x] **Production Domain Verified**: Normalized to `https://probitian.ai.studio/` across canonicals, Open Graph, Twitter, JSON-LD, sitemap, and robots.
 - [x] **HTTPS Protocol Verified**: All internal URLs enforce HTTPS without redirect loops.
 - [x] **Path-Based Routes Verified**: Navigation uses clean browser paths (`/`, `/about`, `/projects`, `/blog`, `/learn`, `/contact`, `/privacy`, `/terms`) without `#` fragments.
@@ -72,10 +83,10 @@ Prior to releasing a new deployment or major update, ensure every item below is 
 - [x] **Technical Performance Status**: Bundle minification and fast local response times verified (Real-world Core Web Vitals: NOT VERIFIED pending live PageSpeed run).
 - [x] **Google Search Console Status**: Technical prerequisites complete (Live indexing status: NOT VERIFIED pending site owner console setup).
 
-### 6. CI/CD, Quality & Security Automation
+### 7. CI/CD, Quality & Security Automation
 - [x] **Dependency Lockfile Synchronized**: `package-lock.json` and `package.json` synchronized; `npm ci` installs cleanly.
 - [x] **Typecheck Passed**: `npm run lint` (`tsc --noEmit`) exits with code 0.
-- [x] **Security & Regression Test Suite Passed**: `npm test` runs 10 suites / 36 tests with 0 failures.
+- [x] **Security & Regression Test Suite Passed**: `npm test` runs across all 24 test suites and 171 automated assertions with 0 failures.
 - [x] **Dependency Audit Clean**: `npm audit --audit-level=high` reports 0 vulnerabilities.
 - [x] **Production Build Passed**: `npm run build` completes with zero errors.
 - [x] **Custom CodeQL SAST Configured**: `.github/workflows/codeql.yml` configured with `security-extended,security-and-quality`.

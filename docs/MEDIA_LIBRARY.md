@@ -69,18 +69,56 @@ Return Asset Metadata & Public URL to Admin UI
 
 ---
 
-## 5. Media Deletion Flow
+## 5. Selection & Bulk Management Architecture
 
-When an admin deletes a media file:
-1. Express receives `DELETE /api/cms/media/:id`.
-2. Validates media ID syntax (`isValidId`) and sanitizes storage path to prevent directory traversal or bucket escape.
-3. The server removes the file object from Supabase Storage (`probitian-media` bucket).
-4. The server deletes the corresponding metadata record from `public.media` in Supabase PostgreSQL.
-5. On-screen feedback confirms successful removal.
+The Admin Media Library interface provides enterprise-grade asset curation with single and multiple selection controls:
+
+- **Single & Multi-Select:** Clicking media cards or selection checkboxes dynamically adds/removes items from an active `selectedIds` state set.
+- **Select All / Deselect All:** Header controls allow instant toggling of all currently filtered media items with an active counter (`X items selected`).
+- **Bulk Action Bar:** When one or more items are selected, a floating/header action toolbar enables batch operations, including **Bulk Delete** and quick clearing of selections.
+- **State Preservation on Error:** If any single deletion or bulk operation fails (e.g. network timeout or blocked by active references), the user's active selection is preserved non-destructively so the administrator does not lose their working context.
 
 ---
 
-## 6. Server Environment Configuration
+## 6. Pre-Deletion Referential Integrity & Usage Checks
+
+To prevent broken images or missing downloads across the public website:
+- **Reference Pre-Check (`GET /api/cms/media/:id/usage`):** Prior to deletion, the backend inspects all database tables and content columns for active URL or filename references:
+  - **Site Settings & Branding:** `site_logo`, `site_banner`, `favicon_url`.
+  - **Blog Articles:** `cover_image` and inline markdown/HTML content references.
+  - **Portfolio Projects:** `cover_image`, `dataset_url`, live demo previews.
+  - **Course Curriculum:** `cover_image`, `pdf_url`, practice dataset files.
+  - **Founder & CEO Message:** `photo_url` and signature graphics.
+  - **CMS Pages & Sections:** Content body URLs.
+- **Deletion Prevention / Warning:** If an asset is actively referenced, the backend rejects deletion or presents a warning modal listing every referencing page/entity, requiring explicit confirmation or reference reassignment.
+- **Bulk Deletion (`POST /api/cms/media/bulk-delete`):** Validates all selected media IDs in batch, checks referential usage, deletes unreferenced storage objects from `probitian-media`, deletes metadata records from `public.media`, and returns a detailed summary of successful and blocked items.
+
+---
+
+## 7. Single & Bulk Deletion Flow
+
+```
+Admin clicks "Delete" on single item OR selects multiple items & clicks "Bulk Delete"
+        ↓
+Frontend calls GET /api/cms/media/:id/usage (or batch usage check)
+        ↓
+Usage detected?
+  ├── YES: Show confirmation modal with warning and list of referencing content
+  └── NO: Show standard confirmation dialog
+        ↓
+Admin confirms deletion in modal dialog
+        ↓
+Server executes DELETE /api/cms/media/:id or POST /api/cms/media/bulk-delete
+        ├── Storage removal: Removes file object from `probitian-media` bucket
+        └── Database removal: Deletes metadata row from `public.media` table
+        ↓
+Success: Removes item(s) from UI and clears selection
+Failure: Displays descriptive error alert; selection state remains intact
+```
+
+---
+
+## 8. Server Environment Configuration
 
 - **Bucket Name**: `probitian-media`
 - **Public URL Format**: `https://{project-ref}.supabase.co/storage/v1/object/public/probitian-media/{category}/{filename}`

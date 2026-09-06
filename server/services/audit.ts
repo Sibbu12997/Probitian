@@ -37,6 +37,24 @@ function sanitizeMetadata(meta?: Record<string, any>): Record<string, any> {
   return cleaned;
 }
 
+const inMemoryAuditLogs: any[] = [];
+const MAX_IN_MEMORY_LOGS = 200;
+
+export function getAuditLogs(filter?: { action?: string; resource?: string }): any[] {
+  let logs = [...inMemoryAuditLogs];
+  if (filter?.action) {
+    logs = logs.filter(l => l.action === filter.action);
+  }
+  if (filter?.resource) {
+    logs = logs.filter(l => l.resource === filter.resource);
+  }
+  return logs;
+}
+
+export function clearInMemoryAuditLogs(): void {
+  inMemoryAuditLogs.length = 0;
+}
+
 /**
  * Records an administrative audit trail event in the Supabase audit_logs table.
  * Fails gracefully to never disrupt core application requests if database is offline.
@@ -64,6 +82,12 @@ export async function recordAuditLog(
       metadata: sanitizeMetadata(entry.metadata),
       created_at: new Date().toISOString()
     };
+
+    // Store in ring buffer for diagnostics and testing
+    inMemoryAuditLogs.unshift(logRecord);
+    if (inMemoryAuditLogs.length > MAX_IN_MEMORY_LOGS) {
+      inMemoryAuditLogs.pop();
+    }
 
     if (serverSupabase) {
       await serverSupabase.from('audit_logs').insert(logRecord);
