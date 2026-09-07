@@ -5,8 +5,22 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+function resolveServerSecretKey(): string {
+  const secretKey = (process.env.SUPABASE_SECRET_KEY || '').trim();
+  const serviceRoleKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
+
+  // If one key has a secret prefix and the other is a publishable/anon key, strictly choose the secret key
+  const isSecretKeySecret = secretKey && !secretKey.startsWith('sb_p') && !secretKey.startsWith('sb_publishable');
+  const isServiceRoleSecret = serviceRoleKey && !serviceRoleKey.startsWith('sb_p') && !serviceRoleKey.startsWith('sb_publishable');
+
+  if (isSecretKeySecret) return secretKey;
+  if (isServiceRoleSecret) return serviceRoleKey;
+
+  return secretKey || serviceRoleKey;
+}
+
 export const supabaseUrl = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '').trim();
-export const serverSecretKey = (process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
+export const serverSecretKey = resolveServerSecretKey();
 
 export const isServerSupabaseConfigured = (): boolean => {
   return Boolean(
