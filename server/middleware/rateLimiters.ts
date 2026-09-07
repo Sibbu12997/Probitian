@@ -7,6 +7,7 @@ export interface RateLimitOptions {
   message?: string;
   prefix?: string;
   statusCode?: number;
+  sensitive?: boolean;
 }
 
 export interface SharedStoreProvider {
@@ -24,17 +25,28 @@ export class DistributedRateLimitStore {
   private providerUnavailableUntil = 0;
   private hasLoggedProviderError = false;
 
-  setProvider(provider: SharedStoreProvider) {
+  setProvider(provider: SharedStoreProvider | null) {
     this.provider = provider;
   }
 
-  async increment(key: string, windowMs: number, max: number): Promise<{
+  isProviderHealthy(): boolean {
+    return Boolean(this.provider && Date.now() >= this.providerUnavailableUntil);
+  }
+
+  async increment(key: string, windowMs: number, max: number, sensitive: boolean = false): Promise<{
     count: number;
     resetTime: number;
     allowed: boolean;
     remaining: number;
   }> {
     const now = Date.now();
+
+    // FAIL-CLOSED for sensitive endpoints in production if distributed provider is missing or down
+    if (sensitive && process.env.NODE_ENV === 'production') {
+      if (!this.provider || now < this.providerUnavailableUntil) {
+        throw new Error('Distributed rate limit store is unavailable for sensitive endpoint');
+      }
+    }
 
     if (this.provider && now >= this.providerUnavailableUntil) {
       try {
@@ -43,7 +55,6 @@ export class DistributedRateLimitStore {
         return result;
       } catch (err: any) {
         const isMissingFunction = err?.code === 'PGRST202' || err?.code === '42883' || String(err?.message || '').includes('schema cache');
-        // If RPC function is not found in schema cache, permanently disable remote provider for the process lifecycle; otherwise back off 5 minutes
         this.providerUnavailableUntil = isMissingFunction ? Infinity : now + 5 * 60 * 1000;
         if (!this.hasLoggedProviderError) {
           this.hasLoggedProviderError = true;
@@ -53,6 +64,10 @@ export class DistributedRateLimitStore {
             const msg = err?.message || err?.code || 'Remote provider error';
             console.info(`[RateLimitStore] Remote rate limit store unavailable (${msg}), seamlessly falling back to in-memory store.`);
           }
+        }
+
+        if (sensitive && process.env.NODE_ENV === 'production') {
+          throw new Error(`Authoritative rate limit verification failed: ${err?.message || String(err)}`);
         }
       }
     }
@@ -78,19 +93,21 @@ export function createDistributedRateLimiter(options: RateLimitOptions, store: D
     max,
     message = 'Too many requests, please try again later.',
     prefix = 'rl',
-    statusCode = 429
+    statusCode = 429,
+    sensitive = false
   } = options;
 
   return async (req: express.Request, res: express.Response, next: express.NextFunction) => {
     try {
       const clientIp = (
+        req.ip ||
         (req.headers['x-forwarded-for'] as string)?.split(',')[0] ||
         req.socket.remoteAddress ||
         '127.0.0.1'
       ).trim();
 
       const key = `${prefix}:${clientIp}`;
-      const result = await store.increment(key, windowMs, max);
+      const result = await store.increment(key, windowMs, max, sensitive);
 
       res.setHeader('X-RateLimit-Limit', max);
       res.setHeader('X-RateLimit-Remaining', result.remaining);
@@ -104,7 +121,10 @@ export function createDistributedRateLimiter(options: RateLimitOptions, store: D
       next();
     } catch (err) {
       console.error('[RateLimiter Error]', err);
-      next(); // Fail open if rate limiting subsystem experiences internal error
+      if (sensitive && process.env.NODE_ENV === 'production') {
+        return res.status(503).json({ error: 'Security service temporarily unavailable. Rate limit verification failed.' });
+      }
+      next(); // Fail open for non-sensitive endpoints during transient internal error
     }
   };
 }
@@ -146,10 +166,15 @@ if (serverSupabase) {
   globalDistributedRateLimitStore.setProvider(supabaseRateLimitProvider);
 }
 
-export const loginLimiter = createDistributedRateLimiter({ windowMs: 15 * 60 * 1000, max: 15, prefix: 'login', message: 'Too many login attempts. Please try again in 15 minutes.' }, globalDistributedRateLimitStore);
+export const loginLimiter = createDistributedRateLimiter({ windowMs: 15 * 60 * 1000, max: 15, prefix: 'login', sensitive: true, message: 'Too many login attempts. Please try again in 15 minutes.' }, globalDistributedRateLimitStore);
+export const passkeyLimiter = createDistributedRateLimiter({ windowMs: 15 * 60 * 1000, max: 15, prefix: 'passkey', sensitive: true, message: 'Too many passkey attempts. Please try again in 15 minutes.' }, globalDistributedRateLimitStore);
+export const adminSessionLimiter = createDistributedRateLimiter({ windowMs: 1 * 60 * 1000, max: 60, prefix: 'admin-sess', sensitive: false, message: 'Too many session checks. Please slow down.' }, globalDistributedRateLimitStore);
+export const adminRevokeLimiter = createDistributedRateLimiter({ windowMs: 15 * 60 * 1000, max: 30, prefix: 'admin-revoke', sensitive: true, message: 'Too many session revocation requests. Please try again later.' }, globalDistributedRateLimitStore);
 export const newsletterLimiter = createDistributedRateLimiter({ windowMs: 15 * 60 * 1000, max: 15, prefix: 'newsletter', message: 'Too many subscription attempts. Please try again later.' }, globalDistributedRateLimitStore);
 export const unsubscribeLimiter = createDistributedRateLimiter({ windowMs: 15 * 60 * 1000, max: 20, prefix: 'unsub', message: 'Too many unsubscribe requests. Please try again later.' }, globalDistributedRateLimitStore);
 export const contactLimiter = createDistributedRateLimiter({ windowMs: 15 * 60 * 1000, max: 15, prefix: 'contact', message: 'Too many contact messages sent. Please try again later.' }, globalDistributedRateLimitStore);
-export const uploadLimiter = createDistributedRateLimiter({ windowMs: 15 * 60 * 1000, max: 30, prefix: 'upload', message: 'Too many upload requests. Please try again later.' }, globalDistributedRateLimitStore);
-export const emailTestLimiter = createDistributedRateLimiter({ windowMs: 15 * 60 * 1000, max: 10, prefix: 'email-test', message: 'Too many test emails sent. Please try again later.' }, globalDistributedRateLimitStore);
-export const emailSendLimiter = createDistributedRateLimiter({ windowMs: 15 * 60 * 1000, max: 5, prefix: 'email-send', message: 'Too many campaign broadcasts requested. Please try again later.' }, globalDistributedRateLimitStore);
+export const crmLeadLimiter = createDistributedRateLimiter({ windowMs: 15 * 60 * 1000, max: 60, prefix: 'crm-lead', sensitive: true, message: 'Too many CRM operations requested. Please try again later.' }, globalDistributedRateLimitStore);
+export const uploadLimiter = createDistributedRateLimiter({ windowMs: 15 * 60 * 1000, max: 30, prefix: 'upload', sensitive: true, message: 'Too many upload requests. Please try again later.' }, globalDistributedRateLimitStore);
+export const mediaDeleteLimiter = createDistributedRateLimiter({ windowMs: 15 * 60 * 1000, max: 30, prefix: 'media-del', sensitive: true, message: 'Too many media deletion requests. Please try again later.' }, globalDistributedRateLimitStore);
+export const emailTestLimiter = createDistributedRateLimiter({ windowMs: 15 * 60 * 1000, max: 10, prefix: 'email-test', sensitive: true, message: 'Too many test emails sent. Please try again later.' }, globalDistributedRateLimitStore);
+export const emailSendLimiter = createDistributedRateLimiter({ windowMs: 15 * 60 * 1000, max: 5, prefix: 'email-send', sensitive: true, message: 'Too many campaign broadcasts requested. Please try again later.' }, globalDistributedRateLimitStore);

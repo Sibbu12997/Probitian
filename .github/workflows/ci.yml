@@ -32,6 +32,12 @@ jobs:
       run: npm run lint
 
     - name: Run Security & Regression Tests
+      env:
+        CI_ADMIN_PASSKEY: ${{ secrets.CI_ADMIN_PASSKEY || 'ci-test-dedicated-admin-passkey-never-used-in-production' }}
+        CI_SESSION_SECRET: ${{ secrets.CI_SESSION_SECRET || 'ci-test-session-secret-at-least-32-chars-long' }}
+        ADMIN_PASSKEY: ${{ secrets.CI_ADMIN_PASSKEY || 'ci-test-dedicated-admin-passkey-never-used-in-production' }}
+        SESSION_SECRET: ${{ secrets.CI_SESSION_SECRET || 'ci-test-session-secret-at-least-32-chars-long' }}
+        NODE_ENV: test
       run: npm test
 
     - name: Dependency Vulnerability Audit

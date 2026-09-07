@@ -7,7 +7,10 @@ import { isRunningInIframe } from '../src/pages/admin/AdminLogin';
 describe('24. Admin Authentication & Iframe Warning Differentiation', () => {
   let server: http.Server;
   let baseUrl: string;
-  const adminPasskey = process.env.ADMIN_PASSKEY || 'ProBitian#Master!Key_2026';
+  // Dedicated test passkey configured from CI/environment without hardcoded production secrets
+  const adminPasskey = process.env.CI_ADMIN_PASSKEY || process.env.TEST_ADMIN_PASSKEY || process.env.ADMIN_PASSKEY || 'ci-test-dedicated-admin-passkey-never-used-in-production';
+  // Ensure the server process uses the dedicated test passkey during test execution
+  process.env.ADMIN_PASSKEY = adminPasskey;
 
   before(async () => {
     if (serverReady) {

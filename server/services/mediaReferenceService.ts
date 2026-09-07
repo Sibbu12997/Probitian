@@ -1,5 +1,12 @@
 import { serverSupabase, readCmsData } from './supabase';
 
+export class MediaReferenceCheckError extends Error {
+  constructor(message: string, public readonly cause?: any) {
+    super(message);
+    this.name = 'MediaReferenceCheckError';
+  }
+}
+
 export interface MediaReference {
   location: string;
   type: string;
@@ -86,9 +93,12 @@ export async function findMediaReferences(media: MediaItemLike): Promise<MediaRe
   if (serverSupabase) {
     try {
       // Check Blogs / Articles
-      const { data: blogs } = await serverSupabase
+      const { data: blogs, error: blogsErr } = await serverSupabase
         .from('blogs')
         .select('id, title, featured_image, content, excerpt');
+      if (blogsErr) {
+        throw new MediaReferenceCheckError(`Database error checking blogs: ${blogsErr.message}`, blogsErr);
+      }
       if (Array.isArray(blogs)) {
         for (const blog of blogs) {
           if (containsAnyToken(blog.featured_image, tokens)) {
@@ -114,9 +124,12 @@ export async function findMediaReferences(media: MediaItemLike): Promise<MediaRe
       }
 
       // Check Projects
-      const { data: projects } = await serverSupabase
+      const { data: projects, error: projectsErr } = await serverSupabase
         .from('projects')
         .select('id, title, image_url, gallery_urls, description, full_description');
+      if (projectsErr) {
+        throw new MediaReferenceCheckError(`Database error checking projects: ${projectsErr.message}`, projectsErr);
+      }
       if (Array.isArray(projects)) {
         for (const project of projects) {
           if (containsAnyToken(project.image_url, tokens)) {
@@ -142,16 +155,25 @@ export async function findMediaReferences(media: MediaItemLike): Promise<MediaRe
       }
 
       // Check Courses
-      const { data: courses } = await serverSupabase
+      const { data: courses, error: coursesErr } = await serverSupabase
         .from('courses')
-        .select('id, title, thumbnail_url, image_url, description');
+        .select('id, title, thumbnail, description, video_url, pdf_url');
+      if (coursesErr) {
+        throw new MediaReferenceCheckError(`Database error checking courses: ${coursesErr.message}`, coursesErr);
+      }
       if (Array.isArray(courses)) {
         for (const course of courses) {
-          if (containsAnyToken(course.thumbnail_url || course.image_url, tokens)) {
+          if (containsAnyToken(course.thumbnail, tokens)) {
             references.push({
               location: `Course: "${course.title || 'Untitled'}"`,
               type: 'course_thumbnail',
               details: 'Used as course thumbnail'
+            });
+          } else if (containsAnyToken(course.video_url || course.pdf_url, tokens)) {
+            references.push({
+              location: `Course: "${course.title || 'Untitled'}"`,
+              type: 'course_media',
+              details: 'Used as course video or PDF resource'
             });
           } else if (containsAnyToken(course.description, tokens)) {
             references.push({
@@ -164,25 +186,37 @@ export async function findMediaReferences(media: MediaItemLike): Promise<MediaRe
       }
 
       // Check Videos
-      const { data: videos } = await serverSupabase
+      const { data: videos, error: videosErr } = await serverSupabase
         .from('videos')
-        .select('id, title, thumbnail_url, video_url');
+        .select('id, title, thumbnail, youtube_url, description');
+      if (videosErr) {
+        throw new MediaReferenceCheckError(`Database error checking videos: ${videosErr.message}`, videosErr);
+      }
       if (Array.isArray(videos)) {
         for (const video of videos) {
-          if (containsAnyToken(video.thumbnail_url || video.video_url, tokens)) {
+          if (containsAnyToken(video.thumbnail, tokens)) {
             references.push({
               location: `Video: "${video.title || 'Untitled'}"`,
-              type: 'video_media',
-              details: 'Used as video thumbnail or media asset'
+              type: 'video_thumbnail',
+              details: 'Used as video thumbnail asset'
+            });
+          } else if (containsAnyToken(video.youtube_url, tokens)) {
+            references.push({
+              location: `Video: "${video.title || 'Untitled'}"`,
+              type: 'video_url',
+              details: 'Referenced in video URL'
             });
           }
         }
       }
 
       // Check Settings (home, founder_message, navigation, social_links, etc.)
-      const { data: settings } = await serverSupabase
+      const { data: settings, error: settingsErr } = await serverSupabase
         .from('settings')
         .select('key, value');
+      if (settingsErr) {
+        throw new MediaReferenceCheckError(`Database error checking settings: ${settingsErr.message}`, settingsErr);
+      }
       if (Array.isArray(settings)) {
         for (const setting of settings) {
           if (containsAnyToken(setting.value, tokens)) {
@@ -208,27 +242,39 @@ export async function findMediaReferences(media: MediaItemLike): Promise<MediaRe
       }
 
       // Check Pages
-      const { data: pages } = await serverSupabase
+      const { data: pages, error: pagesErr } = await serverSupabase
         .from('pages')
-        .select('id, title, slug, content, sections');
+        .select('id, page_key, title, banner_url, feature_cards, testimonials, cta');
+      if (pagesErr) {
+        throw new MediaReferenceCheckError(`Database error checking pages: ${pagesErr.message}`, pagesErr);
+      }
       if (Array.isArray(pages)) {
         for (const page of pages) {
-          if (containsAnyToken(page.sections || page.content, tokens)) {
+          if (containsAnyToken(page.banner_url, tokens)) {
             references.push({
-              location: `Page: "${page.title || page.slug || 'Custom Page'}"`,
+              location: `Page: "${page.title || page.page_key || 'Custom Page'}"`,
+              type: 'page_banner',
+              details: 'Used as page banner image'
+            });
+          } else if (containsAnyToken(page.feature_cards || page.testimonials || page.cta, tokens)) {
+            references.push({
+              location: `Page: "${page.title || page.page_key || 'Custom Page'}"`,
               type: 'page_content',
-              details: 'Used in page sections or content layout'
+              details: 'Used in page dynamic components or content layout'
             });
           }
         }
       }
 
-    } catch (err) {
-      console.warn('[mediaReferenceService] Supabase query encountered error, checking fallback:', err);
+    } catch (err: any) {
+      if (err instanceof MediaReferenceCheckError) {
+        throw err;
+      }
+      throw new MediaReferenceCheckError(`Database exception during media reference scan: ${err?.message || String(err)}`, err);
     }
   }
 
-  // 2. LOCAL DEV / TEST FALLBACK CHECK (via readCmsData)
+  // 2. CMS DATA CHECK (Local cache / Test fixtures)
   try {
     const data = readCmsData();
 

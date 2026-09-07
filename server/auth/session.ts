@@ -141,7 +141,7 @@ export class SupabaseSessionRevocationStore implements SessionRevocationStore {
     // 2. Query authoritative Supabase PostgreSQL for distributed state across all instances
     const client = this.getClient();
     if (!client) {
-      if (this.isExplicitNullClient || (process.env.NODE_ENV === 'production' && !process.env.AI_STUDIO_APPLET_ID)) {
+      if (this.isExplicitNullClient || process.env.NODE_ENV === 'production') {
         // FAIL-CLOSED: Explicit null client or production environment without configured database
         return {
           revoked: true,
@@ -178,13 +178,21 @@ export class SupabaseSessionRevocationStore implements SessionRevocationStore {
             error.message.includes('admin_session_revocations'));
 
         if (isMissingTable) {
+          if (process.env.NODE_ENV === 'production') {
+            return {
+              revoked: true,
+              verified: false,
+              reason: 'STORE_UNAVAILABLE',
+              error: 'Authoritative table admin_session_revocations is not provisioned in database schema'
+            };
+          }
           if (!SupabaseSessionRevocationStore.warnedMissingTable) {
             SupabaseSessionRevocationStore.warnedMissingTable = true;
             console.info(
               '[SessionRevocationStore] Remote table public.admin_session_revocations is not provisioned in Supabase schema cache. Active session revocation is enforced via high-performance in-memory store.'
             );
           }
-          // The local caches checked in step 1 already verified no local revocation
+          // In development/test only, local caches checked in step 1 verified no local revocation
           return { revoked: false, verified: true, reason: 'NONE' };
         }
 
@@ -255,7 +263,7 @@ export class SupabaseSessionRevocationStore implements SessionRevocationStore {
 
     const client = this.getClient();
     if (!client) {
-      if (this.isExplicitNullClient || (process.env.NODE_ENV === 'production' && !process.env.AI_STUDIO_APPLET_ID)) {
+      if (this.isExplicitNullClient || process.env.NODE_ENV === 'production') {
         throw new SessionRevocationError(
           'Cannot revoke session: authoritative database client is unavailable',
           'STORE_UNAVAILABLE'
@@ -286,6 +294,12 @@ export class SupabaseSessionRevocationStore implements SessionRevocationStore {
           error.message.includes('admin_session_revocations'));
 
       if (isMissingTable) {
+        if (process.env.NODE_ENV === 'production') {
+          throw new SessionRevocationError(
+            'Cannot record session revocation: table public.admin_session_revocations is not provisioned in database',
+            'STORE_UNAVAILABLE'
+          );
+        }
         if (!SupabaseSessionRevocationStore.warnedMissingTable) {
           SupabaseSessionRevocationStore.warnedMissingTable = true;
           console.info(
@@ -312,7 +326,7 @@ export class SupabaseSessionRevocationStore implements SessionRevocationStore {
   async revokeUser(identifier: { email?: string; userId?: string }, reason: string = 'USER_REVOKED'): Promise<void> {
     const client = this.getClient();
     if (!client) {
-      if (this.isExplicitNullClient || (process.env.NODE_ENV === 'production' && !process.env.AI_STUDIO_APPLET_ID)) {
+      if (this.isExplicitNullClient || process.env.NODE_ENV === 'production') {
         throw new SessionRevocationError(
           'Cannot revoke user sessions: authoritative database client is unavailable',
           'STORE_UNAVAILABLE'
@@ -375,6 +389,12 @@ export class SupabaseSessionRevocationStore implements SessionRevocationStore {
           error.message.includes('admin_session_revocations'));
 
       if (isMissingTable) {
+        if (process.env.NODE_ENV === 'production') {
+          throw new SessionRevocationError(
+            'Cannot record user revocation: table public.admin_session_revocations is not provisioned in database',
+            'STORE_UNAVAILABLE'
+          );
+        }
         if (!SupabaseSessionRevocationStore.warnedMissingTable) {
           SupabaseSessionRevocationStore.warnedMissingTable = true;
           console.info(
@@ -409,7 +429,7 @@ export class SupabaseSessionRevocationStore implements SessionRevocationStore {
   async revokeAll(reason: string = 'GLOBAL_REVOCATION'): Promise<void> {
     const client = this.getClient();
     if (!client) {
-      if (this.isExplicitNullClient || (process.env.NODE_ENV === 'production' && !process.env.AI_STUDIO_APPLET_ID)) {
+      if (this.isExplicitNullClient || process.env.NODE_ENV === 'production') {
         throw new SessionRevocationError(
           'Cannot revoke all sessions: authoritative database client is unavailable',
           'STORE_UNAVAILABLE'
@@ -438,6 +458,12 @@ export class SupabaseSessionRevocationStore implements SessionRevocationStore {
           error.message.includes('admin_session_revocations'));
 
       if (isMissingTable) {
+        if (process.env.NODE_ENV === 'production') {
+          throw new SessionRevocationError(
+            'Cannot record global revocation: table public.admin_session_revocations is not provisioned in database',
+            'STORE_UNAVAILABLE'
+          );
+        }
         if (!SupabaseSessionRevocationStore.warnedMissingTable) {
           SupabaseSessionRevocationStore.warnedMissingTable = true;
           console.info(
@@ -457,6 +483,28 @@ export class SupabaseSessionRevocationStore implements SessionRevocationStore {
 
     // Update local cache on successful write
     this.localGlobalRevocationTimestamp = now;
+  }
+
+  async cleanExpiredRevocations(): Promise<number> {
+    const client = this.getClient();
+    if (!client) return 0;
+    try {
+      const now = Date.now();
+      const { data, error } = await client
+        .from('admin_session_revocations')
+        .delete()
+        .lt('expires_at', now)
+        .not('expires_at', 'is', null)
+        .select('target');
+      if (error) {
+        console.warn('[SessionRevocationStore] Cleanup of expired revocations encountered error:', error);
+        return 0;
+      }
+      return Array.isArray(data) ? data.length : 0;
+    } catch (err) {
+      console.warn('[SessionRevocationStore] Cleanup exception:', err);
+      return 0;
+    }
   }
 
   async getGlobalRevocationTimestamp(): Promise<number> {
