@@ -266,6 +266,47 @@ export async function findMediaReferences(media: MediaItemLike): Promise<MediaRe
         }
       }
 
+      // Check Lead Campaigns (email template media)
+      const { data: leadCampaigns, error: leadCampErr } = await serverSupabase
+        .from('lead_campaigns')
+        .select('id, name, subject, html_content');
+      if (leadCampErr) {
+        // Fail closed if database error occurs on existing table
+        if (leadCampErr.code !== '42P01' && leadCampErr.code !== 'PGRST205' && !String(leadCampErr.message || '').includes('does not exist')) {
+          throw new MediaReferenceCheckError(`Database error checking lead campaigns: ${leadCampErr.message}`, leadCampErr);
+        }
+      } else if (Array.isArray(leadCampaigns)) {
+        for (const camp of leadCampaigns) {
+          if (containsAnyToken(camp.html_content, tokens)) {
+            references.push({
+              location: `Lead Campaign: "${camp.name || camp.subject || 'Outreach Campaign'}"`,
+              type: 'campaign_content',
+              details: 'Embedded in campaign email template'
+            });
+          }
+        }
+      }
+
+      // Check Leads (lead notes & use case descriptions)
+      const { data: leadRecords, error: leadsErr } = await serverSupabase
+        .from('leads')
+        .select('id, company_name, notes, powerbi_use_case');
+      if (leadsErr) {
+        if (leadsErr.code !== '42P01' && leadsErr.code !== 'PGRST205' && !String(leadsErr.message || '').includes('does not exist')) {
+          throw new MediaReferenceCheckError(`Database error checking leads: ${leadsErr.message}`, leadsErr);
+        }
+      } else if (Array.isArray(leadRecords)) {
+        for (const lead of leadRecords) {
+          if (containsAnyToken(lead.notes || lead.powerbi_use_case, tokens)) {
+            references.push({
+              location: `Lead Record: "${lead.company_name || 'Enterprise Lead'}"`,
+              type: 'lead_content',
+              details: 'Referenced inside lead documentation or notes'
+            });
+          }
+        }
+      }
+
     } catch (err: any) {
       if (err instanceof MediaReferenceCheckError) {
         throw err;
@@ -385,6 +426,32 @@ export async function findMediaReferences(media: MediaItemLike): Promise<MediaRe
             location: `Page: "${page.title || page.slug || 'Custom Page'}"`,
             type: 'page_content',
             details: 'Used in page sections or content layout'
+          });
+        }
+      }
+    }
+
+    // Check Leads in local dev cache
+    if (Array.isArray(data.leads)) {
+      for (const lead of data.leads) {
+        if (containsAnyToken(lead.notes || lead.powerbi_use_case, tokens)) {
+          references.push({
+            location: `Lead Record: "${lead.company_name || 'Enterprise Lead'}"`,
+            type: 'lead_content',
+            details: 'Referenced inside lead documentation or notes'
+          });
+        }
+      }
+    }
+
+    // Check Lead Campaigns in local dev cache
+    if (Array.isArray(data.lead_campaigns)) {
+      for (const camp of data.lead_campaigns) {
+        if (containsAnyToken(camp.html_content, tokens)) {
+          references.push({
+            location: `Lead Campaign: "${camp.name || camp.subject || 'Outreach Campaign'}"`,
+            type: 'campaign_content',
+            details: 'Embedded in campaign email template'
           });
         }
       }
