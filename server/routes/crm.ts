@@ -26,7 +26,7 @@ export async function getSupabaseCrmLeads(): Promise<any[]> {
       .select('*')
       .order('created_at', { ascending: false });
 
-    if (!tblErr && Array.isArray(dbLeads)) {
+    if (!tblErr && Array.isArray(dbLeads) && dbLeads.length > 0) {
       return dbLeads;
     }
 
@@ -40,7 +40,7 @@ export async function getSupabaseCrmLeads(): Promise<any[]> {
     if (!rowErr && row && Array.isArray(row.value?.leads)) {
       return row.value.leads;
     }
-    return [];
+    return dbLeads || [];
   } catch (err: any) {
     console.error('[Supabase CRM Leads Read Exception]', err);
     throw new Error('Supabase CRM database unavailable');
@@ -111,7 +111,7 @@ export async function getSupabaseCrmCampaigns(): Promise<any[]> {
       .select('*')
       .order('created_at', { ascending: false });
 
-    if (!tblErr && Array.isArray(dbCamps)) {
+    if (!tblErr && Array.isArray(dbCamps) && dbCamps.length > 0) {
       return dbCamps;
     }
 
@@ -124,7 +124,7 @@ export async function getSupabaseCrmCampaigns(): Promise<any[]> {
     if (!rowErr && row && Array.isArray(row.value?.campaigns)) {
       return row.value.campaigns;
     }
-    return [];
+    return dbCamps || [];
   } catch (err: any) {
     console.error('[Supabase CRM Campaigns Read Exception]', err);
     throw new Error('Supabase CRM campaigns database unavailable');
@@ -188,7 +188,7 @@ export async function getSupabaseCrmRecipients(): Promise<any[]> {
       .select('*')
       .order('created_at', { ascending: false });
 
-    if (!error && Array.isArray(data)) return data;
+    if (!error && Array.isArray(data) && data.length > 0) return data;
 
     const { data: row } = await serverSupabase
       .from('settings')
@@ -197,7 +197,7 @@ export async function getSupabaseCrmRecipients(): Promise<any[]> {
       .maybeSingle();
 
     if (row && Array.isArray(row.value?.recipients)) return row.value.recipients;
-    return [];
+    return data || [];
   } catch (e) {
     return [];
   }
