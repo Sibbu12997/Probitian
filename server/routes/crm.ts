@@ -3,10 +3,11 @@ import crypto from 'crypto';
 import { requireAuth, requirePermission } from '../auth/rbac';
 import { Permission, UserRole } from '../auth/types';
 import { isValidId, isValidUuid } from '../config/constants';
-import { generateUnsubscribeToken } from '../security/tokens';
-import { emailSendLimiter, emailTestLimiter } from '../middleware/rateLimiters';
+import { generateUnsubscribeToken, verifyUnsubscribeToken } from '../security/tokens';
+import { emailSendLimiter, emailTestLimiter, unsubscribeLimiter } from '../middleware/rateLimiters';
 import { serverSupabase, readCmsData, writeCmsData } from '../services/supabase';
 import { campaignEmailService } from '../../src/services/campaignEmailService';
+import { escapeHtml } from '../../src/lib/htmlSanitizer';
 
 const router = express.Router();
 
@@ -812,13 +813,14 @@ router.post('/admin/lead-campaigns/:id/send', requireAuth, requirePermission(Per
       const unsubToken = generateUnsubscribeToken(lead.email);
       const reqProtocol = req.headers['x-forwarded-proto'] || req.protocol;
       const reqHost = req.headers['x-forwarded-host'] || req.headers.host;
-      const unsubUrl = `${reqProtocol}://${reqHost}/api/newsletter/unsubscribe?token=${unsubToken}`;
+      const unsubUrl = `${reqProtocol}://${reqHost}/api/crm/unsubscribe?token=${unsubToken}`;
 
-      const sendRes = await campaignEmailService.sendSingleRecipient({
+      const sendRes = await campaignEmailService.sendLeadSingleRecipient({
         toEmail: lead.email,
         subject: personalizedSubject,
-        previewText: campaign.preheader || '',
+        preheader: campaign.preheader || '',
         contentHtml: personalizedHtml,
+        lead: lead,
         unsubscribeUrl: unsubUrl
       });
 
@@ -1376,18 +1378,19 @@ router.post('/api/admin/lead-sequences/:id/test', requireAuth, requirePermission
     const unsubToken = generateUnsubscribeToken(testEmail);
     const reqProtocol = req.headers['x-forwarded-proto'] || req.protocol;
     const reqHost = req.headers['x-forwarded-host'] || req.headers.host;
-    const unsubUrl = `${reqProtocol}://${reqHost}/api/newsletter/unsubscribe?token=${unsubToken}`;
+    const unsubUrl = `${reqProtocol}://${reqHost}/api/crm/unsubscribe?token=${unsubToken}`;
 
-    const sendRes = await campaignEmailService.sendSingleRecipient({
-      toEmail: testEmail,
+    const sendRes = await campaignEmailService.sendLeadTestEmail({
+      testEmail: testEmail,
       subject: personalizedSubject,
-      previewText: `Test delivery for Step ${stepNumber}`,
+      preheader: `Test delivery for Step ${stepNumber}`,
       contentHtml: personalizedHtml,
+      lead: sampleLead,
       unsubscribeUrl: unsubUrl
     });
 
     if (!sendRes.success) {
-      return res.status(500).json({ error: sendRes.error || 'Failed to dispatch test email' });
+      return res.status(500).json({ error: sendRes.message || 'Failed to dispatch test email' });
     }
 
     return res.json({
@@ -1442,6 +1445,84 @@ router.get('/admin/leads/:id/sequences', requireAuth, requirePermission(Permissi
   } catch (err: any) {
     return res.status(503).json({ error: 'Failed to load lead sequences' });
   }
+});
+
+// GET /api/crm/unsubscribe (Public with rate limiter: Lead Outreach Unsubscribe)
+router.get('/crm/unsubscribe', unsubscribeLimiter, async (req, res) => {
+  const token = (req.query.token || '').toString().trim();
+  let verifiedEmail: string | null = null;
+  if (token) {
+    verifiedEmail = verifyUnsubscribeToken(token);
+  }
+
+  if (!verifiedEmail) {
+    return res.status(400).send(`
+      <!DOCTYPE html>
+      <html lang="en">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Invalid Unsubscribe Link - ProBitian</title>
+          <style>body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;text-align:center;padding:50px 20px;background:#f8fafc;color:#1e293b;}.card{max-width:480px;margin:auto;background:white;padding:32px;border-radius:12px;border:1px solid #e2e8f0;box-shadow:0 4px 6px -1px rgba(0,0,0,0.05);}</style>
+        </head>
+        <body>
+          <div class="card">
+            <h2 style="color:#ef4444;margin-top:0;">Invalid or Expired Link</h2>
+            <p style="color:#64748b;">The unsubscribe link you followed is invalid or has expired.</p>
+            <p style="margin-top:20px;"><a href="/" style="color:#7c3aed;text-decoration:none;font-weight:600;">Return to Home</a></p>
+          </div>
+        </body>
+      </html>
+    `);
+  }
+
+  // Update lead status in Supabase relational table to 'Do Not Contact'
+  if (serverSupabase) {
+    try {
+      await serverSupabase
+        .from('leads')
+        .update({ status: 'Do Not Contact', updated_at: new Date().toISOString() })
+        .ilike('email', verifiedEmail);
+    } catch (dbErr) {
+      console.error('[CRM Unsubscribe Error]', dbErr);
+    }
+  }
+
+  // Also update local / fallback data if present
+  try {
+    const data = readCmsData();
+    if (Array.isArray(data.leads)) {
+      for (const lead of data.leads) {
+        if (lead.email?.toLowerCase() === verifiedEmail.toLowerCase()) {
+          lead.status = 'Do Not Contact';
+          lead.updated_at = new Date().toISOString();
+        }
+      }
+      writeCmsData(data);
+    }
+  } catch (localErr) {
+    // ignore
+  }
+
+  return res.send(`
+    <!DOCTYPE html>
+    <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Unsubscribed - ProBitian Outreach</title>
+        <style>body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;text-align:center;padding:50px 20px;background:#f8fafc;color:#1e293b;}.card{max-width:480px;margin:auto;background:white;padding:32px;border-radius:12px;border:1px solid #e2e8f0;box-shadow:0 4px 6px -1px rgba(0,0,0,0.05);}a{color:#7c3aed;text-decoration:none;font-weight:600;}</style>
+      </head>
+      <body>
+        <div class="card">
+          <h2 style="color:#10b981;margin-top:0;">Unsubscribed Successfully</h2>
+          <p style="color:#475569;">You have been unsubscribed from B2B outreach communications from ProBitian.</p>
+          <p style="color:#64748b;font-size:14px;">Email: <strong>${escapeHtml(verifiedEmail)}</strong> has been updated to Do Not Contact.</p>
+          <p style="margin-top:24px;"><a href="/">Return to ProBitian Home</a></p>
+        </div>
+      </body>
+    </html>
+  `);
 });
 
 export default router;

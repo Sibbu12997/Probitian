@@ -161,9 +161,10 @@ export const campaignEmailService = {
     preheader?: string;
     contentHtml: string;
     lead?: Record<string, any>;
+    unsubscribeUrl?: string;
   }): string {
     const gmailUser = getGmailUser();
-    const { preheader, contentHtml, lead = {} } = params;
+    const { preheader, contentHtml, lead = {}, unsubscribeUrl } = params;
     let interpolatedBody = this.interpolateLeadVariables(contentHtml, lead, { isHtml: true });
     const hasHtmlTags = /<[a-z][\s\S]*>/i.test(interpolatedBody);
     if (!hasHtmlTags) {
@@ -174,6 +175,7 @@ export const campaignEmailService = {
     }
     const safeContentHtml = sanitizeCmsHtml(interpolatedBody);
     const interpolatedPreheader = preheader ? this.interpolateLeadVariables(preheader, lead, { isHtml: false }) : '';
+    const safeUnsubscribeUrl = unsubscribeUrl ? sanitizeUrl(unsubscribeUrl, '#') : null;
 
     return `<!DOCTYPE html>
 <html lang="en">
@@ -225,7 +227,7 @@ export const campaignEmailService = {
       <p style="margin: 0; font-weight: 600; color: #475569;">Shivam Baghel &bull; ProBitian Analytics</p>
       <p style="margin: 4px 0;">Salaiya, Madhya Pradesh, India &bull; Direct: <a href="mailto:${gmailUser}" style="color: #7c3aed;">${gmailUser}</a></p>
       <p style="margin: 4px 0;"><a href="https://probitian.ai.studio/" style="color: #7c3aed; text-decoration: none;">probitian.ai.studio</a> &bull; <a href="https://probitian.ai.studio/contact" style="color: #7c3aed; text-decoration: none;">Contact Us</a> &bull; Power BI &amp; Data Engineering Solutions</p>
-      <p style="margin-top: 12px; font-size: 11px; color: #94a3b8;">If you prefer not to receive business intelligence insights from us, simply reply with "Unsubscribe".</p>
+      ${safeUnsubscribeUrl ? `<p style="margin-top: 10px; font-size: 11px;"><a href="${safeUnsubscribeUrl}" target="_blank" rel="noopener noreferrer" style="color: #64748b; text-decoration: underline;">Unsubscribe from outreach communications</a></p>` : `<p style="margin-top: 12px; font-size: 11px; color: #94a3b8;">If you prefer not to receive business intelligence insights from us, simply reply with "Unsubscribe".</p>`}
     </div>
   </div>
 </body>
@@ -327,6 +329,7 @@ export const campaignEmailService = {
     preheader?: string;
     contentHtml: string;
     lead?: Record<string, any>;
+    unsubscribeUrl?: string;
   }): Promise<{ success: boolean; message: string; messageId?: string }> {
     const gmailUser = getGmailUser();
     const gmailPass = getGmailPass();
@@ -347,7 +350,8 @@ export const campaignEmailService = {
       subject: personalizedSubject,
       preheader: params.preheader,
       contentHtml: params.contentHtml,
-      lead: leadData
+      lead: leadData,
+      unsubscribeUrl: params.unsubscribeUrl
     });
 
     if (gmailPass) {
@@ -385,6 +389,7 @@ export const campaignEmailService = {
     preheader?: string;
     contentHtml: string;
     lead: Record<string, any>;
+    unsubscribeUrl?: string;
   }): Promise<{ success: boolean; messageId?: string; error?: string }> {
     const gmailUser = getGmailUser();
     const gmailPass = getGmailPass();
@@ -393,7 +398,8 @@ export const campaignEmailService = {
       subject: personalizedSubject,
       preheader: params.preheader,
       contentHtml: params.contentHtml,
-      lead: params.lead
+      lead: params.lead,
+      unsubscribeUrl: params.unsubscribeUrl
     });
 
     if (gmailPass) {

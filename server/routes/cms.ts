@@ -1035,7 +1035,14 @@ router.delete('/cms/media/:id', mediaDeleteLimiter, requireAuth, requirePermissi
     try {
       const { data, error } = await serverSupabase.from('media').select('*').eq('id', id).maybeSingle();
       if (error) {
-        console.error('[CMS Media Delete] Error querying media item:', error);
+        console.error('[CMS Media Delete Diagnostic]', {
+          operation: 'MEDIA_DELETE',
+          mediaId: id,
+          databaseOperation: 'SELECT_MEDIA',
+          storageOperation: 'NONE',
+          errorCode: error.code || 'DB_QUERY_ERROR',
+          safeErrorMessage: error.message || 'Database error querying media record'
+        });
         return res.status(503).json({ error: 'Database service unavailable' });
       }
       if (data) {
@@ -1043,7 +1050,14 @@ router.delete('/cms/media/:id', mediaDeleteLimiter, requireAuth, requirePermissi
         fromDatabase = true;
       }
     } catch (err: any) {
-      console.error('[CMS Media Delete] Database query exception:', err);
+      console.error('[CMS Media Delete Diagnostic]', {
+        operation: 'MEDIA_DELETE',
+        mediaId: id,
+        databaseOperation: 'SELECT_MEDIA',
+        storageOperation: 'NONE',
+        errorCode: err?.code || 'DB_QUERY_EXCEPTION',
+        safeErrorMessage: err?.message || 'Database query exception'
+      });
       return res.status(503).json({ error: 'Database service unavailable' });
     }
   }
@@ -1058,6 +1072,14 @@ router.delete('/cms/media/:id', mediaDeleteLimiter, requireAuth, requirePermissi
   }
 
   if (!mediaItem) {
+    console.warn('[CMS Media Delete Diagnostic]', {
+      operation: 'MEDIA_DELETE',
+      mediaId: id,
+      databaseOperation: 'FIND_MEDIA',
+      storageOperation: 'NONE',
+      errorCode: 'MEDIA_NOT_FOUND',
+      safeErrorMessage: 'Media asset not found in database or local cache'
+    });
     return res.status(404).json({ error: 'Media asset not found' });
   }
 
@@ -1066,11 +1088,26 @@ router.delete('/cms/media/:id', mediaDeleteLimiter, requireAuth, requirePermissi
   try {
     references = await findMediaReferences(mediaItem);
   } catch (refErr: any) {
-    console.error('[CMS Media Delete] Reference check failed (failing closed):', refErr);
+    console.error('[CMS Media Delete Diagnostic]', {
+      operation: 'MEDIA_DELETE',
+      mediaId: id,
+      databaseOperation: 'SCAN_REFERENCES',
+      storageOperation: 'NONE',
+      errorCode: refErr?.code || 'REFERENCE_CHECK_FAILED',
+      safeErrorMessage: refErr?.message || 'Media reference check failed'
+    });
     return res.status(503).json({ error: 'Security service unavailable: media reference check failed' });
   }
 
   if (references.length > 0) {
+    console.warn('[CMS Media Delete Diagnostic]', {
+      operation: 'MEDIA_DELETE',
+      mediaId: id,
+      databaseOperation: 'NONE',
+      storageOperation: 'NONE',
+      errorCode: 'MEDIA_IN_USE',
+      safeErrorMessage: `Media asset is in use across ${references.length} application locations`
+    });
     await recordAuditLog(req, {
       actor: session?.email || 'admin',
       role: session?.role || 'admin',
@@ -1094,20 +1131,41 @@ router.delete('/cms/media/:id', mediaDeleteLimiter, requireAuth, requirePermissi
     });
   }
 
-  // 2. Synchronized Storage Object Removal
+  // 2. Synchronized Storage Object Removal (idempotent if object is already absent)
   let storageCleaned = false;
   if (serverSupabase && mediaItem.storage_path) {
     try {
       const { error: storageErr } = await serverSupabase.storage
         .from(PROBITIAN_MEDIA_BUCKET)
         .remove([mediaItem.storage_path]);
-      if (storageErr) {
-        console.error(`[Storage Cleanup Error] Could not delete object ${mediaItem.storage_path}:`, storageErr);
+
+      const isNotFound = storageErr && (
+        storageErr.message?.toLowerCase().includes('not found') ||
+        (storageErr as any).statusCode === '404' ||
+        (storageErr as any).status === 404
+      );
+
+      if (storageErr && !isNotFound) {
+        console.error('[CMS Media Delete Diagnostic]', {
+          operation: 'MEDIA_DELETE',
+          mediaId: id,
+          databaseOperation: 'NONE',
+          storageOperation: 'REMOVE_OBJECT',
+          errorCode: (storageErr as any).code || 'STORAGE_DELETE_FAILED',
+          safeErrorMessage: storageErr.message || 'Failed to delete media asset from storage'
+        });
         return res.status(500).json({ error: 'Failed to delete media asset from storage' });
       }
       storageCleaned = true;
-    } catch (stErr) {
-      console.error('[Storage Cleanup Error] Exception during storage removal:', stErr);
+    } catch (stErr: any) {
+      console.error('[CMS Media Delete Diagnostic]', {
+        operation: 'MEDIA_DELETE',
+        mediaId: id,
+        databaseOperation: 'NONE',
+        storageOperation: 'REMOVE_OBJECT',
+        errorCode: stErr?.code || 'STORAGE_EXCEPTION',
+        safeErrorMessage: stErr?.message || 'Exception during storage removal'
+      });
       return res.status(500).json({ error: 'Failed to delete media asset from storage' });
     }
   }
@@ -1117,6 +1175,14 @@ router.delete('/cms/media/:id', mediaDeleteLimiter, requireAuth, requirePermissi
     try {
       const { error } = await serverSupabase.from('media').delete().eq('id', id);
       if (error) {
+        console.error('[CMS Media Delete Diagnostic]', {
+          operation: 'MEDIA_DELETE',
+          mediaId: id,
+          databaseOperation: 'DELETE_ROW',
+          storageOperation: storageCleaned ? 'REMOVE_OBJECT_COMPLETED' : 'NONE',
+          errorCode: error.code || 'DB_DELETE_FAILED',
+          safeErrorMessage: error.message || 'Failed to delete media record from database'
+        });
         await recordAuditLog(req, {
           actor: session?.email || 'admin',
           role: session?.role || 'admin',
@@ -1129,6 +1195,14 @@ router.delete('/cms/media/:id', mediaDeleteLimiter, requireAuth, requirePermissi
         return res.status(500).json({ error: 'Failed to delete media record from database' });
       }
     } catch (e: any) {
+      console.error('[CMS Media Delete Diagnostic]', {
+        operation: 'MEDIA_DELETE',
+        mediaId: id,
+        databaseOperation: 'DELETE_ROW',
+        storageOperation: storageCleaned ? 'REMOVE_OBJECT_COMPLETED' : 'NONE',
+        errorCode: e?.code || 'DB_DELETE_EXCEPTION',
+        safeErrorMessage: e?.message || 'Exception deleting media record from database'
+      });
       return res.status(500).json({ error: 'Failed to delete media record from database' });
     }
   }
@@ -1256,11 +1330,32 @@ router.post('/cms/media/bulk-delete', mediaDeleteLimiter, requireAuth, requirePe
         const { error: storageErr } = await serverSupabase.storage
           .from(PROBITIAN_MEDIA_BUCKET)
           .remove([item.storage_path]);
-        if (storageErr) {
+
+        const isNotFound = storageErr && (
+          storageErr.message?.toLowerCase().includes('not found') ||
+          (storageErr as any).statusCode === '404' ||
+          (storageErr as any).status === 404
+        );
+
+        if (storageErr && !isNotFound) {
+          console.error('[Bulk Media Delete Diagnostic]', {
+            operation: 'MEDIA_BULK_DELETE',
+            mediaId: item.id,
+            storageOperation: 'REMOVE_OBJECT',
+            errorCode: (storageErr as any).code || 'STORAGE_DELETE_FAILED',
+            safeErrorMessage: storageErr.message || 'Failed to delete asset from storage'
+          });
           failed.push({ id: item.id, filename: item.filename, error: 'Failed to delete asset from storage' });
           continue;
         }
-      } catch (stErr) {
+      } catch (stErr: any) {
+        console.error('[Bulk Media Delete Diagnostic]', {
+          operation: 'MEDIA_BULK_DELETE',
+          mediaId: item.id,
+          storageOperation: 'REMOVE_OBJECT',
+          errorCode: stErr?.code || 'STORAGE_EXCEPTION',
+          safeErrorMessage: stErr?.message || 'Exception deleting asset from storage'
+        });
         failed.push({ id: item.id, filename: item.filename, error: 'Exception deleting asset from storage' });
         continue;
       }
