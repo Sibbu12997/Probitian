@@ -52,7 +52,8 @@ import { CampaignsManager } from './modules/CampaignsManager';
 import { LeadsManager } from './modules/LeadsManager';
 import { LeadCampaignsManager } from './modules/LeadCampaignsManager';
 import { LeadSequencesManager } from './modules/LeadSequencesManager';
-import { Send, Building2, SendHorizontal, Workflow } from 'lucide-react';
+import { FeedbackManager } from './modules/FeedbackManager';
+import { Send, Building2, SendHorizontal, Workflow, MessageSquareQuote } from 'lucide-react';
 
 interface AdminPortalProps {
   userEmail: string;
@@ -70,6 +71,7 @@ const resolveModuleId = (slug?: string | null): string => {
   if (s === 'campaigns' || s === 'lead_campaigns' || s === 'lead-campaigns') return 'lead_campaigns';
   if (s === 'sequences' || s === 'lead_sequences' || s === 'lead-sequences') return 'lead_sequences';
   if (s === 'newsletter' || s === 'newsletter-campaigns') return 'campaigns';
+  if (s === 'feedback' || s === 'testimonials') return 'feedback';
   return s;
 };
 
@@ -133,7 +135,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
         { id: 'blog', label: 'Blog & Articles', icon: Newspaper },
         { id: 'learn', label: 'Learn & Courses', icon: GraduationCap },
         { id: 'videos', label: 'YouTube Showcase', icon: Youtube },
-        { id: 'media', label: 'Media Library', icon: ImageIcon }
+        { id: 'media', label: 'Media Library', icon: ImageIcon },
+        { id: 'feedback', label: 'Testimonials & Reviews', icon: MessageSquareQuote }
       ]
     },
     {
@@ -188,6 +191,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       case 'learn': return <LearnManager />;
       case 'videos': return <VideoManager />;
       case 'media': return <MediaLibraryManager />;
+      case 'feedback': return <FeedbackManager />;
       case 'messages': return <MessagesManager />;
       case 'subscribers': return <SubscribersManager />;
       case 'campaigns': return <CampaignsManager />;

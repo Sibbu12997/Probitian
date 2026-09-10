@@ -20,6 +20,7 @@ import crmRouter from './server/routes/crm';
 import newsletterRouter from './server/routes/newsletter';
 import analyticsRouter from './server/routes/analytics';
 import cmsRouter from './server/routes/cms';
+import feedbackRouter from './server/routes/feedback';
 import seoRouter from './server/routes/seo';
 
 // P0 Session Secret Validation (fails startup in production if missing/weak)
@@ -79,6 +80,7 @@ app.use('/api', crmRouter);
 app.use('/api', newsletterRouter);
 app.use('/api', analyticsRouter);
 app.use('/api', cmsRouter);
+app.use('/api', feedbackRouter);
 
 // 404 Handler for undefined API routes
 app.all('/api/*', apiNotFoundHandler);

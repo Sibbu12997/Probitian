@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { NavPage, ProjectItem, BlogArticle, YouTubeVideo, HomePageConfig } from '../types';
+import { NavPage, ProjectItem, BlogArticle, YouTubeVideo, HomePageConfig, PublicFeedbackItem } from '../types';
 import { FEATURE_CARDS, PROJECTS, YOUTUBE_VIDEOS, BLOG_ARTICLES, WHY_PROBITIAN_CARDS } from '../data/mockData';
 import { cmsService } from '../services/cmsService';
 import { BannerGraphic } from '../components/BannerGraphic';
-import { Youtube, Instagram, ArrowRight, Play, Sparkles, BarChart3, Database, Table, Filter, BrainCircuit, GraduationCap, Briefcase, HeartHandshake, TrendingUp, CheckCircle, ExternalLink, Quote, Star, MessageSquare } from 'lucide-react';
+import { FeedbackModal } from '../components/FeedbackModal';
+import { Youtube, Instagram, ArrowRight, Play, Sparkles, BarChart3, Database, Table, Filter, BrainCircuit, GraduationCap, Briefcase, HeartHandshake, TrendingUp, CheckCircle, ExternalLink, Quote, Star, MessageSquare, MessageSquareQuote } from 'lucide-react';
 import { trackSocialClick, trackCtaClick, trackCourseClick, trackProjectClick, trackBlogClick } from '../lib/analytics';
 
 interface HomePageProps {
@@ -17,6 +18,8 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate, onSelectProject,
   const [projects, setProjects] = useState<ProjectItem[]>(PROJECTS);
   const [blogs, setBlogs] = useState<BlogArticle[]>(BLOG_ARTICLES);
   const [videos, setVideos] = useState<YouTubeVideo[]>(YOUTUBE_VIDEOS);
+  const [feedbackTestimonials, setFeedbackTestimonials] = useState<PublicFeedbackItem[]>([]);
+  const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
 
   useEffect(() => {
     loadCmsData();
@@ -31,7 +34,8 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate, onSelectProject,
         cmsService.getHomePageConfig(),
         cmsService.getProjects(),
         cmsService.getBlogs(),
-        cmsService.getVideos()
+        cmsService.getVideos(),
+        cmsService.getApprovedFeedback()
       ]);
 
       if (results[0].status === 'fulfilled' && results[0].value) {
@@ -45,6 +49,9 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate, onSelectProject,
       }
       if (results[3].status === 'fulfilled' && results[3].value && results[3].value.length > 0) {
         setVideos(results[3].value);
+      }
+      if (results[4].status === 'fulfilled' && Array.isArray(results[4].value)) {
+        setFeedbackTestimonials(results[4].value);
       }
     } catch (err) {
       console.warn('Notice loading CMS data for home page:', err);
@@ -307,84 +314,151 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate, onSelectProject,
 
       {/* ----------------- WHAT PEOPLE SAY / TESTIMONIALS SECTION ----------------- */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10">
-        <div className="text-center space-y-3 max-w-2xl mx-auto">
-          <span className="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300">
-            Community Voices
-          </span>
-          <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white">
-            What People Say
-          </h2>
-          <p className="text-slate-600 dark:text-slate-400 text-sm">
-            Hear how ProBItian tutorials, data modeling guides, and portfolio projects help data professionals advance their skills.
-          </p>
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6 max-w-4xl mx-auto text-center sm:text-left">
+          <div className="space-y-3">
+            <span className="inline-block px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300">
+              Community Voices
+            </span>
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white">
+              What People Say
+            </h2>
+            <p className="text-slate-600 dark:text-slate-400 text-sm max-w-xl">
+              Hear how ProBItian tutorials, data modeling guides, and portfolio projects help data professionals advance their skills.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setIsFeedbackModalOpen(true)}
+            className="btn-radius self-center sm:self-auto px-5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white text-xs sm:text-sm font-bold shadow-md hover:shadow-purple-500/20 transition-all flex items-center gap-2 cursor-pointer shrink-0"
+          >
+            <MessageSquareQuote className="w-4 h-4" />
+            <span>Share Your Feedback</span>
+          </button>
         </div>
 
-        {homeConfig?.testimonials && homeConfig.testimonials.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {homeConfig.testimonials.map((t) => (
-              <div
-                key={t.id}
-                className="card-radius bg-white dark:bg-slate-800/90 p-6 border border-slate-200 dark:border-slate-700/80 shadow-soft hover:shadow-soft-lg transition-all flex flex-col justify-between space-y-4"
-              >
-                <div className="space-y-3">
-                  <div className="flex items-center gap-1 text-amber-400">
-                    {[...Array(5)].map((_, i) => (
-                      <Star key={i} className="w-4 h-4 fill-current" />
-                    ))}
-                  </div>
-                  <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 italic leading-relaxed">
-                    "{t.quote}"
+        {(() => {
+          const dbItems = feedbackTestimonials.map(f => ({
+            id: f.id,
+            author: f.name,
+            role: f.role && f.company ? `${f.role} at ${f.company}` : f.role || f.company || 'Community Member',
+            quote: f.feedback,
+            rating: f.rating || 5,
+            featured: f.featured,
+            service: f.service,
+            avatar: undefined as string | undefined
+          }));
+
+          const allTestimonials = [
+            ...dbItems,
+            ...(homeConfig?.testimonials || [])
+              .filter(legacy => !dbItems.some(d => d.id === legacy.id || d.author === legacy.author))
+              .map(legacy => ({
+                id: legacy.id,
+                author: legacy.author,
+                role: legacy.role,
+                quote: legacy.quote,
+                rating: 5,
+                featured: false,
+                service: undefined as string | undefined,
+                avatar: legacy.avatar
+              }))
+          ].sort((a, b) => (b.featured ? 1 : 0) - (a.featured ? 1 : 0));
+
+          if (allTestimonials.length === 0) {
+            return (
+              <div className="card-radius bg-slate-50 dark:bg-slate-800/50 p-8 border border-dashed border-slate-300 dark:border-slate-700 text-center space-y-4 max-w-3xl mx-auto">
+                <div className="w-12 h-12 rounded-full bg-purple-100 dark:bg-purple-900/40 text-purple-600 dark:text-purple-300 mx-auto flex items-center justify-center">
+                  <MessageSquare className="w-6 h-6" />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                    Share Your ProBitian Learning Experience
+                  </h3>
+                  <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 max-w-lg mx-auto">
+                    Have you landed a data role or built an enterprise dashboard using our tutorials? We would love to feature your journey.
                   </p>
                 </div>
-
-                <div className="pt-3 border-t border-slate-100 dark:border-slate-700/60 flex items-center gap-3">
-                  {t.avatar ? (
-                    <img src={t.avatar} alt={t.author} className="w-10 h-10 rounded-full object-cover" />
-                  ) : (
-                    <div className="w-10 h-10 rounded-full bg-purple-100 dark:bg-purple-900/60 text-purple-700 dark:text-purple-300 font-bold flex items-center justify-center text-xs">
-                      {t.author.slice(0, 2).toUpperCase()}
-                    </div>
-                  )}
-                  <div>
-                    <h4 className="text-xs font-bold text-slate-900 dark:text-white">{t.author}</h4>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400">{t.role}</p>
-                  </div>
+                <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setIsFeedbackModalOpen(true)}
+                    className="btn-radius px-5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold transition-colors cursor-pointer"
+                  >
+                    Submit Your Feedback
+                  </button>
+                  <a
+                    href="https://youtube.com/@probitian"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => trackSocialClick('youtube', 'https://youtube.com/@probitian')}
+                    className="btn-radius px-5 py-2.5 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-600 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors"
+                  >
+                    Join Community Discussions
+                  </a>
                 </div>
               </div>
-            ))}
-          </div>
-        ) : (
-          <div className="card-radius bg-slate-50 dark:bg-slate-800/50 p-8 border border-dashed border-slate-300 dark:border-slate-700 text-center space-y-4 max-w-3xl mx-auto">
-            <div className="w-12 h-12 rounded-full bg-purple-100 dark:bg-purple-900/40 text-purple-600 dark:text-purple-300 mx-auto flex items-center justify-center">
-              <MessageSquare className="w-6 h-6" />
+            );
+          }
+
+          return (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {allTestimonials.map((t) => (
+                <div
+                  key={t.id}
+                  className={`card-radius bg-white dark:bg-slate-800/90 p-6 border transition-all flex flex-col justify-between space-y-4 ${
+                    t.featured
+                      ? 'border-purple-300 dark:border-purple-600 shadow-md ring-1 ring-purple-400/25'
+                      : 'border-slate-200 dark:border-slate-700/80 shadow-soft hover:shadow-soft-lg'
+                  }`}
+                >
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1 text-amber-400">
+                        {[...Array(t.rating || 5)].map((_, i) => (
+                          <Star key={i} className="w-4 h-4 fill-current" />
+                        ))}
+                      </div>
+
+                      {t.featured && (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-purple-100 text-purple-700 dark:bg-purple-900/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800 flex items-center gap-1">
+                          <Sparkles className="w-3 h-3" />
+                          <span>Featured</span>
+                        </span>
+                      )}
+                    </div>
+
+                    <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 italic leading-relaxed">
+                      "{t.quote}"
+                    </p>
+
+                    {t.service && (
+                      <div className="pt-1">
+                        <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-semibold bg-slate-100 dark:bg-slate-700/70 text-slate-600 dark:text-slate-300">
+                          {t.service}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="pt-3 border-t border-slate-100 dark:border-slate-700/60 flex items-center gap-3">
+                    {t.avatar ? (
+                      <img src={t.avatar} alt={t.author} className="w-10 h-10 rounded-full object-cover" />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-purple-100 dark:bg-purple-900/60 text-purple-700 dark:text-purple-300 font-bold flex items-center justify-center text-xs shrink-0">
+                        {t.author.slice(0, 2).toUpperCase()}
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <h4 className="text-xs font-bold text-slate-900 dark:text-white truncate">{t.author}</h4>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">{t.role}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
-            <div className="space-y-1">
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white">
-                Share Your ProBitian Learning Experience
-              </h3>
-              <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 max-w-lg mx-auto">
-                Have you landed a data role or built an enterprise dashboard using our tutorials? We would love to feature your journey.
-              </p>
-            </div>
-            <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
-              <button
-                onClick={() => onNavigate('contact')}
-                className="btn-radius px-5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold transition-colors cursor-pointer"
-              >
-                Submit Your Feedback
-              </button>
-              <a
-                href="https://youtube.com/@probitian"
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={() => trackSocialClick('youtube', 'https://youtube.com/@probitian')}
-                className="btn-radius px-5 py-2.5 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-600 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors"
-              >
-                Join Community Discussions
-              </a>
-            </div>
-          </div>
-        )}
+          );
+        })()}
       </section>
 
       {/* ----------------- LATEST CONTENT (YOUTUBE & BLOGS) ----------------- */}
@@ -605,6 +679,13 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate, onSelectProject,
           </div>
         </div>
       </section>
+
+      {/* Public Feedback Modal */}
+      <FeedbackModal
+        isOpen={isFeedbackModalOpen}
+        onClose={() => setIsFeedbackModalOpen(false)}
+        onFeedbackSubmitted={() => loadCmsData()}
+      />
     </div>
   );
 };

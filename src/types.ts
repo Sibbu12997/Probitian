@@ -231,6 +231,38 @@ export interface HomePageConfig {
   cta?: { heading: string; subheading: string; button_text: string; button_link: string };
 }
 
+export type FeedbackStatus = 'pending' | 'approved' | 'rejected';
+
+export interface PublicFeedbackItem {
+  id: string;
+  name: string;
+  role?: string | null;
+  company?: string | null;
+  rating: number;
+  feedback: string;
+  service?: string | null;
+  featured: boolean;
+  created_at: string;
+}
+
+export interface FeedbackItem extends PublicFeedbackItem {
+  email: string;
+  consent_public: boolean;
+  status: FeedbackStatus;
+  updated_at: string;
+}
+
+export interface SubmitFeedbackPayload {
+  name: string;
+  email: string;
+  role?: string;
+  company?: string;
+  rating: number;
+  feedback: string;
+  service?: string;
+  consent_public: boolean;
+}
+
 export interface AdminUser {
   email: string;
   full_name: string;
@@ -402,6 +434,7 @@ export interface SequenceLead {
   updated_at: string;
   lead?: Lead;
   sequence?: LeadSequence;
+  deliveries?: SequenceDeliveryLog[];
 }
 
 export interface SequenceDeliveryLog {

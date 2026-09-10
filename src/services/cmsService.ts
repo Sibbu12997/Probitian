@@ -26,7 +26,11 @@ import {
   LeadSequence,
   SequenceStep,
   SequenceLead,
-  SequenceDeliveryLog
+  SequenceDeliveryLog,
+  PublicFeedbackItem,
+  FeedbackItem,
+  SubmitFeedbackPayload,
+  FeedbackStatus
 } from '../types';
 import { LegalSettings, DEFAULT_LEGAL_SETTINGS } from '../data/defaultLegalData';
 import { DEFAULT_FOUNDER_MESSAGE } from '../data/defaultFounderData';
@@ -1198,6 +1202,38 @@ export const cmsService = {
     }
   },
 
+  async pauseLeadInSequence(sequenceId: string, leadId: string): Promise<{ success: boolean; message: string }> {
+    try {
+      const res = await safeFetchJson<{ success?: boolean; message?: string }>(`/api/admin/lead-sequences/${sequenceId}/pause-lead`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ leadId })
+      });
+      return {
+        success: Boolean(res && res.success !== false),
+        message: res?.message || 'Lead sequence status paused.'
+      };
+    } catch (e: any) {
+      return { success: false, message: e?.message || 'Failed to pause lead in sequence' };
+    }
+  },
+
+  async resumeLeadInSequence(sequenceId: string, leadId: string): Promise<{ success: boolean; message: string }> {
+    try {
+      const res = await safeFetchJson<{ success?: boolean; message?: string }>(`/api/admin/lead-sequences/${sequenceId}/resume-lead`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ leadId })
+      });
+      return {
+        success: Boolean(res && res.success !== false),
+        message: res?.message || 'Lead sequence status resumed.'
+      };
+    } catch (e: any) {
+      return { success: false, message: e?.message || 'Failed to resume lead in sequence' };
+    }
+  },
+
   async sendSequenceTestEmail(sequenceId: string, stepNumber: number, testEmail: string, sampleLeadId?: string): Promise<{ success: boolean; message: string }> {
     try {
       const res = await safeFetchJson<{ success?: boolean; message?: string }>(`/api/admin/lead-sequences/${sequenceId}/test`, {
@@ -1214,17 +1250,19 @@ export const cmsService = {
     }
   },
 
-  async triggerSequenceProcessing(): Promise<{ success: boolean; stats?: any }> {
+  async triggerSequenceProcessing(): Promise<{ success: boolean; message?: string; stats?: any; details?: any[] }> {
     try {
-      const res = await safeFetchJson<{ success?: boolean; stats?: any }>('/api/admin/lead-sequences/process', {
+      const res = await safeFetchJson<{ success?: boolean; message?: string; stats?: any; details?: any[] }>('/api/admin/lead-sequences/process', {
         method: 'POST'
       });
       return {
         success: Boolean(res && res.success !== false),
-        stats: res?.stats
+        message: res?.message,
+        stats: res?.stats,
+        details: res?.details
       };
     } catch (e: any) {
-      return { success: false };
+      return { success: false, message: e?.message || 'Failed to trigger sequence processing' };
     }
   },
 
@@ -1560,5 +1598,104 @@ export const cmsService = {
       for (const v of data.videos) await this.saveVideo(v);
     }
     return true;
+  },
+
+  // --- FEEDBACK & TESTIMONIALS ---
+  async submitFeedback(payload: SubmitFeedbackPayload): Promise<{ success: boolean; message?: string; error?: string }> {
+    try {
+      const res = await safeFetchJson<{ success?: boolean; message?: string; error?: string }>('/api/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (res && res.success) {
+        return { success: true, message: res.message };
+      }
+      return { success: false, error: res?.error || 'Failed to submit feedback' };
+    } catch (e: any) {
+      console.error('Feedback submission error:', e?.message || e);
+      return { success: false, error: e?.message || 'Failed to submit feedback' };
+    }
+  },
+
+  async getApprovedFeedback(): Promise<PublicFeedbackItem[]> {
+    try {
+      const data = await safeFetchJson<PublicFeedbackItem[]>('/api/feedback');
+      return Array.isArray(data) ? data : [];
+    } catch (e: any) {
+      console.warn('Failed to load approved feedback:', e?.message || e);
+      return [];
+    }
+  },
+
+  async getAdminFeedback(filter?: { status?: string; featured?: string; search?: string }): Promise<FeedbackItem[]> {
+    try {
+      const params = new URLSearchParams();
+      if (filter?.status) params.set('status', filter.status);
+      if (filter?.featured) params.set('featured', filter.featured);
+      if (filter?.search) params.set('search', filter.search);
+      const queryString = params.toString();
+      const url = `/api/admin/feedback${queryString ? `?${queryString}` : ''}`;
+      const data = await safeFetchJson<FeedbackItem[]>(url);
+      return Array.isArray(data) ? data : [];
+    } catch (e: any) {
+      if (e instanceof AuthenticationError || e?.isAuthError) {
+        console.warn('[cmsService] Authentication required for admin feedback');
+      } else {
+        console.warn('Failed to fetch admin feedback:', e?.message || e);
+      }
+      return [];
+    }
+  },
+
+  async getAdminFeedbackById(id: string): Promise<FeedbackItem | null> {
+    try {
+      const data = await safeFetchJson<FeedbackItem>(`/api/admin/feedback/${encodeURIComponent(id)}`);
+      return data || null;
+    } catch (e: any) {
+      console.error('Failed to get feedback by ID:', e?.message || e);
+      return null;
+    }
+  },
+
+  async updateFeedback(
+    id: string,
+    updates: Partial<FeedbackItem>
+  ): Promise<{ success: boolean; feedback?: FeedbackItem; error?: string }> {
+    try {
+      const res = await safeFetchJson<{ success?: boolean; feedback?: FeedbackItem; error?: string }>(
+        `/api/admin/feedback/${encodeURIComponent(id)}`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updates)
+        }
+      );
+      if (res && res.success) {
+        return { success: true, feedback: res.feedback };
+      }
+      return { success: false, error: res?.error || 'Failed to update feedback' };
+    } catch (e: any) {
+      console.error('Update feedback error:', e?.message || e);
+      return { success: false, error: e?.message || 'Failed to update feedback' };
+    }
+  },
+
+  async deleteFeedback(id: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const res = await safeFetchJson<{ success?: boolean; error?: string }>(
+        `/api/admin/feedback/${encodeURIComponent(id)}`,
+        {
+          method: 'DELETE'
+        }
+      );
+      if (res && res.success) {
+        return { success: true };
+      }
+      return { success: false, error: res?.error || 'Failed to delete feedback' };
+    } catch (e: any) {
+      console.error('Delete feedback error:', e?.message || e);
+      return { success: false, error: e?.message || 'Failed to delete feedback' };
+    }
   }
 };

@@ -52,6 +52,7 @@ export const useLeadSequences = () => {
   const [selectedLeadIdsToEnroll, setSelectedLeadIdsToEnroll] = useState<string[]>([]);
   const [enrollSearch, setEnrollSearch] = useState('');
   const [isEnrolling, setIsEnrolling] = useState(false);
+  const [isTriggeringWorker, setIsTriggeringWorker] = useState(false);
 
   // Toast / Feedback State
   const [toastMessage, setToastMessage] = useState<ToastMessage | null>(null);
@@ -268,21 +269,57 @@ export const useLeadSequences = () => {
 
   // Trigger manual background worker
   const handleTriggerWorker = useCallback(async () => {
+    if (isTriggeringWorker) return;
     try {
-      showToast('Processing active sequence cycle...');
+      setIsTriggeringWorker(true);
+      showToast('Evaluating sequence queue and dispatching pending steps...');
       const res = await cmsService.triggerSequenceProcessing();
       if (res.success) {
         const stats = res.stats || {};
-        showToast(`Cycle complete: ${stats.sent || 0} sent, ${stats.completed || 0} completed, ${stats.stopped || 0} stopped.`);
+        const sentCount = stats.sent || 0;
+        const compCount = stats.completed || 0;
+        const stopCount = stats.stopped || 0;
+        const msg = sentCount > 0
+          ? `Sequence cycle completed: ${sentCount} email(s) dispatched, ${compCount} completed, ${stopCount} auto-stopped.`
+          : `Sequence queue evaluated: No pending emails due right now (${stats.activeEnrollments || 0} active enrollments).`;
+        showToast(msg, 'success');
         if (selectedSequence) {
-          loadSequenceDetails(selectedSequence.id);
+          await loadSequenceDetails(selectedSequence.id);
         }
-        fetchSequences();
+        await fetchSequences();
+      } else {
+        showToast(res.message || 'Sequence processing returned an issue.', 'error');
       }
-    } catch {
-      showToast('Failed to run sequence worker', 'error');
+    } catch (err: any) {
+      showToast(err?.message || 'Failed to run sequence worker', 'error');
+    } finally {
+      setIsTriggeringWorker(false);
     }
-  }, [fetchSequences, loadSequenceDetails, selectedSequence, showToast]);
+  }, [fetchSequences, isTriggeringWorker, loadSequenceDetails, selectedSequence, showToast]);
+
+  // Pause single lead in sequence
+  const handlePauseLead = useCallback(async (leadId: string) => {
+    if (!selectedSequence) return;
+    try {
+      const res = await cmsService.pauseLeadInSequence(selectedSequence.id, leadId);
+      showToast(res.message);
+      loadSequenceDetails(selectedSequence.id);
+    } catch {
+      showToast('Failed to pause lead sequence', 'error');
+    }
+  }, [loadSequenceDetails, selectedSequence, showToast]);
+
+  // Resume single lead in sequence
+  const handleResumeLead = useCallback(async (leadId: string) => {
+    if (!selectedSequence) return;
+    try {
+      const res = await cmsService.resumeLeadInSequence(selectedSequence.id, leadId);
+      showToast(res.message);
+      loadSequenceDetails(selectedSequence.id);
+    } catch {
+      showToast('Failed to resume lead sequence', 'error');
+    }
+  }, [loadSequenceDetails, selectedSequence, showToast]);
 
   // Stop single lead in sequence
   const handleStopLead = useCallback(async (leadId: string, companyName: string) => {
@@ -509,7 +546,10 @@ export const useLeadSequences = () => {
     handleDeleteStep,
     handleMoveStep,
     handleSaveSteps,
+    isTriggeringWorker,
     handleTriggerWorker,
+    handlePauseLead,
+    handleResumeLead,
     handleStopLead,
     handleOpenTestModal,
     handleSendTestEmail,

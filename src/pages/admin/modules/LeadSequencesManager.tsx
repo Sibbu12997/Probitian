@@ -78,7 +78,10 @@ export const LeadSequencesManager: React.FC<LeadSequencesManagerProps> = ({ onNa
     handleDeleteStep,
     handleMoveStep,
     handleSaveSteps,
+    isTriggeringWorker,
     handleTriggerWorker,
+    handlePauseLead,
+    handleResumeLead,
     handleStopLead,
     handleOpenTestModal,
     handleSendTestEmail,
@@ -135,12 +138,17 @@ export const LeadSequencesManager: React.FC<LeadSequencesManagerProps> = ({ onNa
         <div className="flex flex-wrap items-center gap-2.5">
           <button
             type="button"
+            disabled={isTriggeringWorker}
             onClick={handleTriggerWorker}
-            className="px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-300 text-xs font-bold flex items-center gap-1.5 transition-colors"
-            title="Immediately trigger sequence queue evaluation"
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${
+              isTriggeringWorker
+                ? 'bg-purple-100 dark:bg-purple-950/50 text-purple-700 dark:text-purple-300 cursor-not-allowed opacity-90'
+                : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-300'
+            }`}
+            title="Immediately evaluate sequence queue and send due emails"
           >
-            <RefreshCw className="w-3.5 h-3.5" />
-            <span>Run Sequence Cycle</span>
+            <RefreshCw className={`w-3.5 h-3.5 ${isTriggeringWorker ? 'animate-spin text-purple-600' : ''}`} />
+            <span>{isTriggeringWorker ? 'Evaluating Queue...' : 'Run Sequence Cycle'}</span>
           </button>
 
           {onNavigateToLeads && (
@@ -231,6 +239,8 @@ export const LeadSequencesManager: React.FC<LeadSequencesManagerProps> = ({ onNa
               onLeadTabFilterChange={setLeadTabFilter}
               onOpenEnrollModal={handleOpenEnrollModal}
               onStopLead={handleStopLead}
+              onPauseLead={handlePauseLead}
+              onResumeLead={handleResumeLead}
             />
           )}
         </div>

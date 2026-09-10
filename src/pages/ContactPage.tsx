@@ -17,13 +17,15 @@ import {
   AlertCircle, 
   Globe, 
   Clock, 
-  ShieldCheck 
+  ShieldCheck,
+  MessageSquareQuote
 } from 'lucide-react';
 import { XIcon } from '../components/icons/XIcon';
 import { cmsService } from '../services/cmsService';
 import { trackContactFormSubmit, trackSocialClick } from '../lib/analytics';
 import { SocialLinkItem } from '../types';
 import { sanitizeUrl } from '../lib/htmlSanitizer';
+import { FeedbackForm } from '../components/FeedbackForm';
 
 export const ContactPage: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -34,6 +36,7 @@ export const ContactPage: React.FC = () => {
     subject: '',
     message: ''
   });
+  const [formTab, setFormTab] = useState<'message' | 'feedback'>('message');
   const [submitted, setSubmitted] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -199,41 +202,85 @@ export const ContactPage: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         {/* Contact Form Card */}
         <div className="lg:col-span-7 card-radius bg-white dark:bg-slate-800/90 p-6 sm:p-8 border border-slate-200 dark:border-slate-700/80 shadow-soft space-y-6">
-          <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-700/60 pb-4">
-            <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white flex items-center gap-2.5">
-              <MessageSquare className="w-6 h-6 text-purple-600 dark:text-purple-400" />
-              <span>Send a Message</span>
-            </h2>
-            <span className="text-[11px] text-slate-400 font-medium">* Required fields</span>
+          {/* Tab Selector */}
+          <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-900/80 rounded-2xl border border-slate-200/60 dark:border-slate-700/60">
+            <button
+              type="button"
+              onClick={() => setFormTab('message')}
+              className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                formTab === 'message'
+                  ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              <MessageSquare className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+              <span>Send an Inquiry</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setFormTab('feedback')}
+              className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                formTab === 'feedback'
+                  ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              <MessageSquareQuote className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+              <span>Share Testimonial</span>
+            </button>
           </div>
 
-          {error && (
-            <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-600 dark:text-red-400 text-xs font-semibold flex items-center gap-2.5">
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              <span>{error}</span>
-            </div>
-          )}
-
-          {submitted ? (
-            <div className="p-8 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 text-center space-y-4 shadow-inner">
-              <div className="w-14 h-14 bg-emerald-500/10 text-emerald-500 rounded-full flex items-center justify-center mx-auto">
-                <CheckCircle2 className="w-10 h-10 text-emerald-500 animate-bounce" />
+          {formTab === 'feedback' ? (
+            <div className="space-y-4">
+              <div className="border-b border-slate-100 dark:border-slate-700/60 pb-3">
+                <h2 className="text-xl font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                  <MessageSquareQuote className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                  <span>Student & Community Testimonial</span>
+                </h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  Share how ProBitian courses, YouTube videos, or portfolio templates aided your career growth.
+                </p>
               </div>
-              <h3 className="text-2xl font-black text-emerald-800 dark:text-emerald-200">
-                Message Sent Successfully!
-              </h3>
-              <p className="text-xs sm:text-sm text-emerald-700 dark:text-emerald-300 leading-relaxed max-w-md mx-auto">
-                Thanks for reaching out. We've received your enquiry and will get back to you soon. A notification has been logged for Shivam Singh at <strong className="font-bold">{contactEmail}</strong>.
-              </p>
-              <button
-                onClick={() => setSubmitted(false)}
-                className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs transition-all cursor-pointer shadow-md"
-              >
-                Send Another Message
-              </button>
+
+              <FeedbackForm />
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="space-y-5">
+            <>
+              <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-700/60 pb-4">
+                <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white flex items-center gap-2.5">
+                  <MessageSquare className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+                  <span>Send a Message</span>
+                </h2>
+                <span className="text-[11px] text-slate-400 font-medium">* Required fields</span>
+              </div>
+
+              {error && (
+                <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-600 dark:text-red-400 text-xs font-semibold flex items-center gap-2.5">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{error}</span>
+                </div>
+              )}
+
+              {submitted ? (
+                <div className="p-8 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 text-center space-y-4 shadow-inner">
+                  <div className="w-14 h-14 bg-emerald-500/10 text-emerald-500 rounded-full flex items-center justify-center mx-auto">
+                    <CheckCircle2 className="w-10 h-10 text-emerald-500 animate-bounce" />
+                  </div>
+                  <h3 className="text-2xl font-black text-emerald-800 dark:text-emerald-200">
+                    Message Sent Successfully!
+                  </h3>
+                  <p className="text-xs sm:text-sm text-emerald-700 dark:text-emerald-300 leading-relaxed max-w-md mx-auto">
+                    Thanks for reaching out. We've received your enquiry and will get back to you soon. A notification has been logged for Shivam Singh at <strong className="font-bold">{contactEmail}</strong>.
+                  </p>
+                  <button
+                    onClick={() => setSubmitted(false)}
+                    className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs transition-all cursor-pointer shadow-md"
+                  >
+                    Send Another Message
+                  </button>
+                </div>
+              ) : (
+                <form onSubmit={handleSubmit} className="space-y-5">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Full Name */}
                 <div className="space-y-1.5">
@@ -367,6 +414,8 @@ export const ContactPage: React.FC = () => {
                 </p>
               </div>
             </form>
+          )}
+          </>
           )}
         </div>
 

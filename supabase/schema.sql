@@ -629,3 +629,50 @@ INSERT INTO public.pages (page_key, title, hero_heading, hero_description, butto
  '/banner.svg',
  '[{"label": "Active Learners", "value": "15,000+"}, {"label": "Tutorial Hours", "value": "120+"}, {"label": "Portfolio Projects", "value": "25+"}, {"label": "Community Rating", "value": "4.9/5"}]'
 ) ON CONFLICT (page_key) DO NOTHING;
+
+-- ============================================================
+-- 8. PUBLIC FEEDBACK & TESTIMONIALS
+-- ============================================================
+CREATE TABLE IF NOT EXISTS public.feedback (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  email TEXT NOT NULL,
+  role TEXT,
+  company TEXT,
+  rating SMALLINT NOT NULL CHECK (rating >= 1 AND rating <= 5),
+  feedback TEXT NOT NULL,
+  service TEXT,
+  consent_public BOOLEAN NOT NULL DEFAULT true,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+  featured BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_feedback_status ON public.feedback(status);
+CREATE INDEX IF NOT EXISTS idx_feedback_featured ON public.feedback(featured) WHERE status = 'approved';
+CREATE INDEX IF NOT EXISTS idx_feedback_created_at ON public.feedback(created_at DESC);
+
+ALTER TABLE public.feedback ENABLE ROW LEVEL SECURITY;
+
+DO $$ BEGIN
+  CREATE POLICY "Public can view approved feedback"
+    ON public.feedback
+    FOR SELECT
+    TO anon, authenticated
+    USING (status = 'approved');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "Service role full access on feedback"
+    ON public.feedback
+    FOR ALL
+    TO service_role
+    USING (true)
+    WITH CHECK (true);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
+

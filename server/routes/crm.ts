@@ -8,98 +8,34 @@ import { emailSendLimiter, emailTestLimiter, unsubscribeLimiter } from '../middl
 import { serverSupabase, readCmsData, writeCmsData } from '../services/supabase';
 import { campaignEmailService } from '../../src/services/campaignEmailService';
 import { escapeHtml } from '../../src/lib/htmlSanitizer';
+import { executeSequenceProcessingCycle } from '../services/sequenceProcessor';
+import {
+  getSupabaseCrmLeads,
+  saveSupabaseCrmLeads,
+  getSupabaseCrmSequences,
+  saveSupabaseCrmSequences,
+  getSupabaseSequenceSteps,
+  saveSupabaseSequenceSteps,
+  getSupabaseSequenceLeads,
+  saveSupabaseSequenceLeads,
+  getSupabaseSequenceDeliveries,
+  saveSupabaseSequenceDeliveries
+} from '../services/crmStorage';
+
+export {
+  getSupabaseCrmLeads,
+  saveSupabaseCrmLeads,
+  getSupabaseCrmSequences,
+  saveSupabaseCrmSequences,
+  getSupabaseSequenceSteps,
+  saveSupabaseSequenceSteps,
+  getSupabaseSequenceLeads,
+  saveSupabaseSequenceLeads,
+  getSupabaseSequenceDeliveries,
+  saveSupabaseSequenceDeliveries
+};
 
 const router = express.Router();
-
-// Helper to query Supabase CRM Leads with relational source of truth
-export async function getSupabaseCrmLeads(): Promise<any[]> {
-  if (!serverSupabase) {
-    if (process.env.NODE_ENV === 'production') {
-      throw new Error('Supabase database client is required in production environment.');
-    }
-    const data = readCmsData();
-    return data.leads || [];
-  }
-
-  try {
-    const { data: dbLeads, error: tblErr } = await serverSupabase
-      .from('leads')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (tblErr) {
-      console.error('[CRM Leads Read Diagnostic]', {
-        operation: 'GET_LEADS',
-        errorCode: tblErr.code || 'DB_ERROR',
-        errorMessage: tblErr.message
-      });
-
-      // Legacy fallback ONLY if the relational table does not exist in schema (unmigrated)
-      if (tblErr.code === '42P01' || tblErr.code === 'PGRST205' || String(tblErr.message || '').includes('does not exist')) {
-        const { data: row, error: rowErr } = await serverSupabase
-          .from('settings')
-          .select('value')
-          .eq('key', 'crm_leads')
-          .maybeSingle();
-
-        if (!rowErr && row && Array.isArray(row.value?.leads)) {
-          return row.value.leads;
-        }
-      }
-      throw new Error(`Database query failed for leads: ${tblErr.message}`);
-    }
-
-    // Authoritative relational query succeeded: return result, including empty array []
-    return Array.isArray(dbLeads) ? dbLeads : [];
-  } catch (err: any) {
-    console.error('[CRM Leads Read Exception]', {
-      operation: 'GET_LEADS',
-      errorMessage: err?.message || String(err)
-    });
-    throw err;
-  }
-}
-
-// Helper to save Supabase CRM Leads (Primary: public.leads, non-blocking backup: settings)
-export async function saveSupabaseCrmLeads(leads: any[]): Promise<void> {
-  if (!serverSupabase) {
-    if (process.env.NODE_ENV === 'production') {
-      throw new Error('Supabase database client is required in production environment.');
-    }
-    const data = readCmsData();
-    data.leads = leads;
-    writeCmsData(data);
-    return;
-  }
-
-  const normalizedLeads = leads.map(l => ({
-    ...l,
-    id: isValidUuid(l.id) ? l.id : crypto.randomUUID()
-  }));
-
-  // Primary authoritative storage: public.leads table
-  const { error: tblErr } = await serverSupabase.from('leads').upsert(normalizedLeads);
-  if (tblErr) {
-    console.error('[Supabase Save CRM Leads Error]', {
-      operation: 'SAVE_LEADS',
-      errorCode: tblErr.code,
-      errorMessage: tblErr.message
-    });
-    throw new Error(`Failed to persist leads to primary database: ${tblErr.message}`);
-  }
-
-  // Non-authoritative legacy recovery backup: settings
-  try {
-    const now = new Date().toISOString();
-    await serverSupabase.from('settings').upsert({
-      key: 'crm_leads',
-      value: { leads: normalizedLeads, updated_at: now },
-      updated_at: now
-    });
-  } catch (backupErr) {
-    console.warn('[CRM Leads Backup Warning] Settings backup write failed:', backupErr);
-  }
-}
 
 // Helper to query Supabase Lead Campaigns with relational source of truth
 export async function getSupabaseCrmCampaigns(): Promise<any[]> {
@@ -1053,133 +989,51 @@ router.get('/admin/crm/stats', requireAuth, requirePermission(Permission.MANAGE_
   }
 });
 
-// ==================== LEAD SEQUENCES HELPERS & ROUTES ====================
+// ==================== LEAD SEQUENCES ROUTES ====================
 
-export async function getSupabaseCrmSequences(): Promise<any[]> {
-  if (!serverSupabase) {
-    const data = readCmsData();
-    return data.lead_sequences || [];
-  }
-  try {
-    const { data: row } = await serverSupabase
-      .from('settings')
-      .select('value')
-      .eq('key', 'crm_lead_sequences')
-      .maybeSingle();
-
-    if (row && Array.isArray(row.value?.sequences)) {
-      return row.value.sequences;
-    }
-    return [];
-  } catch (err) {
-    console.error('[Supabase CRM Sequences Read Exception]', err);
-    return [];
-  }
-}
-
-export async function saveSupabaseCrmSequences(sequences: any[]): Promise<void> {
-  const now = new Date().toISOString();
-  if (!serverSupabase) {
-    const data = readCmsData();
-    data.lead_sequences = sequences;
-    writeCmsData(data);
-    return;
-  }
-  await serverSupabase.from('settings').upsert({
-    key: 'crm_lead_sequences',
-    value: { sequences, updated_at: now },
-    updated_at: now
-  });
-}
-
-export async function getSupabaseSequenceSteps(): Promise<any[]> {
-  if (!serverSupabase) {
-    const data = readCmsData();
-    return data.sequence_steps || [];
-  }
-  try {
-    const { data: row } = await serverSupabase
-      .from('settings')
-      .select('value')
-      .eq('key', 'crm_sequence_steps')
-      .maybeSingle();
-
-    if (row && Array.isArray(row.value?.steps)) {
-      return row.value.steps;
-    }
-    return [];
-  } catch (err) {
-    console.error('[Supabase Sequence Steps Read Exception]', err);
-    return [];
-  }
-}
-
-export async function saveSupabaseSequenceSteps(steps: any[]): Promise<void> {
-  const now = new Date().toISOString();
-  if (!serverSupabase) {
-    const data = readCmsData();
-    data.sequence_steps = steps;
-    writeCmsData(data);
-    return;
-  }
-  await serverSupabase.from('settings').upsert({
-    key: 'crm_sequence_steps',
-    value: { steps, updated_at: now },
-    updated_at: now
-  });
-}
-
-export async function getSupabaseSequenceLeads(): Promise<any[]> {
-  if (!serverSupabase) {
-    const data = readCmsData();
-    return data.sequence_leads || [];
-  }
-  try {
-    const { data: row } = await serverSupabase
-      .from('settings')
-      .select('value')
-      .eq('key', 'crm_sequence_leads')
-      .maybeSingle();
-
-    if (row && Array.isArray(row.value?.sequence_leads)) {
-      return row.value.sequence_leads;
-    }
-    return [];
-  } catch (err) {
-    console.error('[Supabase Sequence Leads Read Exception]', err);
-    return [];
-  }
-}
-
-export async function saveSupabaseSequenceLeads(sequenceLeads: any[]): Promise<void> {
-  const now = new Date().toISOString();
-  if (!serverSupabase) {
-    const data = readCmsData();
-    data.sequence_leads = sequenceLeads;
-    writeCmsData(data);
-    return;
-  }
-  await serverSupabase.from('settings').upsert({
-    key: 'crm_sequence_leads',
-    value: { sequence_leads: sequenceLeads, updated_at: now },
-    updated_at: now
-  });
-}
-
-// GET /api/admin/lead-sequences - List all sequences with stats
+// GET /api/admin/lead-sequences - List all sequences with comprehensive metrics
 router.get('/admin/lead-sequences', requireAuth, requirePermission(Permission.MANAGE_CRM), async (req, res) => {
   try {
     const sequences = await getSupabaseCrmSequences();
     const allSteps = await getSupabaseSequenceSteps();
     const allSequenceLeads = await getSupabaseSequenceLeads();
+    const allDeliveries = await getSupabaseSequenceDeliveries();
 
     const result = sequences.map(seq => {
-      const steps = allSteps.filter(s => s.sequence_id === seq.id);
+      const steps = allSteps
+        .filter(s => s.sequence_id === seq.id)
+        .sort((a, b) => (Number(a.step_number) || 0) - (Number(b.step_number) || 0));
       const leads = allSequenceLeads.filter(l => l.sequence_id === seq.id);
+      const deliveries = allDeliveries.filter(d => d.sequence_id === seq.id);
+
+      const activeLeads = leads.filter(l => l.status === 'Active');
+      const completedLeads = leads.filter(l => l.status === 'Completed');
+      const stoppedLeads = leads.filter(l => l.status === 'Stopped' || l.status === 'Replied' || l.status === 'Paused');
+      const sentDeliveries = deliveries.filter(d => d.status === 'sent');
+      const failedDeliveries = deliveries.filter(d => d.status === 'failed');
+
+      // Find earliest scheduled next send among active leads
+      let nextScheduledSend: string | null = null;
+      for (const al of activeLeads) {
+        if (al.next_send_at) {
+          if (!nextScheduledSend || new Date(al.next_send_at).getTime() < new Date(nextScheduledSend).getTime()) {
+            nextScheduledSend = al.next_send_at;
+          }
+        }
+      }
+
       return {
         ...seq,
         step_count: steps.length,
         lead_count: leads.length,
+        total_steps: steps.length,
+        total_leads: leads.length,
+        active_leads: activeLeads.length,
+        completed_leads: completedLeads.length,
+        stopped_leads: stoppedLeads.length,
+        emails_sent: sentDeliveries.length,
+        emails_failed: failedDeliveries.length,
+        next_scheduled_send: nextScheduledSend,
         steps,
         leads
       };
@@ -1192,7 +1046,7 @@ router.get('/admin/lead-sequences', requireAuth, requirePermission(Permission.MA
   }
 });
 
-// GET /api/admin/lead-sequences/:id - Single sequence with steps & enrolled leads
+// GET /api/admin/lead-sequences/:id - Single sequence with steps, hydrated enrolled leads & delivery history
 router.get('/admin/lead-sequences/:id', requireAuth, requirePermission(Permission.MANAGE_CRM), async (req, res) => {
   try {
     const { id } = req.params;
@@ -1204,19 +1058,59 @@ router.get('/admin/lead-sequences/:id', requireAuth, requirePermission(Permissio
 
     const allSteps = await getSupabaseSequenceSteps();
     const allSequenceLeads = await getSupabaseSequenceLeads();
+    const allDeliveries = await getSupabaseSequenceDeliveries();
+    const allCrmLeads = await getSupabaseCrmLeads();
+
+    const crmLeadMap = new Map(allCrmLeads.map(l => [l.id, l]));
 
     const steps = allSteps
       .filter(s => s.sequence_id === id)
-      .sort((a, b) => (a.step_number || 0) - (b.step_number || 0));
+      .sort((a, b) => (Number(a.step_number) || 0) - (Number(b.step_number) || 0));
 
-    const leads = allSequenceLeads.filter(l => l.sequence_id === id);
+    const rawLeads = allSequenceLeads.filter(l => l.sequence_id === id);
+    const seqDeliveries = allDeliveries.filter(d => d.sequence_id === id);
+
+    // Hydrate enrolled leads with relational CRM lead data and delivery history
+    const hydratedLeads = rawLeads.map(sl => {
+      const crmLead = crmLeadMap.get(sl.lead_id) || null;
+      const leadDeliveries = seqDeliveries.filter(d => d.sequence_lead_id === sl.id || d.lead_id === sl.lead_id);
+      return {
+        ...sl,
+        lead: crmLead,
+        deliveries: leadDeliveries
+      };
+    });
+
+    const activeLeads = hydratedLeads.filter(l => l.status === 'Active');
+    const completedLeads = hydratedLeads.filter(l => l.status === 'Completed');
+    const stoppedLeads = hydratedLeads.filter(l => l.status === 'Stopped' || l.status === 'Replied' || l.status === 'Paused');
+    const sentDeliveries = seqDeliveries.filter(d => d.status === 'sent');
+    const failedDeliveries = seqDeliveries.filter(d => d.status === 'failed');
+
+    let nextScheduledSend: string | null = null;
+    for (const al of activeLeads) {
+      if (al.next_send_at) {
+        if (!nextScheduledSend || new Date(al.next_send_at).getTime() < new Date(nextScheduledSend).getTime()) {
+          nextScheduledSend = al.next_send_at;
+        }
+      }
+    }
 
     return res.json({
       ...seq,
       step_count: steps.length,
-      lead_count: leads.length,
+      lead_count: hydratedLeads.length,
+      total_steps: steps.length,
+      total_leads: hydratedLeads.length,
+      active_leads: activeLeads.length,
+      completed_leads: completedLeads.length,
+      stopped_leads: stoppedLeads.length,
+      emails_sent: sentDeliveries.length,
+      emails_failed: failedDeliveries.length,
+      next_scheduled_send: nextScheduledSend,
       steps,
-      leads
+      leads: hydratedLeads,
+      deliveries: seqDeliveries
     });
   } catch (err: any) {
     console.error('[GET /api/admin/lead-sequences/:id Error]', err);
@@ -1258,6 +1152,7 @@ router.post('/admin/lead-sequences', requireAuth, requirePermission(Permission.M
         subject: s.subject || `Follow-up ${idx + 1}`,
         html_content: s.html_content || '',
         plain_text: s.plain_text || '',
+        preheader: s.preheader || '',
         created_at: now,
         updated_at: now
       }));
@@ -1343,6 +1238,7 @@ router.post('/admin/lead-sequences/:id/steps', requireAuth, requirePermission(Pe
       subject: s.subject || `Step ${idx + 1}`,
       html_content: s.html_content || '',
       plain_text: s.plain_text || '',
+      preheader: s.preheader || '',
       created_at: s.created_at || now,
       updated_at: now
     }));
@@ -1366,40 +1262,72 @@ router.post('/admin/lead-sequences/:id/enroll', requireAuth, requirePermission(P
       return res.status(400).json({ error: 'Lead IDs are required for enrollment' });
     }
 
+    const sequences = await getSupabaseCrmSequences();
+    const seq = sequences.find(s => s.id === id);
+    if (!seq) {
+      return res.status(404).json({ error: 'Sequence not found' });
+    }
+
+    const allCrmLeads = await getSupabaseCrmLeads();
+    const validLeadIds = new Set(allCrmLeads.map(l => l.id));
+
     const allSequenceLeads = await getSupabaseSequenceLeads();
     const now = new Date().toISOString();
 
     let enrolledCount = 0;
     let skippedCount = 0;
 
-    for (const leadId of leadIds) {
-      const alreadyActive = allSequenceLeads.some(
-        sl => sl.sequence_id === id && sl.lead_id === leadId && sl.status === 'Active'
-      );
-      if (alreadyActive) {
+    for (const rawId of leadIds) {
+      const leadId = String(rawId).trim();
+      if (!validLeadIds.has(leadId)) {
         skippedCount++;
         continue;
       }
 
-      allSequenceLeads.push({
-        id: crypto.randomUUID(),
-        sequence_id: id,
-        lead_id: leadId,
-        status: 'Active',
-        current_step: 1,
-        created_at: now,
-        updated_at: now,
-        last_sent_at: null,
-        next_send_at: now
-      });
-      enrolledCount++;
+      const existingIndex = allSequenceLeads.findIndex(
+        sl => sl.sequence_id === id && sl.lead_id === leadId
+      );
+
+      if (existingIndex !== -1) {
+        const existing = allSequenceLeads[existingIndex];
+        if (existing.status === 'Active') {
+          skippedCount++;
+          continue;
+        }
+        // Reactivate enrollment
+        allSequenceLeads[existingIndex] = {
+          ...existing,
+          status: 'Active',
+          current_step: 1,
+          last_sent_at: null,
+          next_send_at: now,
+          stop_reason: undefined,
+          stopped_at: undefined,
+          completed_at: undefined,
+          updated_at: now
+        };
+        enrolledCount++;
+      } else {
+        allSequenceLeads.push({
+          id: crypto.randomUUID(),
+          sequence_id: id,
+          lead_id: leadId,
+          status: 'Active',
+          current_step: 1,
+          created_at: now,
+          updated_at: now,
+          last_sent_at: null,
+          next_send_at: now
+        });
+        enrolledCount++;
+      }
     }
 
     await saveSupabaseSequenceLeads(allSequenceLeads);
 
     return res.json({
       success: true,
-      message: `Enrolled ${enrolledCount} leads (${skippedCount} already enrolled).`,
+      message: `Enrolled ${enrolledCount} leads (${skippedCount} already enrolled or invalid).`,
       enrolledCount,
       skippedCount,
       totalSelected: leadIds.length
@@ -1450,6 +1378,54 @@ router.post('/admin/lead-sequences/:id/resume', requireAuth, requirePermission(P
   }
 });
 
+// POST /api/admin/lead-sequences/:id/pause-lead - Pause specific lead in sequence
+router.post('/admin/lead-sequences/:id/pause-lead', requireAuth, requirePermission(Permission.MANAGE_CRM), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { leadId } = req.body || {};
+    const allSequenceLeads = await getSupabaseSequenceLeads();
+    const sl = allSequenceLeads.find(l => l.sequence_id === id && l.lead_id === leadId);
+    if (!sl) {
+      return res.status(404).json({ error: 'Lead sequence enrollment not found' });
+    }
+
+    sl.status = 'Paused';
+    sl.updated_at = new Date().toISOString();
+    await saveSupabaseSequenceLeads(allSequenceLeads);
+
+    return res.json({ success: true, message: 'Lead sequence status paused.' });
+  } catch (err: any) {
+    return res.status(500).json({ error: 'Failed to pause lead in sequence' });
+  }
+});
+
+// POST /api/admin/lead-sequences/:id/resume-lead - Resume specific lead in sequence
+router.post('/admin/lead-sequences/:id/resume-lead', requireAuth, requirePermission(Permission.MANAGE_CRM), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { leadId } = req.body || {};
+    const allSequenceLeads = await getSupabaseSequenceLeads();
+    const sl = allSequenceLeads.find(l => l.sequence_id === id && l.lead_id === leadId);
+    if (!sl) {
+      return res.status(404).json({ error: 'Lead sequence enrollment not found' });
+    }
+
+    const now = new Date().toISOString();
+    sl.status = 'Active';
+    sl.stop_reason = undefined;
+    sl.stopped_at = undefined;
+    if (!sl.next_send_at || new Date(sl.next_send_at).getTime() < Date.now()) {
+      sl.next_send_at = now;
+    }
+    sl.updated_at = now;
+    await saveSupabaseSequenceLeads(allSequenceLeads);
+
+    return res.json({ success: true, message: 'Lead sequence status resumed to Active.' });
+  } catch (err: any) {
+    return res.status(500).json({ error: 'Failed to resume lead in sequence' });
+  }
+});
+
 // POST /api/admin/lead-sequences/:id/stop-lead - Stop specific lead in sequence
 router.post('/admin/lead-sequences/:id/stop-lead', requireAuth, requirePermission(Permission.MANAGE_CRM), async (req, res) => {
   try {
@@ -1461,8 +1437,11 @@ router.post('/admin/lead-sequences/:id/stop-lead', requireAuth, requirePermissio
       return res.status(404).json({ error: 'Lead sequence enrollment not found' });
     }
 
+    const now = new Date().toISOString();
     sl.status = reason === 'Replied' ? 'Replied' : 'Stopped';
-    sl.updated_at = new Date().toISOString();
+    sl.stop_reason = reason || 'Manually stopped by admin';
+    sl.stopped_at = now;
+    sl.updated_at = now;
     await saveSupabaseSequenceLeads(allSequenceLeads);
 
     return res.json({ success: true, message: 'Lead sequence status updated.' });
@@ -1472,7 +1451,7 @@ router.post('/admin/lead-sequences/:id/stop-lead', requireAuth, requirePermissio
 });
 
 // POST /api/admin/lead-sequences/:id/test - Send sequence test email
-router.post('/api/admin/lead-sequences/:id/test', requireAuth, requirePermission(Permission.MANAGE_CRM), emailTestLimiter, async (req, res) => {
+router.post(['/admin/lead-sequences/:id/test', '/api/admin/lead-sequences/:id/test'], requireAuth, requirePermission(Permission.MANAGE_CRM), emailTestLimiter, async (req, res) => {
   try {
     const { id } = req.params;
     const { stepNumber, testEmail, sampleLeadId } = req.body || {};
@@ -1494,15 +1473,6 @@ router.post('/api/admin/lead-sequences/:id/test', requireAuth, requirePermission
       industry: 'Business Intelligence & Operations'
     };
 
-    let personalizedSubject = `[TEST STEP ${stepNumber}] ${step.subject}`
-      .replace(/{{company_name}}/gi, sampleLead.company_name || 'Acme Enterprises')
-      .replace(/{{contact_person}}/gi, sampleLead.contact_person || 'Leader');
-
-    let personalizedHtml = (step.html_content || '')
-      .replace(/{{company_name}}/gi, sampleLead.company_name || 'Acme Enterprises')
-      .replace(/{{contact_person}}/gi, sampleLead.contact_person || 'Leader')
-      .replace(/{{industry}}/gi, sampleLead.industry || 'Business Intelligence');
-
     const unsubToken = generateUnsubscribeToken(testEmail);
     const reqProtocol = req.headers['x-forwarded-proto'] || req.protocol;
     const reqHost = req.headers['x-forwarded-host'] || req.headers.host;
@@ -1510,9 +1480,9 @@ router.post('/api/admin/lead-sequences/:id/test', requireAuth, requirePermission
 
     const sendRes = await campaignEmailService.sendLeadTestEmail({
       testEmail: testEmail,
-      subject: personalizedSubject,
-      preheader: `Test delivery for Step ${stepNumber}`,
-      contentHtml: personalizedHtml,
+      subject: step.subject,
+      preheader: step.preheader || `Test delivery for Step ${stepNumber}`,
+      contentHtml: step.html_content || '',
       lead: sampleLead,
       unsubscribeUrl: unsubUrl
     });
@@ -1531,24 +1501,64 @@ router.post('/api/admin/lead-sequences/:id/test', requireAuth, requirePermission
   }
 });
 
-// POST /api/admin/lead-sequences/process - Trigger queue evaluation
-router.post('/api/admin/lead-sequences/process', requireAuth, requirePermission(Permission.MANAGE_CRM), async (req, res) => {
+// POST /api/admin/lead-sequences/process - Trigger sequence processing cycle
+router.post(['/admin/lead-sequences/process', '/api/admin/lead-sequences/process'], requireAuth, requirePermission(Permission.MANAGE_CRM), async (req, res) => {
   try {
-    const sequences = await getSupabaseCrmSequences();
-    const allSequenceLeads = await getSupabaseSequenceLeads();
-    const activeLeads = allSequenceLeads.filter(l => l.status === 'Active');
+    const reqProtocol = (req.headers['x-forwarded-proto'] || req.protocol || 'https').toString();
+    const reqHost = (req.headers['x-forwarded-host'] || req.headers.host || 'probitian.ai.studio').toString();
+
+    const result = await executeSequenceProcessingCycle({
+      reqProtocol,
+      reqHost,
+      batchLimit: 25
+    });
 
     return res.json({
-      success: true,
-      stats: {
-        totalSequences: sequences.length,
-        activeEnrollments: activeLeads.length,
-        processed: 0,
-        sent: 0
-      }
+      success: result.success,
+      message: result.message,
+      stats: result.stats,
+      details: result.details
     });
   } catch (err: any) {
-    return res.status(500).json({ error: 'Failed to process sequences' });
+    console.error('[POST /api/admin/lead-sequences/process Error]', err);
+    return res.status(500).json({ error: 'Failed to process lead sequences: ' + (err?.message || String(err)) });
+  }
+});
+
+// POST /api/cron/process-sequences - Scheduled webhook endpoint for external schedulers
+router.post(['/cron/process-sequences', '/api/cron/process-sequences'], async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization || '';
+    const cronKey = req.headers['x-cron-key'] || req.query.key;
+    const expectedSecret = process.env.CRON_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    // Check authorization: Bearer token, x-cron-key, or session
+    const isAuthorized =
+      (expectedSecret && (authHeader === `Bearer ${expectedSecret}` || cronKey === expectedSecret)) ||
+      Boolean((req as any).session && (req as any).session.user);
+
+    if (!isAuthorized) {
+      return res.status(401).json({ error: 'Unauthorized: Invalid cron key or session.' });
+    }
+
+    const reqProtocol = (req.headers['x-forwarded-proto'] || req.protocol || 'https').toString();
+    const reqHost = (req.headers['x-forwarded-host'] || req.headers.host || 'probitian.ai.studio').toString();
+
+    const result = await executeSequenceProcessingCycle({
+      reqProtocol,
+      reqHost,
+      batchLimit: 30
+    });
+
+    return res.json({
+      success: result.success,
+      message: result.message,
+      stats: result.stats,
+      details: result.details
+    });
+  } catch (err: any) {
+    console.error('[POST /api/cron/process-sequences Error]', err);
+    return res.status(500).json({ error: 'Cron sequence processing error: ' + (err?.message || String(err)) });
   }
 });
 
@@ -1558,14 +1568,18 @@ router.get('/admin/leads/:id/sequences', requireAuth, requirePermission(Permissi
     const { id } = req.params;
     const allSequenceLeads = await getSupabaseSequenceLeads();
     const sequences = await getSupabaseCrmSequences();
+    const allDeliveries = await getSupabaseSequenceDeliveries();
+
     const leadEnrollments = allSequenceLeads.filter(sl => sl.lead_id === id);
 
     const result = leadEnrollments.map(sl => {
       const seq = sequences.find(s => s.id === sl.sequence_id);
+      const deliveries = allDeliveries.filter(d => d.sequence_lead_id === sl.id || d.lead_id === id);
       return {
         ...sl,
         sequence_name: seq?.name || 'Unknown Sequence',
-        sequence_status: seq?.status || 'Unknown'
+        sequence_status: seq?.status || 'Unknown',
+        deliveries
       };
     });
 
@@ -1605,15 +1619,43 @@ router.get('/crm/unsubscribe', unsubscribeLimiter, async (req, res) => {
   }
 
   // Update lead status in Supabase relational table to 'Do Not Contact'
+  let unsubscribedLeadId: string | null = null;
   if (serverSupabase) {
     try {
-      await serverSupabase
+      const { data: updatedLeads } = await serverSupabase
         .from('leads')
         .update({ status: 'Do Not Contact', updated_at: new Date().toISOString() })
-        .ilike('email', verifiedEmail);
+        .ilike('email', verifiedEmail)
+        .select('id');
+      if (Array.isArray(updatedLeads) && updatedLeads.length > 0) {
+        unsubscribedLeadId = updatedLeads[0].id;
+      }
     } catch (dbErr) {
       console.error('[CRM Unsubscribe Error]', dbErr);
     }
+  }
+
+  // Also immediately stop any active sequence enrollments for this lead
+  try {
+    const allSeqLeads = await getSupabaseSequenceLeads();
+    let seqLeadsChanged = false;
+    const nowIso = new Date().toISOString();
+
+    for (const sl of allSeqLeads) {
+      if (sl.status === 'Active' && unsubscribedLeadId && sl.lead_id === unsubscribedLeadId) {
+        sl.status = 'Stopped';
+        sl.stop_reason = 'Unsubscribed by recipient';
+        sl.stopped_at = nowIso;
+        sl.updated_at = nowIso;
+        seqLeadsChanged = true;
+      }
+    }
+
+    if (seqLeadsChanged) {
+      await saveSupabaseSequenceLeads(allSeqLeads);
+    }
+  } catch (seqStopErr) {
+    console.error('[CRM Unsubscribe Sequence Stop Error]', seqStopErr);
   }
 
   // Also update local / fallback data if present

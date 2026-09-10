@@ -1,5 +1,5 @@
 import React from 'react';
-import { Users, Plus, Clock, Ban } from 'lucide-react';
+import { Users, Plus, Clock, Ban, Pause, Play, MailCheck, AlertTriangle } from 'lucide-react';
 import { SequenceLead } from '../../../../types';
 import { SequenceLeadTabFilter } from './types';
 
@@ -10,6 +10,8 @@ interface SequenceEnrolledLeadsTableProps {
   onLeadTabFilterChange: (filter: SequenceLeadTabFilter) => void;
   onOpenEnrollModal: () => void;
   onStopLead: (leadId: string, companyName: string) => void;
+  onPauseLead?: (leadId: string) => void;
+  onResumeLead?: (leadId: string) => void;
 }
 
 const TAB_FILTERS: SequenceLeadTabFilter[] = ['All', 'Active', 'Completed', 'Stopped'];
@@ -20,7 +22,9 @@ export const SequenceEnrolledLeadsTable: React.FC<SequenceEnrolledLeadsTableProp
   leadTabFilter,
   onLeadTabFilterChange,
   onOpenEnrollModal,
-  onStopLead
+  onStopLead,
+  onPauseLead,
+  onResumeLead
 }) => {
   return (
     <div className="space-y-4">
@@ -157,17 +161,43 @@ export const SequenceEnrolledLeadsTable: React.FC<SequenceEnrolledLeadsTableProp
                       </td>
 
                       <td className="py-3 px-4 text-right">
-                        {sl.status === 'Active' && (
-                          <button
-                            type="button"
-                            onClick={() => onStopLead(sl.lead_id, lead.company_name || 'this lead')}
-                            className="px-2.5 py-1 rounded-lg bg-red-50 dark:bg-red-950/50 hover:bg-red-100 text-red-600 text-[11px] font-bold inline-flex items-center gap-1"
-                            title="Stop sequence outreach for this lead"
-                          >
-                            <Ban className="w-3 h-3" />
-                            <span>Stop</span>
-                          </button>
-                        )}
+                        <div className="flex items-center justify-end gap-1.5">
+                          {sl.status === 'Active' && onPauseLead && (
+                            <button
+                              type="button"
+                              onClick={() => onPauseLead(sl.lead_id)}
+                              className="px-2 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/50 hover:bg-amber-100 text-amber-700 dark:text-amber-300 text-[11px] font-bold inline-flex items-center gap-1"
+                              title="Pause sequence for this lead"
+                            >
+                              <Pause className="w-3 h-3" />
+                              <span>Pause</span>
+                            </button>
+                          )}
+
+                          {sl.status === 'Paused' && onResumeLead && (
+                            <button
+                              type="button"
+                              onClick={() => onResumeLead(sl.lead_id)}
+                              className="px-2 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 hover:bg-emerald-100 text-emerald-700 dark:text-emerald-300 text-[11px] font-bold inline-flex items-center gap-1"
+                              title="Resume sequence for this lead"
+                            >
+                              <Play className="w-3 h-3" />
+                              <span>Resume</span>
+                            </button>
+                          )}
+
+                          {(sl.status === 'Active' || sl.status === 'Paused') && (
+                            <button
+                              type="button"
+                              onClick={() => onStopLead(sl.lead_id, lead.company_name || 'this lead')}
+                              className="px-2 py-1 rounded-lg bg-red-50 dark:bg-red-950/50 hover:bg-red-100 text-red-600 text-[11px] font-bold inline-flex items-center gap-1"
+                              title="Stop sequence outreach for this lead"
+                            >
+                              <Ban className="w-3 h-3" />
+                              <span>Stop</span>
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
