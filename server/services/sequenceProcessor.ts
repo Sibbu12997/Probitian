@@ -6,7 +6,8 @@ import {
   saveSupabaseSequenceLeads,
   getSupabaseSequenceDeliveries,
   saveSupabaseSequenceDeliveries,
-  getSupabaseCrmLeads
+  getSupabaseCrmLeads,
+  saveSupabaseCrmLeads
 } from './crmStorage';
 import { serverSupabase } from './supabase';
 import { campaignEmailService } from '../../src/services/campaignEmailService';
@@ -54,13 +55,14 @@ async function acquireDistributedCycleLock(timeoutSeconds: number = 30): Promise
     const { data, error } = await serverSupabase.rpc('increment_rate_limit', {
       p_key: 'crm_seq_worker_cycle_lock',
       p_window_ms: timeoutSeconds * 1000,
-      p_max_requests: 1
+      p_max: 1
     });
     if (error) {
       console.warn('[Distributed Cycle Lock RPC Warning]', error.message);
       return true; // Fallback to local mutex if RPC unavailable
     }
-    return Boolean(data?.allowed);
+    const row = Array.isArray(data) ? data[0] : data;
+    return Boolean(row?.allowed);
   } catch (err: any) {
     console.warn('[Distributed Cycle Lock Exception]', err?.message || err);
     return true;
@@ -78,13 +80,14 @@ async function acquireEnrollmentStepClaim(sequenceLeadId: string, stepNumber: nu
     const { data, error } = await serverSupabase.rpc('increment_rate_limit', {
       p_key: claimKey,
       p_window_ms: 10 * 60 * 1000,
-      p_max_requests: 1
+      p_max: 1
     });
     if (error) {
       console.warn('[Step Claim RPC Warning]', error.message);
       return true;
     }
-    return Boolean(data?.allowed);
+    const row = Array.isArray(data) ? data[0] : data;
+    return Boolean(row?.allowed);
   } catch (err: any) {
     console.warn('[Step Claim Exception]', err?.message || err);
     return true;
@@ -213,6 +216,7 @@ export async function executeSequenceProcessingCycle(options?: {
     };
 
     const details: SequenceProcessingDetail[] = [];
+    let hasModifiedLeads = false;
 
     // Apply batch limit to prevent massive parallel burst / SMTP throttling
     const toProcess = eligibleEnrollments.slice(0, batchLimit);
@@ -243,9 +247,9 @@ export async function executeSequenceProcessingCycle(options?: {
       const leadEmail = (crmLead.email || '').trim();
 
       // Section 5: Automatic stop logic
-      const stopStatuses = ['Converted', 'Not Interested', 'Do Not Contact', 'Bounced'];
+      const stopStatuses = ['Replied', 'Converted', 'Not Interested', 'Do Not Contact', 'Bounced'];
       if (stopStatuses.includes(crmLead.status)) {
-        sl.status = 'Stopped';
+        sl.status = crmLead.status === 'Replied' ? 'Replied' : 'Stopped';
         sl.stop_reason = `Lead marked as ${crmLead.status}`;
         sl.stopped_at = nowIso;
         sl.updated_at = nowIso;
@@ -498,6 +502,13 @@ export async function executeSequenceProcessingCycle(options?: {
             stats.completed++;
           }
 
+          // Update lead status in CRM if it was Not Contacted
+          if (crmLead.status === 'Not Contacted') {
+            crmLead.status = 'Contacted';
+            crmLead.updated_at = deliveryNow;
+            hasModifiedLeads = true;
+          }
+
           stats.sent++;
           details.push({
             sequenceId: sl.sequence_id,
@@ -576,10 +587,13 @@ export async function executeSequenceProcessingCycle(options?: {
       await new Promise(r => setTimeout(r, 250));
     }
 
-    // 3. Persist state changes back to Supabase settings
+    // 3. Persist state changes back to Supabase
     try {
       await saveSupabaseSequenceDeliveries(allDeliveries);
       await saveSupabaseSequenceLeads(allSequenceLeads);
+      if (hasModifiedLeads) {
+        await saveSupabaseCrmLeads(allCrmLeads);
+      }
     } catch (persistErr: any) {
       console.error('[CRITICAL: Sequence State Persistence Error]', persistErr);
       return {
