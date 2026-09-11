@@ -1127,6 +1127,11 @@ export const cmsService = {
     enrolledCount: number;
     skippedCount: number;
     totalSelected: number;
+    requested?: number;
+    valid?: number;
+    enrolled?: number;
+    already_enrolled?: number;
+    invalid?: number;
   }> {
     try {
       const res = await safeFetchJson<{
@@ -1135,6 +1140,11 @@ export const cmsService = {
         enrolledCount?: number;
         skippedCount?: number;
         totalSelected?: number;
+        requested?: number;
+        valid?: number;
+        enrolled?: number;
+        already_enrolled?: number;
+        invalid?: number;
       }>(`/api/admin/lead-sequences/${sequenceId}/enroll`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1143,9 +1153,14 @@ export const cmsService = {
       return {
         success: Boolean(res && res.success !== false),
         message: res?.message || 'Enrollment processed',
-        enrolledCount: res?.enrolledCount || 0,
-        skippedCount: res?.skippedCount || 0,
-        totalSelected: res?.totalSelected || leadIds.length
+        enrolledCount: res?.enrolledCount ?? res?.enrolled ?? 0,
+        skippedCount: res?.skippedCount ?? ((res?.already_enrolled || 0) + (res?.invalid || 0)),
+        totalSelected: res?.totalSelected ?? res?.requested ?? leadIds.length,
+        requested: res?.requested ?? leadIds.length,
+        valid: res?.valid,
+        enrolled: res?.enrolled ?? res?.enrolledCount ?? 0,
+        already_enrolled: res?.already_enrolled ?? 0,
+        invalid: res?.invalid ?? 0
       };
     } catch (e: any) {
       return {

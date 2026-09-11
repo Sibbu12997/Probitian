@@ -379,7 +379,11 @@ export const useLeadSequences = () => {
     try {
       setIsEnrolling(true);
       const res = await cmsService.enrollLeadsInSequence(selectedSequence.id, selectedLeadIdsToEnroll);
-      showToast(res.message);
+      const enrolled = res.enrolled ?? res.enrolledCount ?? 0;
+      const already = res.already_enrolled ?? 0;
+      const invalid = res.invalid ?? 0;
+      const msg = res.message || `Successfully enrolled ${enrolled} lead(s). (${already} already enrolled, ${invalid} invalid)`;
+      showToast(msg, 'success');
       setIsEnrollModalOpen(false);
       setSelectedLeadIdsToEnroll([]);
       await loadSequenceDetails(selectedSequence.id);
@@ -483,6 +487,13 @@ export const useLeadSequences = () => {
     });
   }, [crmLeads, sequenceLeads, selectedSequence, enrollSearch]);
 
+  // Leads already enrolled in the active sequence
+  const alreadyEnrolledLeads = useMemo(() => {
+    if (!selectedSequence) return [];
+    const enrolledIds = new Set(sequenceLeads.map(sl => sl.lead_id));
+    return crmLeads.filter(l => enrolledIds.has(l.id));
+  }, [crmLeads, sequenceLeads, selectedSequence]);
+
   return {
     sequences,
     loading,
@@ -491,6 +502,9 @@ export const useLeadSequences = () => {
     sequenceSteps,
     setSequenceSteps,
     sequenceLeads,
+    crmLeads,
+    eligibleLeadsForEnrollment,
+    alreadyEnrolledLeads,
     loadingDetails,
     searchQuery,
     setSearchQuery,
@@ -522,7 +536,6 @@ export const useLeadSequences = () => {
     setTestRecipientEmail,
     sendingTest,
     testFeedback,
-    crmLeads,
     sampleLeadId,
     setSampleLeadId,
     isEnrollModalOpen,
@@ -558,7 +571,6 @@ export const useLeadSequences = () => {
     getInterpolatedHtml,
     filteredSequences,
     filteredSequenceLeads,
-    overallStats,
-    eligibleLeadsForEnrollment
+    overallStats
   };
 };

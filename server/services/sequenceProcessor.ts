@@ -8,6 +8,7 @@ import {
   saveSupabaseSequenceDeliveries,
   getSupabaseCrmLeads
 } from './crmStorage';
+import { serverSupabase } from './supabase';
 import { campaignEmailService } from '../../src/services/campaignEmailService';
 import { generateUnsubscribeToken } from '../security/tokens';
 
@@ -41,8 +42,54 @@ export interface SequenceProcessingResult {
   details: SequenceProcessingDetail[];
 }
 
-// In-process mutex to prevent concurrent runs from executing at the same time
-let isProcessingActive = false;
+// In-process mutex as fast local guard
+let isLocalProcessingActive = false;
+
+/**
+ * Acquire a distributed atomic lock for sequence processing cycle across all worker instances.
+ */
+async function acquireDistributedCycleLock(timeoutSeconds: number = 30): Promise<boolean> {
+  if (!serverSupabase) return true;
+  try {
+    const { data, error } = await serverSupabase.rpc('increment_rate_limit', {
+      p_key: 'crm_seq_worker_cycle_lock',
+      p_window_ms: timeoutSeconds * 1000,
+      p_max_requests: 1
+    });
+    if (error) {
+      console.warn('[Distributed Cycle Lock RPC Warning]', error.message);
+      return true; // Fallback to local mutex if RPC unavailable
+    }
+    return Boolean(data?.allowed);
+  } catch (err: any) {
+    console.warn('[Distributed Cycle Lock Exception]', err?.message || err);
+    return true;
+  }
+}
+
+/**
+ * Acquire an atomic lock for a specific sequence enrollment step send to prevent duplicate sends across workers.
+ */
+async function acquireEnrollmentStepClaim(sequenceLeadId: string, stepNumber: number): Promise<boolean> {
+  if (!serverSupabase) return true;
+  try {
+    const claimKey = `crm_claim_sl_${sequenceLeadId}_s${stepNumber}`;
+    // Claim window: 10 minutes (600,000 ms)
+    const { data, error } = await serverSupabase.rpc('increment_rate_limit', {
+      p_key: claimKey,
+      p_window_ms: 10 * 60 * 1000,
+      p_max_requests: 1
+    });
+    if (error) {
+      console.warn('[Step Claim RPC Warning]', error.message);
+      return true;
+    }
+    return Boolean(data?.allowed);
+  } catch (err: any) {
+    console.warn('[Step Claim Exception]', err?.message || err);
+    return true;
+  }
+}
 
 /**
  * Execute a single cycle of sequence processing across all active sequences and eligible leads.
@@ -51,11 +98,14 @@ export async function executeSequenceProcessingCycle(options?: {
   reqProtocol?: string;
   reqHost?: string;
   batchLimit?: number;
+  targetEmail?: string;
+  targetLeadId?: string;
+  forceProductionSend?: boolean;
 }): Promise<SequenceProcessingResult> {
-  if (isProcessingActive) {
+  if (isLocalProcessingActive) {
     return {
       success: true,
-      message: 'Sequence processing cycle is currently already running in background.',
+      message: 'Sequence processing cycle is currently already running in local process.',
       stats: {
         totalSequences: 0,
         eligibleEnrollments: 0,
@@ -70,7 +120,26 @@ export async function executeSequenceProcessingCycle(options?: {
     };
   }
 
-  isProcessingActive = true;
+  const hasCycleLock = await acquireDistributedCycleLock(30);
+  if (!hasCycleLock) {
+    return {
+      success: true,
+      message: 'Sequence processing cycle is currently active on another server instance.',
+      stats: {
+        totalSequences: 0,
+        eligibleEnrollments: 0,
+        processed: 0,
+        sent: 0,
+        failed: 0,
+        completed: 0,
+        stopped: 0,
+        skipped: 0
+      },
+      details: []
+    };
+  }
+
+  isLocalProcessingActive = true;
   const startTime = Date.now();
 
   try {
@@ -112,9 +181,22 @@ export async function executeSequenceProcessingCycle(options?: {
     // - status is 'Active'
     // - Parent sequence is Active
     // - next_send_at is null (immediate) OR next_send_at <= now
+    // - Optional filtering by targetEmail or targetLeadId
     const eligibleEnrollments = allSequenceLeads.filter(sl => {
       if (sl.status !== 'Active') return false;
       if (!activeSeqMap.has(sl.sequence_id)) return false;
+
+      if (options?.targetLeadId && sl.lead_id !== options.targetLeadId) {
+        return false;
+      }
+
+      if (options?.targetEmail) {
+        const lead = crmLeadMap.get(sl.lead_id);
+        if (!lead || (lead.email || '').trim().toLowerCase() !== options.targetEmail.toLowerCase()) {
+          return false;
+        }
+      }
+
       if (!sl.next_send_at) return true; // immediate
       return new Date(sl.next_send_at).getTime() <= now.getTime();
     });
@@ -132,7 +214,7 @@ export async function executeSequenceProcessingCycle(options?: {
 
     const details: SequenceProcessingDetail[] = [];
 
-    // Apply batch limit to prevent massive parallel burst / throttling
+    // Apply batch limit to prevent massive parallel burst / SMTP throttling
     const toProcess = eligibleEnrollments.slice(0, batchLimit);
 
     for (const sl of toProcess) {
@@ -288,7 +370,7 @@ export async function executeSequenceProcessingCycle(options?: {
         continue;
       }
 
-      // Idempotency: verify if this specific step was already delivered to this lead
+      // Section 6 & 9: Idempotency check against historical deliveries
       const alreadySent = allDeliveries.some(
         d => d.sequence_lead_id === sl.id &&
              Number(d.step_number) === currentStepNum &&
@@ -323,6 +405,43 @@ export async function executeSequenceProcessingCycle(options?: {
         continue;
       }
 
+      // Section 6: Atomic Claim per Enrollment Step across multi-instance workers
+      const stepClaimed = await acquireEnrollmentStepClaim(sl.id, currentStepNum);
+      if (!stepClaimed) {
+        stats.skipped++;
+        details.push({
+          sequenceId: sl.sequence_id,
+          sequenceName: seqName,
+          leadId: sl.lead_id,
+          companyName,
+          email: leadEmail,
+          stepNumber: currentStepNum,
+          action: 'skipped',
+          reason: `Step #${currentStepNum} is currently claimed by another concurrent worker instance`
+        });
+        continue;
+      }
+
+      // Section 15: EMAIL SAFETY GUARD
+      // In development/test mode, only send to approved test recipient or explicitly targeted email
+      const isApprovedRecipient = leadEmail.toLowerCase() === 'shivambaghel79@gmail.com' ||
+        (options?.targetEmail && leadEmail.toLowerCase() === options.targetEmail.toLowerCase());
+
+      if (process.env.NODE_ENV !== 'production' && !options?.forceProductionSend && !isApprovedRecipient) {
+        stats.skipped++;
+        details.push({
+          sequenceId: sl.sequence_id,
+          sequenceName: seqName,
+          leadId: sl.lead_id,
+          companyName,
+          email: leadEmail,
+          stepNumber: currentStepNum,
+          action: 'skipped',
+          reason: `Email Safety Guard: Skipped real dispatch to ${leadEmail} in non-production mode.`
+        });
+        continue;
+      }
+
       // Generate Unsubscribe token & URL
       const unsubToken = generateUnsubscribeToken(leadEmail);
       const unsubscribeUrl = `${baseUrl}/api/crm/unsubscribe?token=${unsubToken}`;
@@ -352,6 +471,7 @@ export async function executeSequenceProcessingCycle(options?: {
             email: leadEmail,
             subject: campaignEmailService.interpolateLeadVariables(currentStep.subject, crmLead, { isHtml: false }),
             status: 'sent',
+            message_id: sendRes.messageId,
             sent_at: deliveryNow,
             created_at: deliveryNow
           };
@@ -452,18 +572,28 @@ export async function executeSequenceProcessingCycle(options?: {
         });
       }
 
-      // Slight safety delay between sends (250ms) to respect SMTP rate limits
+      // Safety throttle delay between sends (250ms) to respect SMTP rate limits
       await new Promise(r => setTimeout(r, 250));
     }
 
     // 3. Persist state changes back to Supabase settings
-    await saveSupabaseSequenceLeads(allSequenceLeads);
-    await saveSupabaseSequenceDeliveries(allDeliveries);
+    try {
+      await saveSupabaseSequenceDeliveries(allDeliveries);
+      await saveSupabaseSequenceLeads(allSequenceLeads);
+    } catch (persistErr: any) {
+      console.error('[CRITICAL: Sequence State Persistence Error]', persistErr);
+      return {
+        success: false,
+        message: `Dispatched ${stats.sent} email(s), but failed to persist sequence state to Supabase: ${persistErr?.message}`,
+        stats,
+        details
+      };
+    }
 
     const elapsedMs = Date.now() - startTime;
     return {
       success: true,
-      message: `Sequence processing completed in ${elapsedMs}ms: ${stats.sent} sent, ${stats.failed} failed, ${stats.completed} completed, ${stats.stopped} stopped.`,
+      message: `Sequence processing cycle completed in ${elapsedMs}ms: ${stats.sent} sent, ${stats.failed} failed, ${stats.completed} completed, ${stats.stopped} stopped, ${stats.skipped} skipped.`,
       stats,
       details
     };
@@ -485,6 +615,6 @@ export async function executeSequenceProcessingCycle(options?: {
       details: []
     };
   } finally {
-    isProcessingActive = false;
+    isLocalProcessingActive = false;
   }
 }

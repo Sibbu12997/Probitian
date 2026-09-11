@@ -1254,7 +1254,7 @@ router.post('/admin/lead-sequences/:id/steps', requireAuth, requirePermission(Pe
 });
 
 // POST /api/admin/lead-sequences/:id/enroll - Enroll leads in sequence
-router.post('/admin/lead-sequences/:id/enroll', requireAuth, requirePermission(Permission.MANAGE_CRM), async (req, res) => {
+router.post(['/admin/lead-sequences/:id/enroll', '/api/admin/lead-sequences/:id/enroll'], requireAuth, requirePermission(Permission.MANAGE_CRM), async (req, res) => {
   try {
     const { id } = req.params;
     const { leadIds } = req.body || {};
@@ -1269,20 +1269,24 @@ router.post('/admin/lead-sequences/:id/enroll', requireAuth, requirePermission(P
     }
 
     const allCrmLeads = await getSupabaseCrmLeads();
-    const validLeadIds = new Set(allCrmLeads.map(l => l.id));
+    const validLeadMap = new Map(allCrmLeads.map(l => [l.id, l]));
 
     const allSequenceLeads = await getSupabaseSequenceLeads();
     const now = new Date().toISOString();
 
     let enrolledCount = 0;
-    let skippedCount = 0;
+    let alreadyEnrolledCount = 0;
+    let invalidCount = 0;
+    let validCount = 0;
 
     for (const rawId of leadIds) {
       const leadId = String(rawId).trim();
-      if (!validLeadIds.has(leadId)) {
-        skippedCount++;
+      if (!validLeadMap.has(leadId)) {
+        invalidCount++;
         continue;
       }
+
+      validCount++;
 
       const existingIndex = allSequenceLeads.findIndex(
         sl => sl.sequence_id === id && sl.lead_id === leadId
@@ -1291,7 +1295,7 @@ router.post('/admin/lead-sequences/:id/enroll', requireAuth, requirePermission(P
       if (existingIndex !== -1) {
         const existing = allSequenceLeads[existingIndex];
         if (existing.status === 'Active') {
-          skippedCount++;
+          alreadyEnrolledCount++;
           continue;
         }
         // Reactivate enrollment
@@ -1323,18 +1327,29 @@ router.post('/admin/lead-sequences/:id/enroll', requireAuth, requirePermission(P
       }
     }
 
+    // Persist enrolled leads
     await saveSupabaseSequenceLeads(allSequenceLeads);
+
+    // Update sequence total leads statistics
+    seq.total_leads = allSequenceLeads.filter(sl => sl.sequence_id === id && sl.status !== 'Stopped').length;
+    seq.updated_at = now;
+    await saveSupabaseCrmSequences(sequences);
 
     return res.json({
       success: true,
-      message: `Enrolled ${enrolledCount} leads (${skippedCount} already enrolled or invalid).`,
+      message: `Enrolled ${enrolledCount} of ${leadIds.length} requested lead(s). (${alreadyEnrolledCount} already active, ${invalidCount} invalid)`,
+      requested: leadIds.length,
+      valid: validCount,
+      enrolled: enrolledCount,
+      already_enrolled: alreadyEnrolledCount,
+      invalid: invalidCount,
       enrolledCount,
-      skippedCount,
+      skippedCount: alreadyEnrolledCount + invalidCount,
       totalSelected: leadIds.length
     });
   } catch (err: any) {
     console.error('[POST /api/admin/lead-sequences/:id/enroll Error]', err);
-    return res.status(500).json({ error: 'Failed to enroll leads' });
+    return res.status(500).json({ error: err?.message || 'Failed to enroll leads' });
   }
 });
 
@@ -1504,13 +1519,17 @@ router.post(['/admin/lead-sequences/:id/test', '/api/admin/lead-sequences/:id/te
 // POST /api/admin/lead-sequences/process - Trigger sequence processing cycle
 router.post(['/admin/lead-sequences/process', '/api/admin/lead-sequences/process'], requireAuth, requirePermission(Permission.MANAGE_CRM), async (req, res) => {
   try {
+    const { targetEmail, targetLeadId, forceProductionSend, batchLimit } = req.body || {};
     const reqProtocol = (req.headers['x-forwarded-proto'] || req.protocol || 'https').toString();
     const reqHost = (req.headers['x-forwarded-host'] || req.headers.host || 'probitian.ai.studio').toString();
 
     const result = await executeSequenceProcessingCycle({
       reqProtocol,
       reqHost,
-      batchLimit: 25
+      batchLimit: typeof batchLimit === 'number' ? batchLimit : 25,
+      targetEmail,
+      targetLeadId,
+      forceProductionSend: Boolean(forceProductionSend)
     });
 
     return res.json({

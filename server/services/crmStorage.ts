@@ -2,6 +2,72 @@ import crypto from 'crypto';
 import { serverSupabase, readCmsData, writeCmsData } from './supabase';
 import { isValidUuid } from '../config/constants';
 
+export interface CrmLead {
+  id: string;
+  company_name: string;
+  industry?: string;
+  location?: string;
+  contact_person?: string;
+  email: string;
+  phone?: string;
+  linkedin?: string;
+  powerbi_use_case?: string;
+  lead_priority?: string;
+  status: string;
+  follow_up_date?: string | null;
+  notes?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface SequenceLead {
+  id: string;
+  sequence_id: string;
+  lead_id: string;
+  status: 'Active' | 'Paused' | 'Completed' | 'Replied' | 'Stopped';
+  current_step: number;
+  last_sent_at?: string | null;
+  next_send_at?: string | null;
+  stop_reason?: string;
+  stopped_at?: string;
+  completed_at?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SequenceStep {
+  id: string;
+  sequence_id: string;
+  step_number: number;
+  step_name?: string;
+  subject: string;
+  preheader?: string;
+  html_content: string;
+  delay_days: number;
+  enabled?: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface SequenceDelivery {
+  id: string;
+  sequence_id: string;
+  sequence_lead_id: string;
+  lead_id: string;
+  step_id?: string;
+  step_number: number;
+  step_name?: string;
+  email?: string;
+  recipient_email?: string;
+  subject: string;
+  status: string;
+  provider_message_id?: string | null;
+  message_id?: string | null;
+  error_message?: string | null;
+  sent_at: string;
+  created_at: string;
+}
+
 // Helper to query Supabase CRM Leads with relational source of truth (public.leads)
 export async function getSupabaseCrmLeads(): Promise<any[]> {
   if (!serverSupabase) {
@@ -105,13 +171,18 @@ export async function getSupabaseCrmSequences(): Promise<any[]> {
       .eq('key', 'crm_lead_sequences')
       .maybeSingle();
 
+    if (rowErr) {
+      console.error('[Supabase Sequences Read Error]', { code: rowErr.code, message: rowErr.message });
+      throw new Error(`Failed to query crm_lead_sequences: ${rowErr.message}`);
+    }
+
     if (row && Array.isArray(row.value?.sequences)) {
       return row.value.sequences;
     }
     return [];
-  } catch (err) {
-    console.error('[Supabase Sequences Read Exception]', err);
-    return [];
+  } catch (err: any) {
+    console.error('[Supabase Sequences Read Exception]', err?.message || err);
+    throw err;
   }
 }
 
@@ -124,11 +195,15 @@ export async function saveSupabaseCrmSequences(sequences: any[]): Promise<void> 
     writeCmsData(data);
     return;
   }
-  await serverSupabase.from('settings').upsert({
+  const { error } = await serverSupabase.from('settings').upsert({
     key: 'crm_lead_sequences',
     value: { sequences, updated_at: now },
     updated_at: now
   });
+  if (error) {
+    console.error('[Supabase Sequences Save Error]', { code: error.code, message: error.message });
+    throw new Error(`Failed to save crm_lead_sequences to Supabase settings: ${error.message}`);
+  }
 }
 
 // Helper to query sequence steps from public.settings
@@ -138,19 +213,24 @@ export async function getSupabaseSequenceSteps(): Promise<any[]> {
     return data.sequence_steps || [];
   }
   try {
-    const { data: row } = await serverSupabase
+    const { data: row, error: rowErr } = await serverSupabase
       .from('settings')
       .select('value')
       .eq('key', 'crm_sequence_steps')
       .maybeSingle();
 
+    if (rowErr) {
+      console.error('[Supabase Sequence Steps Read Error]', { code: rowErr.code, message: rowErr.message });
+      throw new Error(`Failed to query crm_sequence_steps: ${rowErr.message}`);
+    }
+
     if (row && Array.isArray(row.value?.steps)) {
       return row.value.steps;
     }
     return [];
-  } catch (err) {
-    console.error('[Supabase Sequence Steps Read Exception]', err);
-    return [];
+  } catch (err: any) {
+    console.error('[Supabase Sequence Steps Read Exception]', err?.message || err);
+    throw err;
   }
 }
 
@@ -163,11 +243,15 @@ export async function saveSupabaseSequenceSteps(steps: any[]): Promise<void> {
     writeCmsData(data);
     return;
   }
-  await serverSupabase.from('settings').upsert({
+  const { error } = await serverSupabase.from('settings').upsert({
     key: 'crm_sequence_steps',
     value: { steps, updated_at: now },
     updated_at: now
   });
+  if (error) {
+    console.error('[Supabase Sequence Steps Save Error]', { code: error.code, message: error.message });
+    throw new Error(`Failed to save crm_sequence_steps to Supabase settings: ${error.message}`);
+  }
 }
 
 // Helper to query sequence lead enrollments from public.settings
@@ -177,19 +261,24 @@ export async function getSupabaseSequenceLeads(): Promise<any[]> {
     return data.sequence_leads || [];
   }
   try {
-    const { data: row } = await serverSupabase
+    const { data: row, error: rowErr } = await serverSupabase
       .from('settings')
       .select('value')
       .eq('key', 'crm_sequence_leads')
       .maybeSingle();
 
+    if (rowErr) {
+      console.error('[Supabase Sequence Leads Read Error]', { code: rowErr.code, message: rowErr.message });
+      throw new Error(`Failed to query crm_sequence_leads: ${rowErr.message}`);
+    }
+
     if (row && Array.isArray(row.value?.sequence_leads)) {
       return row.value.sequence_leads;
     }
     return [];
-  } catch (err) {
-    console.error('[Supabase Sequence Leads Read Exception]', err);
-    return [];
+  } catch (err: any) {
+    console.error('[Supabase Sequence Leads Read Exception]', err?.message || err);
+    throw err;
   }
 }
 
@@ -202,11 +291,15 @@ export async function saveSupabaseSequenceLeads(sequenceLeads: any[]): Promise<v
     writeCmsData(data);
     return;
   }
-  await serverSupabase.from('settings').upsert({
+  const { error } = await serverSupabase.from('settings').upsert({
     key: 'crm_sequence_leads',
     value: { sequence_leads: sequenceLeads, updated_at: now },
     updated_at: now
   });
+  if (error) {
+    console.error('[Supabase Sequence Leads Save Error]', { code: error.code, message: error.message });
+    throw new Error(`Failed to save crm_sequence_leads to Supabase settings: ${error.message}`);
+  }
 }
 
 // Helper to query sequence deliveries from public.settings
@@ -216,19 +309,24 @@ export async function getSupabaseSequenceDeliveries(): Promise<any[]> {
     return data.sequence_deliveries || [];
   }
   try {
-    const { data: row } = await serverSupabase
+    const { data: row, error: rowErr } = await serverSupabase
       .from('settings')
       .select('value')
       .eq('key', 'crm_sequence_deliveries')
       .maybeSingle();
 
+    if (rowErr) {
+      console.error('[Supabase Sequence Deliveries Read Error]', { code: rowErr.code, message: rowErr.message });
+      throw new Error(`Failed to query crm_sequence_deliveries: ${rowErr.message}`);
+    }
+
     if (row && Array.isArray(row.value?.deliveries)) {
       return row.value.deliveries;
     }
     return [];
-  } catch (err) {
-    console.error('[Supabase Sequence Deliveries Read Exception]', err);
-    return [];
+  } catch (err: any) {
+    console.error('[Supabase Sequence Deliveries Read Exception]', err?.message || err);
+    throw err;
   }
 }
 
@@ -241,9 +339,23 @@ export async function saveSupabaseSequenceDeliveries(deliveries: any[]): Promise
     writeCmsData(data);
     return;
   }
-  await serverSupabase.from('settings').upsert({
+
+  // Ensure deliveries are deduplicated by ID to prevent duplicates
+  const seenIds = new Set<string>();
+  const uniqueDeliveries = deliveries.filter(d => {
+    if (!d || !d.id) return true;
+    if (seenIds.has(d.id)) return false;
+    seenIds.add(d.id);
+    return true;
+  });
+
+  const { error } = await serverSupabase.from('settings').upsert({
     key: 'crm_sequence_deliveries',
-    value: { deliveries, updated_at: now },
+    value: { deliveries: uniqueDeliveries, updated_at: now },
     updated_at: now
   });
+  if (error) {
+    console.error('[Supabase Sequence Deliveries Save Error]', { code: error.code, message: error.message });
+    throw new Error(`Failed to save crm_sequence_deliveries to Supabase settings: ${error.message}`);
+  }
 }

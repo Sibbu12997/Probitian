@@ -91,7 +91,8 @@ export const LeadSequencesManager: React.FC<LeadSequencesManagerProps> = ({ onNa
     filteredSequences,
     filteredSequenceLeads,
     overallStats,
-    eligibleLeadsForEnrollment
+    eligibleLeadsForEnrollment,
+    alreadyEnrolledLeads
   } = useLeadSequences();
 
   return (
@@ -279,6 +280,7 @@ export const LeadSequencesManager: React.FC<LeadSequencesManagerProps> = ({ onNa
         onClose={() => setIsEnrollModalOpen(false)}
         sequenceName={selectedSequence?.name || ''}
         eligibleLeads={eligibleLeadsForEnrollment}
+        alreadyEnrolledLeads={alreadyEnrolledLeads}
         selectedLeadIds={selectedLeadIdsToEnroll}
         onSelectedLeadIdsChange={setSelectedLeadIdsToEnroll}
         enrollSearch={enrollSearch}
