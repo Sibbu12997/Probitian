@@ -35,7 +35,6 @@ import {
 import { LegalSettings, DEFAULT_LEGAL_SETTINGS } from '../data/defaultLegalData';
 import { DEFAULT_FOUNDER_MESSAGE } from '../data/defaultFounderData';
 import { PROBITIAN_LOGO_URL, PROBITIAN_X_URL, DEFAULT_SOCIAL_LINKS, DEFAULT_HOME_CONFIG } from '../constants/branding';
-import { PROJECTS, BLOG_ARTICLES, LEARN_TOPICS, YOUTUBE_VIDEOS } from '../data/mockData';
 
 /**
  * Error raised when an authenticated session is missing, expired, or invalid (HTTP 401).
@@ -353,7 +352,7 @@ export const cmsService = {
   async getProjects(): Promise<ProjectItem[]> {
     try {
       const data = await safeFetchJson<any[]>('/api/cms/projects');
-      if (Array.isArray(data) && data.length > 0) {
+      if (Array.isArray(data)) {
         return data.map((p: any) => ({
           id: String(p.id),
           title: p.title || 'Untitled Project',
@@ -374,9 +373,9 @@ export const cmsService = {
           created_at: p.created_at
         }));
       }
-      return PROJECTS;
+      return [];
     } catch {
-      return PROJECTS;
+      return [];
     }
   },
 
@@ -408,7 +407,7 @@ export const cmsService = {
   async getBlogs(): Promise<BlogArticle[]> {
     try {
       const data = await safeFetchJson<any[]>('/api/cms/blogs');
-      if (Array.isArray(data) && data.length > 0) {
+      if (Array.isArray(data)) {
         return data.map((b: any) => ({
           id: String(b.id),
           title: b.title || 'Untitled Article',
@@ -428,9 +427,9 @@ export const cmsService = {
           created_at: b.created_at
         }));
       }
-      return BLOG_ARTICLES;
+      return [];
     } catch {
-      return BLOG_ARTICLES;
+      return [];
     }
   },
 
@@ -462,7 +461,7 @@ export const cmsService = {
   async getCourses(): Promise<LearnTopic[]> {
     try {
       const data = await safeFetchJson<any[]>('/api/cms/courses');
-      if (Array.isArray(data) && data.length > 0) {
+      if (Array.isArray(data)) {
         return data.map((c: any) => ({
           id: String(c.id),
           title: c.title || 'Untitled Course',
@@ -483,9 +482,9 @@ export const cmsService = {
           created_at: c.created_at
         }));
       }
-      return LEARN_TOPICS;
+      return [];
     } catch {
-      return LEARN_TOPICS;
+      return [];
     }
   },
 
@@ -517,7 +516,7 @@ export const cmsService = {
   async getVideos(): Promise<YouTubeVideo[]> {
     try {
       const data = await safeFetchJson<any[]>('/api/cms/videos');
-      if (Array.isArray(data) && data.length > 0) {
+      if (Array.isArray(data)) {
         return data.map((v: any) => ({
           id: String(v.id),
           title: v.title || 'Untitled Video',
@@ -533,9 +532,9 @@ export const cmsService = {
           created_at: v.created_at
         }));
       }
-      return YOUTUBE_VIDEOS;
+      return [];
     } catch {
-      return YOUTUBE_VIDEOS;
+      return [];
     }
   },
 

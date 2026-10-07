@@ -10,9 +10,10 @@ interface ProjectsPageProps {
 }
 
 export const ProjectsPage: React.FC<ProjectsPageProps> = ({ onSelectProject }) => {
-  const [projectsList, setProjectsList] = useState<ProjectItem[]>(PROJECTS);
+  const [projectsList, setProjectsList] = useState<ProjectItem[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
     loadProjects();
@@ -21,11 +22,13 @@ export const ProjectsPage: React.FC<ProjectsPageProps> = ({ onSelectProject }) =
   const loadProjects = async () => {
     try {
       const data = await cmsService.getProjects();
-      if (data && data.length > 0) {
+      if (Array.isArray(data)) {
         setProjectsList(data);
       }
     } catch (err) {
       console.error('Error fetching projects from cmsService:', err);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -89,6 +92,12 @@ export const ProjectsPage: React.FC<ProjectsPageProps> = ({ onSelectProject }) =
 
       {/* Projects Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {filteredProjects.length === 0 && !loading && (
+          <div className="col-span-full py-16 text-center text-slate-500 dark:text-slate-400">
+            <p className="text-base font-semibold">No portfolio projects published yet.</p>
+            <p className="text-xs mt-1">Check back soon as new enterprise BI dashboards are published!</p>
+          </div>
+        )}
         {filteredProjects.map((project) => (
           <div
             key={project.id}

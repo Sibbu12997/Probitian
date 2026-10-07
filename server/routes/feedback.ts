@@ -3,121 +3,16 @@ import crypto from 'node:crypto';
 import { requireAuth, requirePermission } from '../auth/rbac';
 import { Permission } from '../auth/types';
 import { feedbackLimiter } from '../middleware/rateLimiters';
-import { serverSupabase, readCmsData, writeCmsData } from '../services/supabase';
+import { serverSupabase } from '../services/supabase';
 import { escapeHtml } from '../security/sanitizer';
 import { recordAuditLog } from '../services/audit';
 
 const router = express.Router();
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const SETTINGS_FEEDBACK_KEY = 'feedback_items';
 
-let feedbackTableAvailable: boolean | null = null;
-let lastTableCheckTime = 0;
-const TABLE_CHECK_COOLDOWN_MS = 60 * 1000;
-
-function isTableMissingError(err: any): boolean {
-  if (!err) return false;
-  const code = String(err.code || '');
-  const message = String(err.message || '').toLowerCase();
-  return (
-    code === 'PGRST205' ||
-    code === '42P01' ||
-    message.includes('schema cache') ||
-    message.includes('does not exist') ||
-    message.includes('not found in the schema cache')
-  );
-}
-
-function shouldTryRelationalTable(): boolean {
-  if (!serverSupabase) return false;
-  if (feedbackTableAvailable === true) return true;
-  if (feedbackTableAvailable === false) {
-    return Date.now() - lastTableCheckTime > TABLE_CHECK_COOLDOWN_MS;
-  }
-  return true;
-}
-
-function recordTableCheckResult(success: boolean, error?: any) {
-  lastTableCheckTime = Date.now();
-  if (success) {
-    feedbackTableAvailable = true;
-  } else if (isTableMissingError(error)) {
-    feedbackTableAvailable = false;
-  }
-}
-
-async function getFeedbackFromSettings(): Promise<any[]> {
-  if (serverSupabase) {
-    try {
-      const { data: row, error } = await serverSupabase
-        .from('settings')
-        .select('value')
-        .eq('key', SETTINGS_FEEDBACK_KEY)
-        .maybeSingle();
-
-      if (!error && row && Array.isArray(row.value) && row.value.length > 0) {
-        return row.value;
-      }
-    } catch {
-      // Non-blocking fallback to local CMS file
-    }
-  }
-
-  try {
-    const data = readCmsData();
-    return Array.isArray(data.feedback) ? data.feedback : [];
-  } catch {
-    return [];
-  }
-}
-
-async function saveFeedbackToSettings(items: any[]): Promise<void> {
-  if (serverSupabase) {
-    try {
-      await serverSupabase.from('settings').upsert({
-        key: SETTINGS_FEEDBACK_KEY,
-        value: items,
-        updated_at: new Date().toISOString()
-      }, { onConflict: 'key' });
-    } catch {
-      // non-blocking
-    }
-  }
-
-  try {
-    const data = readCmsData();
-    data.feedback = items;
-    writeCmsData(data);
-  } catch {
-    // non-blocking
-  }
-}
-
-function filterFeedbackList(items: any[], filters: { status?: any; featured?: any; search?: any }): any[] {
-  let list = [...items];
-  const { status, featured, search } = filters;
-
-  if (status && typeof status === 'string' && status !== 'all') {
-    list = list.filter((item: any) => item.status === status);
-  }
-  if (featured && typeof featured === 'string' && featured !== 'all') {
-    const isFeat = featured === 'true';
-    list = list.filter((item: any) => Boolean(item.featured) === isFeat);
-  }
-  if (search && typeof search === 'string' && search.trim()) {
-    const s = search.trim().toLowerCase();
-    list = list.filter((item: any) =>
-      (item.name || '').toLowerCase().includes(s) ||
-      (item.email || '').toLowerCase().includes(s) ||
-      (item.company || '').toLowerCase().includes(s) ||
-      (item.role || '').toLowerCase().includes(s) ||
-      (item.service || '').toLowerCase().includes(s) ||
-      (item.feedback || '').toLowerCase().includes(s)
-    );
-  }
-  return list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-}
+// In-memory test store only for non-production environments when Supabase is not configured
+let memoryFeedbackStore: any[] = [];
 
 // ==============================================================================
 // PUBLIC ENDPOINTS
@@ -185,7 +80,7 @@ router.post('/feedback', feedbackLimiter, async (req, res) => {
   const cleanCompany = typeof company === 'string' ? company.trim().slice(0, 100) : null;
   const cleanService = typeof service === 'string' ? service.trim().slice(0, 100) : null;
 
-  // 2. Build Safe Record (Disregard any client-supplied status, featured, dates, or IDs)
+  // 2. Build Safe Record (Status always 'pending', featured always false)
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
 
@@ -205,42 +100,24 @@ router.post('/feedback', feedbackLimiter, async (req, res) => {
     updated_at: now
   };
 
-  // 3. Database Persistence
-  if (shouldTryRelationalTable()) {
+  // 3. Database Persistence (Primary: public.feedback)
+  if (serverSupabase) {
     try {
-      const { error } = await serverSupabase!.from('feedback').insert(record);
+      const { error } = await serverSupabase.from('feedback').insert(record);
       if (error) {
-        if (isTableMissingError(error)) {
-          recordTableCheckResult(false, error);
-          const existingList = await getFeedbackFromSettings();
-          const updatedList = [record, ...existingList.filter((f: any) => f.id !== record.id)];
-          await saveFeedbackToSettings(updatedList);
-        } else {
-          console.error('[Feedback Submission Error]', {
-            errorCode: error.code,
-            errorMessage: error.message
-          });
-          return res.status(500).json({ error: 'Failed to submit feedback. Please try again later.' });
-        }
-      } else {
-        recordTableCheckResult(true);
-      }
-    } catch (err: any) {
-      if (isTableMissingError(err)) {
-        recordTableCheckResult(false, err);
-        const existingList = await getFeedbackFromSettings();
-        const updatedList = [record, ...existingList.filter((f: any) => f.id !== record.id)];
-        await saveFeedbackToSettings(updatedList);
-      } else {
-        console.error('[Feedback Submission Exception]', err?.message || err);
+        console.error('[Feedback Submission Error]', {
+          errorCode: error.code,
+          errorMessage: error.message
+        });
         return res.status(500).json({ error: 'Failed to submit feedback. Please try again later.' });
       }
+    } catch (err: any) {
+      console.error('[Feedback Submission Exception]', err?.message || err);
+      return res.status(500).json({ error: 'Failed to submit feedback. Please try again later.' });
     }
   } else {
-    // Settings & CMS storage fallback
-    const existingList = await getFeedbackFromSettings();
-    const updatedList = [record, ...existingList.filter((f: any) => f.id !== record.id)];
-    await saveFeedbackToSettings(updatedList);
+    // Non-production memory store fallback
+    memoryFeedbackStore.unshift(record);
   }
 
   return res.status(201).json({
@@ -256,9 +133,9 @@ router.post('/feedback', feedbackLimiter, async (req, res) => {
  * NEVER exposes email or private moderation details.
  */
 router.get('/feedback', async (req, res) => {
-  if (shouldTryRelationalTable()) {
+  if (serverSupabase) {
     try {
-      const { data, error } = await serverSupabase!
+      const { data, error } = await serverSupabase
         .from('feedback')
         .select('id, name, role, company, rating, feedback, service, featured, created_at')
         .eq('status', 'approved')
@@ -266,82 +143,40 @@ router.get('/feedback', async (req, res) => {
         .order('created_at', { ascending: false });
 
       if (error) {
-        if (isTableMissingError(error)) {
-          recordTableCheckResult(false, error);
-          const allItems = await getFeedbackFromSettings();
-          const approved = allItems
-            .filter((item: any) => item.status === 'approved')
-            .sort((a: any, b: any) => {
-              if (Boolean(a.featured) !== Boolean(b.featured)) return a.featured ? -1 : 1;
-              return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-            })
-            .map((item: any) => ({
-              id: item.id,
-              name: item.name,
-              role: item.role,
-              company: item.company,
-              rating: item.rating,
-              feedback: item.feedback,
-              service: item.service,
-              featured: Boolean(item.featured),
-              created_at: item.created_at
-            }));
-          return res.json(approved);
-        }
-
         console.error('[Public Feedback Query Error]', {
           errorCode: error.code,
           errorMessage: error.message
         });
-        return res.json([]);
+        return res.status(500).json({ error: 'Failed to load testimonials' });
       }
 
-      recordTableCheckResult(true);
       return res.json(data || []);
     } catch (err: any) {
-      if (isTableMissingError(err)) {
-        recordTableCheckResult(false, err);
-        const allItems = await getFeedbackFromSettings();
-        const approved = allItems
-          .filter((item: any) => item.status === 'approved')
-          .map((item: any) => ({
-            id: item.id,
-            name: item.name,
-            role: item.role,
-            company: item.company,
-            rating: item.rating,
-            feedback: item.feedback,
-            service: item.service,
-            featured: Boolean(item.featured),
-            created_at: item.created_at
-          }));
-        return res.json(approved);
-      }
       console.error('[Public Feedback Query Exception]', err?.message || err);
       return res.status(500).json({ error: 'Failed to load testimonials' });
     }
-  } else {
-    const allItems = await getFeedbackFromSettings();
-    const approved = allItems
-      .filter((item: any) => item.status === 'approved')
-      .sort((a: any, b: any) => {
-        if (Boolean(a.featured) !== Boolean(b.featured)) return a.featured ? -1 : 1;
-        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-      })
-      .map((item: any) => ({
-        id: item.id,
-        name: item.name,
-        role: item.role,
-        company: item.company,
-        rating: item.rating,
-        feedback: item.feedback,
-        service: item.service,
-        featured: Boolean(item.featured),
-        created_at: item.created_at
-      }));
-
-    return res.json(approved);
   }
+
+  // Non-production memory store fallback
+  const approved = memoryFeedbackStore
+    .filter(f => f.status === 'approved')
+    .sort((a, b) => {
+      if (Boolean(a.featured) !== Boolean(b.featured)) return a.featured ? -1 : 1;
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    })
+    .map(f => ({
+      id: f.id,
+      name: f.name,
+      role: f.role,
+      company: f.company,
+      rating: f.rating,
+      feedback: f.feedback,
+      service: f.service,
+      featured: Boolean(f.featured),
+      created_at: f.created_at
+    }));
+
+  return res.json(approved);
 });
 
 // ==============================================================================
@@ -355,9 +190,9 @@ router.get('/feedback', async (req, res) => {
 router.get('/admin/feedback', requireAuth, requirePermission(Permission.EDIT_CONTENT), async (req, res) => {
   const { status, featured, search } = req.query;
 
-  if (shouldTryRelationalTable()) {
+  if (serverSupabase) {
     try {
-      let query = serverSupabase!.from('feedback').select('*').order('created_at', { ascending: false });
+      let query = serverSupabase.from('feedback').select('*').order('created_at', { ascending: false });
 
       if (status && typeof status === 'string' && status !== 'all') {
         query = query.eq('status', status);
@@ -374,30 +209,37 @@ router.get('/admin/feedback', requireAuth, requirePermission(Permission.EDIT_CON
 
       const { data, error } = await query;
       if (error) {
-        if (isTableMissingError(error)) {
-          recordTableCheckResult(false, error);
-          const allItems = await getFeedbackFromSettings();
-          return res.json(filterFeedbackList(allItems, { status, featured, search }));
-        }
         console.error('[Admin Feedback Query Error]', error);
         return res.status(500).json({ error: 'Database service unavailable' });
       }
 
-      recordTableCheckResult(true);
       return res.json(data || []);
     } catch (err: any) {
-      if (isTableMissingError(err)) {
-        recordTableCheckResult(false, err);
-        const allItems = await getFeedbackFromSettings();
-        return res.json(filterFeedbackList(allItems, { status, featured, search }));
-      }
       console.error('[Admin Feedback Query Exception]', err?.message || err);
       return res.status(500).json({ error: 'Database service unavailable' });
     }
-  } else {
-    const allItems = await getFeedbackFromSettings();
-    return res.json(filterFeedbackList(allItems, { status, featured, search }));
   }
+
+  // Memory fallback
+  let list = [...memoryFeedbackStore];
+  if (status && typeof status === 'string' && status !== 'all') {
+    list = list.filter(f => f.status === status);
+  }
+  if (featured && typeof featured === 'string' && featured !== 'all') {
+    list = list.filter(f => Boolean(f.featured) === (featured === 'true'));
+  }
+  if (search && typeof search === 'string' && search.trim()) {
+    const s = search.trim().toLowerCase();
+    list = list.filter(f =>
+      (f.name || '').toLowerCase().includes(s) ||
+      (f.email || '').toLowerCase().includes(s) ||
+      (f.company || '').toLowerCase().includes(s) ||
+      (f.role || '').toLowerCase().includes(s) ||
+      (f.service || '').toLowerCase().includes(s) ||
+      (f.feedback || '').toLowerCase().includes(s)
+    );
+  }
+  return res.json(list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
 });
 
 /**
@@ -407,46 +249,30 @@ router.get('/admin/feedback', requireAuth, requirePermission(Permission.EDIT_CON
 router.get('/admin/feedback/:id', requireAuth, requirePermission(Permission.EDIT_CONTENT), async (req, res) => {
   const { id } = req.params;
 
-  if (shouldTryRelationalTable()) {
+  if (serverSupabase) {
     try {
-      const { data, error } = await serverSupabase!
+      const { data, error } = await serverSupabase
         .from('feedback')
         .select('*')
         .eq('id', id)
         .single();
 
       if (error) {
-        if (isTableMissingError(error)) {
-          recordTableCheckResult(false, error);
-          const allItems = await getFeedbackFromSettings();
-          const item = allItems.find((f: any) => f.id === id);
-          if (!item) return res.status(404).json({ error: 'Feedback record not found' });
-          return res.json(item);
-        }
         if (error.code === 'PGRST116' || String(error.message || '').includes('0 rows')) {
           return res.status(404).json({ error: 'Feedback record not found' });
         }
         return res.status(500).json({ error: 'Database service unavailable' });
       }
 
-      recordTableCheckResult(true);
       return res.json(data);
-    } catch (err: any) {
-      if (isTableMissingError(err)) {
-        recordTableCheckResult(false, err);
-        const allItems = await getFeedbackFromSettings();
-        const item = allItems.find((f: any) => f.id === id);
-        if (!item) return res.status(404).json({ error: 'Feedback record not found' });
-        return res.json(item);
-      }
+    } catch {
       return res.status(500).json({ error: 'Database service unavailable' });
     }
-  } else {
-    const allItems = await getFeedbackFromSettings();
-    const item = allItems.find((f: any) => f.id === id);
-    if (!item) return res.status(404).json({ error: 'Feedback record not found' });
-    return res.json(item);
   }
+
+  const item = memoryFeedbackStore.find(f => f.id === id);
+  if (!item) return res.status(404).json({ error: 'Feedback record not found' });
+  return res.json(item);
 });
 
 /**
@@ -461,41 +287,24 @@ router.patch('/admin/feedback/:id', requireAuth, requirePermission(Permission.ED
   const { id } = req.params;
   const { status, featured, name, role, company, rating, feedback, service } = req.body;
 
-  // Retrieve current record first to enforce domain invariants
   let currentRecord: any = null;
-  let useRelational = shouldTryRelationalTable();
 
-  if (useRelational) {
-    try {
-      const { data: existing, error: fetchErr } = await serverSupabase!
-        .from('feedback')
-        .select('*')
-        .eq('id', id)
-        .single();
+  if (serverSupabase) {
+    const { data: existing, error: fetchErr } = await serverSupabase
+      .from('feedback')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
 
-      if (fetchErr) {
-        if (isTableMissingError(fetchErr)) {
-          recordTableCheckResult(false, fetchErr);
-          useRelational = false;
-        } else {
-          return res.status(404).json({ error: 'Feedback record not found' });
-        }
-      } else if (existing) {
-        currentRecord = existing;
-      }
-    } catch (err: any) {
-      if (isTableMissingError(err)) {
-        recordTableCheckResult(false, err);
-        useRelational = false;
-      } else {
-        return res.status(500).json({ error: 'Database service unavailable' });
-      }
+    if (fetchErr) {
+      return res.status(500).json({ error: 'Database query failed' });
     }
-  }
-
-  if (!useRelational || !currentRecord) {
-    const allItems = await getFeedbackFromSettings();
-    currentRecord = allItems.find((f: any) => f.id === id);
+    if (!existing) {
+      return res.status(404).json({ error: 'Feedback record not found' });
+    }
+    currentRecord = existing;
+  } else {
+    currentRecord = memoryFeedbackStore.find(f => f.id === id);
     if (!currentRecord) {
       return res.status(404).json({ error: 'Feedback record not found' });
     }
@@ -524,7 +333,6 @@ router.patch('/admin/feedback/:id', requireAuth, requirePermission(Permission.ED
     }
     updates.featured = nextFeatured;
   } else if (nextStatus !== 'approved') {
-    // If status is moved back to pending or rejected, automatically remove from featured
     updates.featured = false;
   }
 
@@ -560,52 +368,23 @@ router.patch('/admin/feedback/:id', requireAuth, requirePermission(Permission.ED
 
   let finalUpdatedRecord = { ...currentRecord, ...updates };
 
-  if (useRelational) {
-    try {
-      const { data: updated, error: updateErr } = await serverSupabase!
-        .from('feedback')
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single();
+  if (serverSupabase) {
+    const { data: updated, error: updateErr } = await serverSupabase
+      .from('feedback')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single();
 
-      if (updateErr) {
-        if (isTableMissingError(updateErr)) {
-          recordTableCheckResult(false, updateErr);
-          const allItems = await getFeedbackFromSettings();
-          const idx = allItems.findIndex((f: any) => f.id === id);
-          if (idx >= 0) {
-            allItems[idx] = finalUpdatedRecord;
-            await saveFeedbackToSettings(allItems);
-          }
-        } else {
-          console.error('[Admin Feedback Update Error]', updateErr);
-          return res.status(500).json({ error: 'Failed to update feedback' });
-        }
-      } else if (updated) {
-        recordTableCheckResult(true);
-        finalUpdatedRecord = updated;
-      }
-    } catch (err: any) {
-      if (isTableMissingError(err)) {
-        recordTableCheckResult(false, err);
-        const allItems = await getFeedbackFromSettings();
-        const idx = allItems.findIndex((f: any) => f.id === id);
-        if (idx >= 0) {
-          allItems[idx] = finalUpdatedRecord;
-          await saveFeedbackToSettings(allItems);
-        }
-      } else {
-        console.error('[Admin Feedback Update Exception]', err?.message || err);
-        return res.status(500).json({ error: 'Failed to update feedback' });
-      }
+    if (updateErr) {
+      console.error('[Admin Feedback Update Error]', updateErr);
+      return res.status(500).json({ error: 'Failed to update feedback' });
     }
+    finalUpdatedRecord = updated;
   } else {
-    const allItems = await getFeedbackFromSettings();
-    const idx = allItems.findIndex((f: any) => f.id === id);
+    const idx = memoryFeedbackStore.findIndex(f => f.id === id);
     if (idx >= 0) {
-      allItems[idx] = finalUpdatedRecord;
-      await saveFeedbackToSettings(allItems);
+      memoryFeedbackStore[idx] = finalUpdatedRecord;
     }
   }
 
@@ -628,37 +407,14 @@ router.patch('/admin/feedback/:id', requireAuth, requirePermission(Permission.ED
 router.delete('/admin/feedback/:id', requireAuth, requirePermission(Permission.EDIT_CONTENT), async (req, res) => {
   const { id } = req.params;
 
-  if (shouldTryRelationalTable()) {
-    try {
-      const { error } = await serverSupabase!.from('feedback').delete().eq('id', id);
-      if (error) {
-        if (isTableMissingError(error)) {
-          recordTableCheckResult(false, error);
-          const allItems = await getFeedbackFromSettings();
-          const filtered = allItems.filter((f: any) => f.id !== id);
-          await saveFeedbackToSettings(filtered);
-        } else {
-          console.error('[Admin Feedback Delete Error]', error);
-          return res.status(500).json({ error: 'Failed to delete feedback record' });
-        }
-      } else {
-        recordTableCheckResult(true);
-      }
-    } catch (err: any) {
-      if (isTableMissingError(err)) {
-        recordTableCheckResult(false, err);
-        const allItems = await getFeedbackFromSettings();
-        const filtered = allItems.filter((f: any) => f.id !== id);
-        await saveFeedbackToSettings(filtered);
-      } else {
-        console.error('[Admin Feedback Delete Exception]', err?.message || err);
-        return res.status(500).json({ error: 'Failed to delete feedback record' });
-      }
+  if (serverSupabase) {
+    const { error } = await serverSupabase.from('feedback').delete().eq('id', id);
+    if (error) {
+      console.error('[Admin Feedback Delete Error]', error);
+      return res.status(500).json({ error: 'Failed to delete feedback record' });
     }
   } else {
-    const allItems = await getFeedbackFromSettings();
-    const filtered = allItems.filter((f: any) => f.id !== id);
-    await saveFeedbackToSettings(filtered);
+    memoryFeedbackStore = memoryFeedbackStore.filter(f => f.id !== id);
   }
 
   await recordAuditLog(req, {

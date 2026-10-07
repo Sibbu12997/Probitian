@@ -11,10 +11,11 @@ interface BlogPageProps {
 }
 
 export const BlogPage: React.FC<BlogPageProps> = ({ onSelectBlog }) => {
-  const [blogsList, setBlogsList] = useState<BlogArticle[]>(BLOG_ARTICLES);
+  const [blogsList, setBlogsList] = useState<BlogArticle[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [currentPage, setCurrentPage] = useState<number>(1);
+  const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
     loadBlogs();
@@ -23,11 +24,13 @@ export const BlogPage: React.FC<BlogPageProps> = ({ onSelectBlog }) => {
   const loadBlogs = async () => {
     try {
       const data = await cmsService.getBlogs();
-      if (data && data.length > 0) {
+      if (Array.isArray(data)) {
         setBlogsList(data);
       }
     } catch (err) {
       console.error('Error fetching blogs from cmsService:', err);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -104,6 +107,12 @@ export const BlogPage: React.FC<BlogPageProps> = ({ onSelectBlog }) => {
 
       {/* Articles Listing */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        {filteredArticles.length === 0 && !loading && (
+          <div className="col-span-full py-16 text-center text-slate-500 dark:text-slate-400">
+            <p className="text-base font-semibold">No articles published yet.</p>
+            <p className="text-xs mt-1">Check back soon for tutorials on Power BI, DAX, and SQL!</p>
+          </div>
+        )}
         {paginatedArticles.map((article) => {
           const slug = getBlogSlug(article);
           return (

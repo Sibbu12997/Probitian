@@ -349,21 +349,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate, onSelectProject,
             avatar: undefined as string | undefined
           }));
 
-          const allTestimonials = [
-            ...dbItems,
-            ...(homeConfig?.testimonials || [])
-              .filter(legacy => !dbItems.some(d => d.id === legacy.id || d.author === legacy.author))
-              .map(legacy => ({
-                id: legacy.id,
-                author: legacy.author,
-                role: legacy.role,
-                quote: legacy.quote,
-                rating: 5,
-                featured: false,
-                service: undefined as string | undefined,
-                avatar: legacy.avatar
-              }))
-          ].sort((a, b) => (b.featured ? 1 : 0) - (a.featured ? 1 : 0));
+          const allTestimonials = dbItems.sort((a, b) => (b.featured ? 1 : 0) - (a.featured ? 1 : 0));
 
           if (allTestimonials.length === 0) {
             return (

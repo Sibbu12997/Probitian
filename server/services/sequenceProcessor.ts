@@ -48,9 +48,14 @@ let isLocalProcessingActive = false;
 
 /**
  * Acquire a distributed atomic lock for sequence processing cycle across all worker instances.
+ * Backed by Supabase increment_rate_limit RPC.
+ * CRITICAL: Fails closed. If distributed lock is unavailable or throws, returns false and does not process.
  */
 async function acquireDistributedCycleLock(timeoutSeconds: number = 30): Promise<boolean> {
-  if (!serverSupabase) return true;
+  if (!serverSupabase) {
+    if (process.env.NODE_ENV === 'production') return false;
+    return true;
+  }
   try {
     const { data, error } = await serverSupabase.rpc('increment_rate_limit', {
       p_key: 'crm_seq_worker_cycle_lock',
@@ -58,22 +63,27 @@ async function acquireDistributedCycleLock(timeoutSeconds: number = 30): Promise
       p_max: 1
     });
     if (error) {
-      console.warn('[Distributed Cycle Lock RPC Warning]', error.message);
-      return true; // Fallback to local mutex if RPC unavailable
+      console.error('[Distributed Cycle Lock RPC Error - Fail Closed]', error.message);
+      return false; // Fail closed: never allow processing if lock RPC fails
     }
     const row = Array.isArray(data) ? data[0] : data;
     return Boolean(row?.allowed);
   } catch (err: any) {
-    console.warn('[Distributed Cycle Lock Exception]', err?.message || err);
-    return true;
+    console.error('[Distributed Cycle Lock Exception - Fail Closed]', err?.message || err);
+    return false; // Fail closed
   }
 }
 
 /**
  * Acquire an atomic lock for a specific sequence enrollment step send to prevent duplicate sends across workers.
+ * Backed by Supabase increment_rate_limit RPC.
+ * CRITICAL: Fails closed. If distributed step claim fails, returns false and prevents email send.
  */
 async function acquireEnrollmentStepClaim(sequenceLeadId: string, stepNumber: number): Promise<boolean> {
-  if (!serverSupabase) return true;
+  if (!serverSupabase) {
+    if (process.env.NODE_ENV === 'production') return false;
+    return true;
+  }
   try {
     const claimKey = `crm_claim_sl_${sequenceLeadId}_s${stepNumber}`;
     // Claim window: 10 minutes (600,000 ms)
@@ -83,14 +93,14 @@ async function acquireEnrollmentStepClaim(sequenceLeadId: string, stepNumber: nu
       p_max: 1
     });
     if (error) {
-      console.warn('[Step Claim RPC Warning]', error.message);
-      return true;
+      console.error('[Step Claim RPC Error - Fail Closed]', error.message);
+      return false; // Fail closed: never send if step claim failed
     }
     const row = Array.isArray(data) ? data[0] : data;
     return Boolean(row?.allowed);
   } catch (err: any) {
-    console.warn('[Step Claim Exception]', err?.message || err);
-    return true;
+    console.error('[Step Claim Exception - Fail Closed]', err?.message || err);
+    return false; // Fail closed
   }
 }
 
