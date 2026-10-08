@@ -80,4 +80,35 @@ describe('CMS Settings and Endpoints Verification', () => {
     const data = await res.json();
     assert.ok(Array.isArray(data));
   });
+
+  test('GET /api/cms/settings/:key blocks non-allowlisted CRM keys with HTTP 404', async () => {
+    const sensitiveKeys = ['crm_leads', 'crm_lead_sequences', 'crm_sequence_steps', 'crm_sequence_leads', 'crm_campaign_leads', 'admin_sessions'];
+    for (const key of sensitiveKeys) {
+      const res = await fetch(`${baseUrl}/api/cms/settings/${key}`);
+      assert.strictEqual(res.status, 404, `Expected 404 for sensitive key: ${key}`);
+      const body = await res.json();
+      assert.strictEqual(body.error, 'Setting not found');
+    }
+  });
+
+  test('GET /api/cms/settings returns array filtered strictly to allowlisted public keys', async () => {
+    const res = await fetch(`${baseUrl}/api/cms/settings`);
+    assert.strictEqual(res.status, 200);
+    const data = await res.json();
+    assert.ok(Array.isArray(data));
+    const allowed = new Set(['general', 'seo', 'legal', 'home', 'founder_message', 'founder']);
+    for (const item of data) {
+      assert.ok(allowed.has(item.key), `Unexpected non-public key in settings: ${item.key}`);
+    }
+  });
+
+  test('Unauthenticated POST /api/cms/settings/general is blocked with HTTP 401', async () => {
+    const res = await fetch(`${baseUrl}/api/cms/settings/general`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ site_name: 'Malicious Overwrite' })
+    });
+    assert.strictEqual(res.status, 401);
+  });
 });
+

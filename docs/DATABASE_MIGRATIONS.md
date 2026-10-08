@@ -54,7 +54,8 @@ supabase/
     ├── 0015_distributed_admin_session_revocation.sql # Multi-instance distributed admin session revocation
     ├── 0016_add_feedback_table.sql             # Public feedback & testimonials table and RLS
     ├── 0017_reconcile_production_schema.sql     # Live production schema reconciliation (feedback, profiles, triggers)
-    └── 0018_security_privilege_reconciliation.sql # Forward-only privilege lockdown (least privilege RPCs, content RLS)
+    ├── 0018_security_privilege_reconciliation.sql # Forward-only privilege lockdown (least privilege RPCs, content RLS)
+    └── 0019_harden_settings_rls.sql            # Restrict public settings SELECT to allowlisted public keys (shield CRM & sequences)
 ```
 
 ---
@@ -63,7 +64,8 @@ supabase/
 
 > 🚨 **IMPORTANT — REPOSITORY FILES VS. PRODUCTION STATE**:
 > - The live production Supabase PostgreSQL instance has already been reconciled through migration **`0017`**.
-> - **Migration `0018`** is the current forward-only security privilege reconciliation script that restricts function execution (`increment_rate_limit`, `prune_expired_session_revocations`, `handle_auth_user_profile`, `handle_new_user`, `rls_auto_enable`) strictly to `service_role` (revoking execution from `anon` and `authenticated`), sets `consent_public DEFAULT false` on `feedback`, and reinforces content table RLS policies.
+> - **Migration `0018`** is the forward-only security privilege reconciliation script that restricts function execution (`increment_rate_limit`, `prune_expired_session_revocations`, `handle_auth_user_profile`, `handle_new_user`, `rls_auto_enable`) strictly to `service_role` (revoking execution from `anon` and `authenticated`), sets `consent_public DEFAULT false` on `feedback`, and reinforces content table RLS policies.
+> - **Migration `0019`** is the forward-only settings RLS hardening script that locks down `public.settings` SELECT policy to an explicit allowlist of public CMS configuration keys (`general`, `seo`, `legal`, `home`, `founder_message`, `founder`, `social_links`, `navigation_items`), ensuring CRM, sequence, audit, and internal system configurations cannot be enumerated anonymously via direct Supabase Data API access.
 > - **DO NOT reset the database, truncate data, or rerun migrations `0001` through `0017`** against the live production database. All historical and production data must be preserved.
 > - The presence of a `.sql` file in `supabase/migrations/` documents repository migration history; each migration must be explicitly applied and verified against the live PostgreSQL instance.
 
@@ -87,6 +89,7 @@ supabase/
 | `0016` | `add_feedback_table.sql` | Public feedback & testimonials table | `feedback` table, indexes, and initial RLS |
 | `0017` | `reconcile_production_schema.sql` | Live production reconciliation | Reconciles `feedback`, `profiles`, automatic user trigger |
 | `0018` | `security_privilege_reconciliation.sql` | Forward-only privilege lockdown | Revokes RPC execution from `anon`/`authenticated`; hardens content RLS |
+| `0019` | `harden_settings_rls.sql` | Restrict settings public SELECT policy | Limits `public.settings` SELECT to allowlisted keys, shielding CRM & sequences |
 
 ---
 

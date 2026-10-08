@@ -529,7 +529,9 @@ GRANT ALL ON ALL ROUTINES IN SCHEMA public TO service_role;
 GRANT EXECUTE ON FUNCTION public.increment_rate_limit(TEXT, BIGINT, INT) TO service_role;
 
 -- Public RLS Policies
-CREATE POLICY "Public read settings" ON public.settings FOR SELECT USING (true);
+CREATE POLICY "Public read settings" ON public.settings
+  FOR SELECT TO anon, authenticated
+  USING (key IN ('general', 'seo', 'legal', 'home', 'founder_message', 'founder', 'social_links', 'navigation_items'));
 CREATE POLICY "Public read projects" ON public.projects FOR SELECT USING (published = true);
 CREATE POLICY "Public read blogs" ON public.blogs FOR SELECT USING (status = 'published');
 CREATE POLICY "Public read categories" ON public.categories FOR SELECT USING (true);

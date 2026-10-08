@@ -93,7 +93,17 @@ Automated email sequence metadata, multi-step configs, and lead enrollments are 
 
 ---
 
-## 5. Connection & Authentication Security
+## 5. Settings Table Security & RLS Isolation (`public.settings`)
+
+To prevent sensitive CRM and outreach enumeration while serving public CMS configuration:
+- **Strict Public Allowlist Policy**: The public SELECT RLS policy on `public.settings` (`Public read settings allowlist`) strictly permits rows matching:
+  `general`, `seo`, `legal`, `home`, `founder_message`, `founder`, `social_links`, `navigation_items`.
+- **Private Data Protection**: Internal CRM sequences (`crm_lead_sequences`, `crm_sequence_steps`, `crm_sequence_leads`, `crm_sequence_deliveries`) and legacy backup keys are completely inaccessible to anonymous PostgREST / Data API clients.
+- **Service Role Exclusivity**: Express backend handlers operate under `service_role`, maintaining authoritative access for CMS and CRM workflows while rejecting non-allowlisted keys at the application route boundary (`/api/cms/settings`).
+
+---
+
+## 6. Connection & Authentication Security
 
 - Server-side Express handlers connect to Supabase using `@supabase/supabase-js` initialized with `process.env.SUPABASE_SECRET_KEY` (or `SUPABASE_SERVICE_ROLE_KEY`).
 - Row Level Security (RLS) is enabled on all tables. Direct client-side postgREST queries using the public anonymous key are restricted (`HTTP 403 Permission Denied`), ensuring all database reads and writes are securely handled server-side.
