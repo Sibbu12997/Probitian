@@ -1031,6 +1031,8 @@ router.delete('/cms/media/:id', mediaDeleteLimiter, requireAuth, requirePermissi
 
   let mediaItem: any = null;
   let fromDatabase = false;
+
+  // 1. Load media record from Supabase
   if (serverSupabase) {
     try {
       const { data, error } = await serverSupabase.from('media').select('*').eq('id', id).maybeSingle();
@@ -1039,7 +1041,6 @@ router.delete('/cms/media/:id', mediaDeleteLimiter, requireAuth, requirePermissi
           operation: 'MEDIA_DELETE',
           mediaId: id,
           databaseOperation: 'SELECT_MEDIA',
-          storageOperation: 'NONE',
           errorCode: error.code || 'DB_QUERY_ERROR',
           safeErrorMessage: error.message || 'Database error querying media record'
         });
@@ -1054,7 +1055,6 @@ router.delete('/cms/media/:id', mediaDeleteLimiter, requireAuth, requirePermissi
         operation: 'MEDIA_DELETE',
         mediaId: id,
         databaseOperation: 'SELECT_MEDIA',
-        storageOperation: 'NONE',
         errorCode: err?.code || 'DB_QUERY_EXCEPTION',
         safeErrorMessage: err?.message || 'Database query exception'
       });
@@ -1062,12 +1062,12 @@ router.delete('/cms/media/:id', mediaDeleteLimiter, requireAuth, requirePermissi
     }
   }
 
-  if (!mediaItem) {
+  if (!mediaItem && process.env.NODE_ENV !== 'production') {
     try {
       const data = readCmsData();
       mediaItem = data.media?.find((m: any) => String(m.id) === id);
     } catch {
-      // ignore
+      // ignore in dev
     }
   }
 
@@ -1076,14 +1076,33 @@ router.delete('/cms/media/:id', mediaDeleteLimiter, requireAuth, requirePermissi
       operation: 'MEDIA_DELETE',
       mediaId: id,
       databaseOperation: 'FIND_MEDIA',
-      storageOperation: 'NONE',
       errorCode: 'MEDIA_NOT_FOUND',
-      safeErrorMessage: 'Media asset not found in database or local cache'
+      safeErrorMessage: 'Media asset not found in database'
     });
     return res.status(404).json({ error: 'Media asset not found' });
   }
 
-  // 1. Authoritative reference check across all content models (FAIL CLOSED on database error)
+  // 2. Validate storage_path presence: DO NOT silently delete database record if missing
+  if (!mediaItem.storage_path || typeof mediaItem.storage_path !== 'string' || !mediaItem.storage_path.trim()) {
+    console.error('[CMS Media Delete Diagnostic]', {
+      operation: 'MEDIA_DELETE',
+      mediaId: id,
+      storageBucket: PROBITIAN_MEDIA_BUCKET,
+      storagePath: null,
+      errorCode: 'MISSING_STORAGE_PATH',
+      safeErrorMessage: 'Media asset has no valid storage path configured; deletion blocked'
+    });
+    return res.status(422).json({
+      error: 'Media asset has no valid Storage path configured and cannot be safely deleted via this endpoint. Controlled cleanup required.'
+    });
+  }
+
+  const rawStoragePath = mediaItem.storage_path.trim().replace(/^\/+/, '');
+  const effectiveStoragePath = rawStoragePath.startsWith(PROBITIAN_MEDIA_BUCKET + '/')
+    ? rawStoragePath.slice(PROBITIAN_MEDIA_BUCKET.length + 1)
+    : rawStoragePath;
+
+  // 3. Authoritative reference check across all content models (FAIL CLOSED on database error)
   let references: any[] = [];
   try {
     references = await findMediaReferences(mediaItem);
@@ -1091,21 +1110,33 @@ router.delete('/cms/media/:id', mediaDeleteLimiter, requireAuth, requirePermissi
     console.error('[CMS Media Delete Diagnostic]', {
       operation: 'MEDIA_DELETE',
       mediaId: id,
-      databaseOperation: 'SCAN_REFERENCES',
-      storageOperation: 'NONE',
+      storageBucket: PROBITIAN_MEDIA_BUCKET,
+      storagePath: effectiveStoragePath,
       errorCode: refErr?.code || 'REFERENCE_CHECK_FAILED',
       safeErrorMessage: refErr?.message || 'Media reference check failed'
     });
     return res.status(503).json({ error: 'Security service unavailable: media reference check failed' });
   }
 
+  console.log('[CMS Media Delete Diagnostic]', {
+    operation: 'MEDIA_DELETE',
+    mediaId: id,
+    storageBucket: PROBITIAN_MEDIA_BUCKET,
+    storagePath: effectiveStoragePath,
+    referenceCheckResult: {
+      in_use: references.length > 0,
+      referenceCount: references.length
+    }
+  });
+
   if (references.length > 0) {
     console.warn('[CMS Media Delete Diagnostic]', {
       operation: 'MEDIA_DELETE',
       mediaId: id,
-      databaseOperation: 'NONE',
-      storageOperation: 'NONE',
+      storageBucket: PROBITIAN_MEDIA_BUCKET,
+      storagePath: effectiveStoragePath,
       errorCode: 'MEDIA_IN_USE',
+      referenceCount: references.length,
       safeErrorMessage: `Media asset is in use across ${references.length} application locations`
     });
     await recordAuditLog(req, {
@@ -1131,38 +1162,56 @@ router.delete('/cms/media/:id', mediaDeleteLimiter, requireAuth, requirePermissi
     });
   }
 
-  // 2. Synchronized Storage Object Removal (idempotent if object is already absent)
+  // 4. Synchronized Storage Object Removal (treat already-missing object as idempotent success)
   let storageCleaned = false;
-  if (serverSupabase && mediaItem.storage_path) {
+  let isAlreadyMissing = false;
+  if (serverSupabase) {
     try {
-      const { error: storageErr } = await serverSupabase.storage
+      const { data: storageData, error: storageErr } = await serverSupabase.storage
         .from(PROBITIAN_MEDIA_BUCKET)
-        .remove([mediaItem.storage_path]);
+        .remove([effectiveStoragePath]);
 
-      const isNotFound = storageErr && (
-        storageErr.message?.toLowerCase().includes('not found') ||
-        (storageErr as any).statusCode === '404' ||
-        (storageErr as any).status === 404
+      const isNotFound = Boolean(
+        (!storageErr && Array.isArray(storageData) && storageData.length === 0) ||
+        (storageErr && (
+          storageErr.message?.toLowerCase().includes('not found') ||
+          (storageErr as any).statusCode === '404' ||
+          (storageErr as any).status === 404
+        ))
       );
+
+      console.log('[CMS Media Delete Diagnostic]', {
+        operation: 'MEDIA_DELETE',
+        mediaId: id,
+        storageBucket: PROBITIAN_MEDIA_BUCKET,
+        storagePath: effectiveStoragePath,
+        storageDeleteSuccess: !storageErr || isNotFound,
+        storageStatus: storageErr ? ((storageErr as any).status || (storageErr as any).statusCode || 'ERROR') : '200',
+        errorCode: storageErr ? (storageErr as any).code || 'STORAGE_ERROR' : null,
+        errorMessage: storageErr ? storageErr.message : null,
+        isAlreadyMissing: isNotFound,
+        deletedObjectsCount: Array.isArray(storageData) ? storageData.length : 0
+      });
 
       if (storageErr && !isNotFound) {
         console.error('[CMS Media Delete Diagnostic]', {
           operation: 'MEDIA_DELETE',
           mediaId: id,
-          databaseOperation: 'NONE',
-          storageOperation: 'REMOVE_OBJECT',
+          storageBucket: PROBITIAN_MEDIA_BUCKET,
+          storagePath: effectiveStoragePath,
           errorCode: (storageErr as any).code || 'STORAGE_DELETE_FAILED',
           safeErrorMessage: storageErr.message || 'Failed to delete media asset from storage'
         });
         return res.status(500).json({ error: 'Failed to delete media asset from storage' });
       }
       storageCleaned = true;
+      isAlreadyMissing = isNotFound;
     } catch (stErr: any) {
       console.error('[CMS Media Delete Diagnostic]', {
         operation: 'MEDIA_DELETE',
         mediaId: id,
-        databaseOperation: 'NONE',
-        storageOperation: 'REMOVE_OBJECT',
+        storageBucket: PROBITIAN_MEDIA_BUCKET,
+        storagePath: effectiveStoragePath,
         errorCode: stErr?.code || 'STORAGE_EXCEPTION',
         safeErrorMessage: stErr?.message || 'Exception during storage removal'
       });
@@ -1170,18 +1219,33 @@ router.delete('/cms/media/:id', mediaDeleteLimiter, requireAuth, requirePermissi
     }
   }
 
-  // 3. Synchronized Database Record Removal (only executed after storage removal succeeds)
+  // 5. Synchronized Database Record Removal (ONLY executed after storage removal succeeds)
   if (serverSupabase && fromDatabase) {
     try {
-      const { error } = await serverSupabase.from('media').delete().eq('id', id);
-      if (error) {
+      const { data: dbData, error: dbErr } = await serverSupabase.from('media').delete().eq('id', id).select();
+      console.log('[CMS Media Delete Diagnostic]', {
+        operation: 'MEDIA_DELETE',
+        mediaId: id,
+        storageBucket: PROBITIAN_MEDIA_BUCKET,
+        storagePath: effectiveStoragePath,
+        databaseOperation: 'DELETE_ROW',
+        databaseDeleteResponse: {
+          status: dbErr ? (dbErr.code || 'DB_ERROR') : '200',
+          errorMessage: dbErr ? dbErr.message : null,
+          success: !dbErr,
+          deletedRowsCount: Array.isArray(dbData) ? dbData.length : 0
+        }
+      });
+
+      if (dbErr) {
         console.error('[CMS Media Delete Diagnostic]', {
           operation: 'MEDIA_DELETE',
           mediaId: id,
+          storageBucket: PROBITIAN_MEDIA_BUCKET,
+          storagePath: effectiveStoragePath,
           databaseOperation: 'DELETE_ROW',
-          storageOperation: storageCleaned ? 'REMOVE_OBJECT_COMPLETED' : 'NONE',
-          errorCode: error.code || 'DB_DELETE_FAILED',
-          safeErrorMessage: error.message || 'Failed to delete media record from database'
+          errorCode: dbErr.code || 'DB_DELETE_FAILED',
+          safeErrorMessage: dbErr.message || 'Failed to delete media record from database'
         });
         await recordAuditLog(req, {
           actor: session?.email || 'admin',
@@ -1190,7 +1254,7 @@ router.delete('/cms/media/:id', mediaDeleteLimiter, requireAuth, requirePermissi
           resource: 'media',
           resource_id: id,
           result: 'FAILURE',
-          metadata: { error: error.message, filename: mediaItem.filename }
+          metadata: { error: dbErr.message, filename: mediaItem.filename }
         });
         return res.status(500).json({ error: 'Failed to delete media record from database' });
       }
@@ -1198,8 +1262,9 @@ router.delete('/cms/media/:id', mediaDeleteLimiter, requireAuth, requirePermissi
       console.error('[CMS Media Delete Diagnostic]', {
         operation: 'MEDIA_DELETE',
         mediaId: id,
+        storageBucket: PROBITIAN_MEDIA_BUCKET,
+        storagePath: effectiveStoragePath,
         databaseOperation: 'DELETE_ROW',
-        storageOperation: storageCleaned ? 'REMOVE_OBJECT_COMPLETED' : 'NONE',
         errorCode: e?.code || 'DB_DELETE_EXCEPTION',
         safeErrorMessage: e?.message || 'Exception deleting media record from database'
       });
@@ -1207,14 +1272,20 @@ router.delete('/cms/media/:id', mediaDeleteLimiter, requireAuth, requirePermissi
     }
   }
 
-  // 4. Update local fallback cache
-  const data = readCmsData();
-  if (data.media) {
-    data.media = data.media.filter((m: any) => String(m.id) !== id);
-    writeCmsData(data);
+  // 6. Update local fallback cache if item was not from Supabase database
+  if (!fromDatabase && process.env.NODE_ENV !== 'production') {
+    try {
+      const data = readCmsData();
+      if (data.media) {
+        data.media = data.media.filter((m: any) => String(m.id) !== id);
+        writeCmsData(data);
+      }
+    } catch {
+      // ignore in dev
+    }
   }
 
-  // 5. Record Success Audit Entry
+  // 7. Record Success Audit Entry
   await recordAuditLog(req, {
     actor: session?.email || 'admin',
     role: session?.role || 'admin',
@@ -1224,8 +1295,9 @@ router.delete('/cms/media/:id', mediaDeleteLimiter, requireAuth, requirePermissi
     result: 'SUCCESS',
     metadata: {
       filename: mediaItem.filename,
-      storage_path: mediaItem.storage_path,
-      storage_synchronized: storageCleaned
+      storage_path: effectiveStoragePath,
+      storage_synchronized: storageCleaned,
+      storage_missing_idempotent: isAlreadyMissing
     }
   });
 
@@ -1248,32 +1320,90 @@ router.post('/cms/media/bulk-delete', mediaDeleteLimiter, requireAuth, requirePe
     return res.status(400).json({ error: 'Bulk deletion limited to maximum 100 items per request' });
   }
 
-  const validIds = ids.filter(id => typeof id === 'string' && isValidId(id));
-  if (validIds.length === 0) {
-    return res.status(400).json({ error: 'No valid media IDs provided' });
+  const deleted: Array<{ id: string; filename: string; storage_path?: string }> = [];
+  const skipped: Array<{ id: string; filename: string; reason: string; references: any[] }> = [];
+  const failed: Array<{ id: string; filename?: string; error: string; category?: string }> = [];
+  const missing_storage: Array<{ id: string; filename: string; storage_path: string }> = [];
+  const failed_storage: Array<{ id: string; filename: string; error: string }> = [];
+  const failed_db: Array<{ id: string; filename: string; error: string }> = [];
+  const invalid_records: Array<{ id: string; filename?: string; error: string }> = [];
+
+  // Separate valid format IDs vs invalid format IDs
+  const validIds: string[] = [];
+  for (const rawId of ids) {
+    if (typeof rawId !== 'string' || !isValidId(rawId)) {
+      invalid_records.push({ id: String(rawId), error: 'Invalid media ID format' });
+      failed.push({ id: String(rawId), error: 'Invalid media ID format', category: 'invalid_record' });
+    } else {
+      validIds.push(rawId);
+    }
   }
 
-  // Query candidate media items
+  if (validIds.length === 0) {
+    return res.status(400).json({
+      success: false,
+      error: 'No valid media IDs provided',
+      total_requested: ids.length,
+      deleted_count: 0,
+      skipped_count: 0,
+      failed_count: failed.length,
+      deleted,
+      skipped,
+      failed,
+      missing_storage,
+      failed_storage,
+      failed_db,
+      invalid_records
+    });
+  }
+
+  // Load candidate media items
   let allMedia: any[] = [];
+  const fromDatabaseIds = new Set<string>();
+
   if (serverSupabase) {
     try {
       const { data, error } = await serverSupabase.from('media').select('*').in('id', validIds);
       if (error) {
+        console.error('[Bulk Media Delete Diagnostic]', {
+          operation: 'MEDIA_BULK_DELETE',
+          databaseOperation: 'SELECT_MEDIA',
+          errorCode: error.code || 'DB_QUERY_ERROR',
+          safeErrorMessage: error.message || 'Database error querying media records'
+        });
         return res.status(503).json({ error: 'Database service unavailable' });
       }
-      if (Array.isArray(data)) allMedia = data;
-    } catch {
+      if (Array.isArray(data)) {
+        allMedia = data;
+        for (const m of data) {
+          fromDatabaseIds.add(String(m.id));
+        }
+      }
+    } catch (err: any) {
+      console.error('[Bulk Media Delete Diagnostic]', {
+        operation: 'MEDIA_BULK_DELETE',
+        databaseOperation: 'SELECT_MEDIA',
+        errorCode: err?.code || 'DB_QUERY_EXCEPTION',
+        safeErrorMessage: err?.message || 'Database query exception'
+      });
       return res.status(503).json({ error: 'Database service unavailable' });
     }
   }
 
-  const localData = readCmsData();
-  if (Array.isArray(localData.media)) {
-    const existingIds = new Set(allMedia.map(m => String(m.id)));
-    for (const m of localData.media) {
-      if (validIds.includes(String(m.id)) && !existingIds.has(String(m.id))) {
-        allMedia.push(m);
+  // Fallback to local dev cache ONLY for non-production tests/offline
+  if (process.env.NODE_ENV !== 'production') {
+    try {
+      const localData = readCmsData();
+      if (Array.isArray(localData.media)) {
+        const existingIds = new Set(allMedia.map(m => String(m.id)));
+        for (const m of localData.media) {
+          if (validIds.includes(String(m.id)) && !existingIds.has(String(m.id))) {
+            allMedia.push(m);
+          }
+        }
       }
+    } catch {
+      // ignore in dev
     }
   }
 
@@ -1282,29 +1412,95 @@ router.post('/cms/media/bulk-delete', mediaDeleteLimiter, requireAuth, requirePe
     mediaMap.set(String(m.id), m);
   }
 
-  const deleted: Array<{ id: string; filename: string }> = [];
-  const skipped: Array<{ id: string; filename: string; reason: string; references: any[] }> = [];
-  const failed: Array<{ id: string; filename?: string; error: string }> = [];
-
-  const itemsToDelete: Array<{ id: string; storage_path?: string; filename: string }> = [];
-
+  // Process each valid ID following the strict sequence
   for (const id of validIds) {
     const mediaItem = mediaMap.get(id);
+
+    // 1. Missing database record
     if (!mediaItem) {
-      failed.push({ id, error: 'Media asset not found in database' });
+      console.warn('[Bulk Media Delete Diagnostic]', {
+        operation: 'MEDIA_BULK_DELETE',
+        mediaId: id,
+        errorCode: 'MEDIA_NOT_FOUND',
+        safeErrorMessage: 'Media asset not found in database'
+      });
+      invalid_records.push({ id, error: 'Media asset not found in database' });
+      failed.push({ id, error: 'Media asset not found in database', category: 'invalid_record' });
       continue;
     }
 
-    // Reference Check (FAIL CLOSED on database error)
+    // 2. Validate storage_path presence: DO NOT silently delete database record if missing
+    if (!mediaItem.storage_path || typeof mediaItem.storage_path !== 'string' || !mediaItem.storage_path.trim()) {
+      console.error('[Bulk Media Delete Diagnostic]', {
+        operation: 'MEDIA_BULK_DELETE',
+        mediaId: id,
+        storageBucket: PROBITIAN_MEDIA_BUCKET,
+        storagePath: null,
+        errorCode: 'MISSING_STORAGE_PATH',
+        safeErrorMessage: 'Media asset has no valid storage path configured; deletion blocked'
+      });
+      invalid_records.push({
+        id,
+        filename: mediaItem.filename || 'asset',
+        error: 'Media asset has no valid Storage path configured and cannot be safely deleted via this endpoint. Controlled cleanup required.'
+      });
+      failed.push({
+        id,
+        filename: mediaItem.filename || 'asset',
+        error: 'Media asset has no valid Storage path configured and cannot be safely deleted via this endpoint. Controlled cleanup required.',
+        category: 'missing_storage_path'
+      });
+      continue;
+    }
+
+    const rawStoragePath = mediaItem.storage_path.trim().replace(/^\/+/, '');
+    const effectiveStoragePath = rawStoragePath.startsWith(PROBITIAN_MEDIA_BUCKET + '/')
+      ? rawStoragePath.slice(PROBITIAN_MEDIA_BUCKET.length + 1)
+      : rawStoragePath;
+
+    // 3. Reference check against authoritative production database content
     let references: any[] = [];
     try {
       references = await findMediaReferences(mediaItem);
     } catch (refErr: any) {
-      failed.push({ id, filename: mediaItem.filename, error: 'Reference check failed' });
+      console.error('[Bulk Media Delete Diagnostic]', {
+        operation: 'MEDIA_BULK_DELETE',
+        mediaId: id,
+        storageBucket: PROBITIAN_MEDIA_BUCKET,
+        storagePath: effectiveStoragePath,
+        errorCode: refErr?.code || 'REFERENCE_CHECK_FAILED',
+        safeErrorMessage: refErr?.message || 'Media reference check failed'
+      });
+      failed.push({
+        id,
+        filename: mediaItem.filename || 'asset',
+        error: 'Media reference check failed',
+        category: 'reference_check_error'
+      });
       continue;
     }
 
+    console.log('[Bulk Media Delete Diagnostic]', {
+      operation: 'MEDIA_BULK_DELETE',
+      mediaId: id,
+      storageBucket: PROBITIAN_MEDIA_BUCKET,
+      storagePath: effectiveStoragePath,
+      referenceCheckResult: {
+        in_use: references.length > 0,
+        referenceCount: references.length
+      }
+    });
+
     if (references.length > 0) {
+      console.warn('[Bulk Media Delete Diagnostic]', {
+        operation: 'MEDIA_BULK_DELETE',
+        mediaId: id,
+        storageBucket: PROBITIAN_MEDIA_BUCKET,
+        storagePath: effectiveStoragePath,
+        action: 'SKIPPED_REFERENCED',
+        errorCode: 'MEDIA_IN_USE',
+        referenceCount: references.length
+      });
       skipped.push({
         id,
         filename: mediaItem.filename || 'asset',
@@ -1314,96 +1510,133 @@ router.post('/cms/media/bulk-delete', mediaDeleteLimiter, requireAuth, requirePe
       continue;
     }
 
-    // Unused -> Candidate for synchronized deletion
-    itemsToDelete.push({
-      id,
-      storage_path: mediaItem.storage_path,
-      filename: mediaItem.filename || 'asset'
-    });
-  }
-
-  // 1. Synchronized Storage Deletion (Storage MUST succeed before DB deletion)
-  const successfullyCleanedIds: string[] = [];
-  for (const item of itemsToDelete) {
-    if (serverSupabase && item.storage_path) {
+    // 4. Synchronized Storage Object Removal (Storage MUST succeed before DB deletion)
+    let isAlreadyMissing = false;
+    if (serverSupabase) {
       try {
-        const { error: storageErr } = await serverSupabase.storage
+        const { data: storageData, error: storageErr } = await serverSupabase.storage
           .from(PROBITIAN_MEDIA_BUCKET)
-          .remove([item.storage_path]);
+          .remove([effectiveStoragePath]);
 
-        const isNotFound = storageErr && (
-          storageErr.message?.toLowerCase().includes('not found') ||
-          (storageErr as any).statusCode === '404' ||
-          (storageErr as any).status === 404
+        const isNotFound = Boolean(
+          (!storageErr && Array.isArray(storageData) && storageData.length === 0) ||
+          (storageErr && (
+            storageErr.message?.toLowerCase().includes('not found') ||
+            (storageErr as any).statusCode === '404' ||
+            (storageErr as any).status === 404
+          ))
         );
+
+        console.log('[Bulk Media Delete Diagnostic]', {
+          operation: 'MEDIA_BULK_DELETE',
+          mediaId: id,
+          storageBucket: PROBITIAN_MEDIA_BUCKET,
+          storagePath: effectiveStoragePath,
+          storageDeleteResponse: {
+            status: storageErr ? ((storageErr as any).status || (storageErr as any).statusCode || 'ERROR') : '200',
+            errorCode: storageErr ? (storageErr as any).code || 'STORAGE_ERROR' : null,
+            errorMessage: storageErr ? storageErr.message : null,
+            isAlreadyMissing: isNotFound,
+            deletedCount: Array.isArray(storageData) ? storageData.length : 0
+          }
+        });
 
         if (storageErr && !isNotFound) {
           console.error('[Bulk Media Delete Diagnostic]', {
             operation: 'MEDIA_BULK_DELETE',
-            mediaId: item.id,
-            storageOperation: 'REMOVE_OBJECT',
+            mediaId: id,
+            storageBucket: PROBITIAN_MEDIA_BUCKET,
+            storagePath: effectiveStoragePath,
             errorCode: (storageErr as any).code || 'STORAGE_DELETE_FAILED',
             safeErrorMessage: storageErr.message || 'Failed to delete asset from storage'
           });
-          failed.push({ id: item.id, filename: item.filename, error: 'Failed to delete asset from storage' });
+          failed_storage.push({ id, filename: mediaItem.filename || 'asset', error: storageErr.message || 'Failed to delete asset from storage' });
+          failed.push({ id, filename: mediaItem.filename || 'asset', error: storageErr.message || 'Failed to delete asset from storage', category: 'storage_delete_failed' });
           continue;
+        }
+
+        if (isNotFound) {
+          isAlreadyMissing = true;
+          missing_storage.push({ id, filename: mediaItem.filename || 'asset', storage_path: effectiveStoragePath });
         }
       } catch (stErr: any) {
         console.error('[Bulk Media Delete Diagnostic]', {
           operation: 'MEDIA_BULK_DELETE',
-          mediaId: item.id,
-          storageOperation: 'REMOVE_OBJECT',
+          mediaId: id,
+          storageBucket: PROBITIAN_MEDIA_BUCKET,
+          storagePath: effectiveStoragePath,
           errorCode: stErr?.code || 'STORAGE_EXCEPTION',
           safeErrorMessage: stErr?.message || 'Exception deleting asset from storage'
         });
-        failed.push({ id: item.id, filename: item.filename, error: 'Exception deleting asset from storage' });
+        failed_storage.push({ id, filename: mediaItem.filename || 'asset', error: stErr?.message || 'Exception deleting asset from storage' });
+        failed.push({ id, filename: mediaItem.filename || 'asset', error: stErr?.message || 'Exception deleting asset from storage', category: 'storage_exception' });
         continue;
       }
     }
-    successfullyCleanedIds.push(item.id);
-  }
 
-  // 2. Synchronized Database Deletion (only for assets whose storage was cleanly removed)
-  if (serverSupabase && successfullyCleanedIds.length > 0) {
-    try {
-      const { error: dbErr } = await serverSupabase.from('media').delete().in('id', successfullyCleanedIds);
-      if (dbErr) {
-        console.error('[Bulk Media Delete Error] Database delete error:', dbErr);
-        for (const id of successfullyCleanedIds) {
-          const it = itemsToDelete.find(x => x.id === id);
-          failed.push({ id, filename: it?.filename, error: 'Database record deletion failed' });
+    // 5. Synchronized Database Deletion (ONLY executed after storage removal succeeds)
+    const isFromDatabase = fromDatabaseIds.has(id);
+    if (serverSupabase && isFromDatabase) {
+      try {
+        const { data: dbData, error: dbErr } = await serverSupabase.from('media').delete().eq('id', id).select();
+        console.log('[Bulk Media Delete Diagnostic]', {
+          operation: 'MEDIA_BULK_DELETE',
+          mediaId: id,
+          storageBucket: PROBITIAN_MEDIA_BUCKET,
+          storagePath: effectiveStoragePath,
+          databaseDeleteResponse: {
+            status: dbErr ? (dbErr.code || 'DB_ERROR') : '200',
+            errorMessage: dbErr ? dbErr.message : null,
+            success: !dbErr,
+            deletedRowsCount: Array.isArray(dbData) ? dbData.length : 0
+          }
+        });
+
+        if (dbErr) {
+          console.error('[Bulk Media Delete Diagnostic]', {
+            operation: 'MEDIA_BULK_DELETE',
+            mediaId: id,
+            errorCode: dbErr.code || 'DB_DELETE_FAILED',
+            safeErrorMessage: dbErr.message || 'Database record deletion failed'
+          });
+          failed_db.push({ id, filename: mediaItem.filename || 'asset', error: dbErr.message || 'Database record deletion failed' });
+          failed.push({ id, filename: mediaItem.filename || 'asset', error: dbErr.message || 'Database record deletion failed', category: 'db_delete_failed' });
+          continue;
         }
-      } else {
-        for (const id of successfullyCleanedIds) {
-          const it = itemsToDelete.find(x => x.id === id);
-          if (it) deleted.push({ id, filename: it.filename });
+      } catch (dbEx: any) {
+        console.error('[Bulk Media Delete Diagnostic]', {
+          operation: 'MEDIA_BULK_DELETE',
+          mediaId: id,
+          errorCode: dbEx?.code || 'DB_DELETE_EXCEPTION',
+          safeErrorMessage: dbEx?.message || 'Database deletion exception'
+        });
+        failed_db.push({ id, filename: mediaItem.filename || 'asset', error: dbEx?.message || 'Database record deletion exception' });
+        failed.push({ id, filename: mediaItem.filename || 'asset', error: dbEx?.message || 'Database record deletion exception', category: 'db_delete_exception' });
+        continue;
+      }
+    }
+
+    // 6. Update local fallback cache if item was in local cache
+    if (!isFromDatabase && process.env.NODE_ENV !== 'production') {
+      try {
+        const data = readCmsData();
+        if (data.media) {
+          data.media = data.media.filter((m: any) => String(m.id) !== id);
+          writeCmsData(data);
         }
-      }
-    } catch (err) {
-      console.error('[Bulk Media Delete Error] Database exception:', err);
-      for (const id of successfullyCleanedIds) {
-        const it = itemsToDelete.find(x => x.id === id);
-        failed.push({ id, filename: it?.filename, error: 'Database record deletion exception' });
+      } catch {
+        // ignore in dev
       }
     }
-  } else if (!serverSupabase) {
-    for (const id of successfullyCleanedIds) {
-      const it = itemsToDelete.find(x => x.id === id);
-      if (it) deleted.push({ id, filename: it.filename });
-    }
+
+    deleted.push({
+      id,
+      filename: mediaItem.filename || 'asset',
+      storage_path: effectiveStoragePath
+    });
   }
 
-  // 3. Update local fallback cache for successfully deleted items
-  if (deleted.length > 0) {
-    const data = readCmsData();
-    if (data.media) {
-      const deletedIdSet = new Set(deleted.map(d => d.id));
-      data.media = data.media.filter((m: any) => !deletedIdSet.has(String(m.id)));
-      writeCmsData(data);
-    }
-  }
-
-  // 4. Audit Log
+  // Record Audit Entry
   await recordAuditLog(req, {
     actor: session?.email || 'admin',
     role: session?.role || 'admin',
@@ -1411,32 +1644,67 @@ router.post('/cms/media/bulk-delete', mediaDeleteLimiter, requireAuth, requirePe
     resource: 'media',
     result: deleted.length > 0 ? 'SUCCESS' : (skipped.length > 0 ? 'DENIED' : 'FAILURE'),
     metadata: {
-      total_requested: validIds.length,
+      total_requested: ids.length,
       deleted_count: deleted.length,
       skipped_count: skipped.length,
       failed_count: failed.length,
       deleted_ids: deleted.map(d => d.id),
-      skipped_items: skipped.map(s => ({ id: s.id, filename: s.filename, ref_count: s.references.length }))
+      skipped_items: skipped.map(s => ({ id: s.id, filename: s.filename, ref_count: s.references.length })),
+      failed_items: failed.map(f => ({ id: f.id, error: f.error, category: f.category }))
     }
   });
 
   return res.json({
-    success: true,
-    total_requested: validIds.length,
+    success: failed.length === 0,
+    total_requested: ids.length,
     deleted_count: deleted.length,
     skipped_count: skipped.length,
     failed_count: failed.length,
     deleted,
     skipped,
-    failed
+    failed,
+    missing_storage,
+    failed_storage,
+    failed_db,
+    invalid_records
   });
 });
 
 // ==================== SETTINGS (BY KEY & GENERAL) ====================
 
-// GET /api/cms/settings/:key (Public)
+// Explicit allowlist of genuinely public CMS settings keys
+export const PUBLIC_SETTINGS_KEYS: ReadonlySet<string> = new Set([
+  'general',
+  'seo',
+  'legal',
+  'home',
+  'founder_message',
+  'founder'
+]);
+
+// Internal system and CRM keys that can never be modified via CMS settings
+const RESERVED_INTERNAL_KEYS: ReadonlySet<string> = new Set([
+  'crm_leads',
+  'crm_lead_sequences',
+  'crm_sequence_steps',
+  'crm_sequence_leads',
+  'crm_sequence_deliveries',
+  'crm_lead_campaigns',
+  'crm_campaign_leads',
+  'admin_sessions',
+  'audit_logs',
+  'rate_limits',
+  'feedback_items'
+]);
+
+// GET /api/cms/settings/:key (Public for allowlisted keys only; non-public keys return 404)
 router.get('/cms/settings/:key', async (req, res) => {
   const { key } = req.params;
+
+  // Strict allowlist validation: non-public settings keys are never served via this public endpoint
+  if (!PUBLIC_SETTINGS_KEYS.has(key)) {
+    return res.status(404).json({ error: 'Setting not found' });
+  }
 
   const getDefaultSetting = (settingKey: string) => {
     if (settingKey === 'home') return DEFAULT_HOME_CONFIG;
@@ -1499,6 +1767,10 @@ router.post('/cms/settings/:key', requireAuth, requirePermission(Permission.EDIT
   const { key } = req.params;
   const payload = req.body;
 
+  if (RESERVED_INTERNAL_KEYS.has(key) || key.startsWith('crm_') || key.startsWith('session_')) {
+    return res.status(403).json({ error: 'Modifying internal system or CRM keys via CMS settings endpoint is forbidden' });
+  }
+
   if (serverSupabase) {
     try {
       const { error } = await serverSupabase.from('settings').upsert({
@@ -1532,22 +1804,37 @@ router.post('/cms/settings/:key', requireAuth, requirePermission(Permission.EDIT
   return res.json({ success: true, setting: payload });
 });
 
-// GET /api/cms/settings (Public read / Protected write)
+// GET /api/cms/settings (Public read for allowlisted public CMS settings ONLY)
 router.get('/cms/settings', async (req, res) => {
+  const publicKeysArray = Array.from(PUBLIC_SETTINGS_KEYS);
   if (serverSupabase) {
     try {
-      const { data, error } = await serverSupabase.from('settings').select('*');
+      const { data, error } = await serverSupabase
+        .from('settings')
+        .select('*')
+        .in('key', publicKeysArray);
       if (error) {
         return res.status(503).json({ error: 'Database service unavailable' });
       }
-      return res.json(Array.isArray(data) ? data : []);
+      const filtered = (Array.isArray(data) ? data : [])
+        .filter(item => PUBLIC_SETTINGS_KEYS.has(item.key));
+      return res.json(filtered);
     } catch (err) {
       return res.status(503).json({ error: 'Database service unavailable' });
     }
   }
   try {
     const data = readCmsData();
-    return res.json(data.settings || []);
+    const settings = data.settings || [];
+    if (Array.isArray(settings)) {
+      return res.json(settings.filter((s: any) => PUBLIC_SETTINGS_KEYS.has(s.key)));
+    } else if (settings && typeof settings === 'object') {
+      const result = Object.entries(settings)
+        .filter(([k]) => PUBLIC_SETTINGS_KEYS.has(k))
+        .map(([k, value]) => ({ key: k, value }));
+      return res.json(result);
+    }
+    return res.json([]);
   } catch {
     return res.json([]);
   }
@@ -1558,6 +1845,10 @@ router.post('/cms/settings', requireAuth, requirePermission(Permission.EDIT_CONT
   const setting = req.body;
   if (!setting || !setting.key) {
     return res.status(400).json({ error: 'Invalid setting payload' });
+  }
+
+  if (RESERVED_INTERNAL_KEYS.has(setting.key) || setting.key.startsWith('crm_') || setting.key.startsWith('session_')) {
+    return res.status(403).json({ error: 'Modifying internal system or CRM keys via CMS settings endpoint is forbidden' });
   }
 
   if (serverSupabase) {

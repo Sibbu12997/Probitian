@@ -166,9 +166,13 @@ export interface MediaBulkDeleteResult {
   deleted_count: number;
   skipped_count: number;
   failed_count: number;
-  deleted: Array<{ id: string; filename: string }>;
+  deleted: Array<{ id: string; filename: string; storage_path?: string }>;
   skipped: Array<{ id: string; filename: string; reason: string; references: MediaReference[] }>;
-  failed: Array<{ id: string; filename?: string; error: string }>;
+  failed: Array<{ id: string; filename?: string; error: string; category?: string }>;
+  missing_storage?: Array<{ id: string; filename: string; storage_path: string }>;
+  failed_storage?: Array<{ id: string; filename: string; error: string }>;
+  failed_db?: Array<{ id: string; filename: string; error: string }>;
+  invalid_records?: Array<{ id: string; filename?: string; error: string }>;
 }
 
 export interface SocialLinkItem {

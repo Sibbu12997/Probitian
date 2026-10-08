@@ -52,6 +52,10 @@ export class DistributedRateLimitStore {
     this.hasLoggedProviderError = false;
   }
 
+  clearLocalHits(): void {
+    this.localHits.clear();
+  }
+
   getProviderUnavailableUntil(): number {
     return this.providerUnavailableUntil;
   }
@@ -243,7 +247,7 @@ export const unsubscribeLimiter = createDistributedRateLimiter({ windowMs: 15 * 
 export const contactLimiter = createDistributedRateLimiter({ windowMs: 15 * 60 * 1000, max: 15, prefix: 'contact', message: 'Too many contact messages sent. Please try again later.' }, globalDistributedRateLimitStore);
 export const crmLeadLimiter = createDistributedRateLimiter({ windowMs: 15 * 60 * 1000, max: 60, prefix: 'crm-lead', sensitive: true, message: 'Too many CRM operations requested. Please try again later.' }, globalDistributedRateLimitStore);
 export const uploadLimiter = createDistributedRateLimiter({ windowMs: 15 * 60 * 1000, max: 30, prefix: 'upload', sensitive: true, message: 'Too many upload requests. Please try again later.' }, globalDistributedRateLimitStore);
-export const mediaDeleteLimiter = createDistributedRateLimiter({ windowMs: 15 * 60 * 1000, max: 30, prefix: 'media-del', sensitive: true, message: 'Too many media deletion requests. Please try again later.' }, globalDistributedRateLimitStore);
+export const mediaDeleteLimiter = createDistributedRateLimiter({ windowMs: 15 * 60 * 1000, max: 120, prefix: 'media-del', sensitive: true, message: 'Too many media deletion requests. Please try again later.' }, globalDistributedRateLimitStore);
 export const emailTestLimiter = createDistributedRateLimiter({ windowMs: 15 * 60 * 1000, max: 10, prefix: 'email-test', sensitive: true, message: 'Too many test emails sent. Please try again later.' }, globalDistributedRateLimitStore);
 export const emailSendLimiter = createDistributedRateLimiter({ windowMs: 15 * 60 * 1000, max: 5, prefix: 'email-send', sensitive: true, message: 'Too many campaign broadcasts requested. Please try again later.' }, globalDistributedRateLimitStore);
 export const feedbackLimiter = createDistributedRateLimiter({ windowMs: 15 * 60 * 1000, max: 15, prefix: 'feedback', message: 'Too many feedback submissions. Please try again later.' }, globalDistributedRateLimitStore);

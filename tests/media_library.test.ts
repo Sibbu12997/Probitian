@@ -15,6 +15,7 @@ import { UserRole } from '../server/auth/types';
 import { readCmsData, writeCmsData } from '../server/services/supabase';
 import { findMediaReferences, getMediaSearchTokens } from '../server/services/mediaReferenceService';
 import { getAuditLogs } from '../server/services/audit';
+import { globalDistributedRateLimitStore } from '../server/middleware/rateLimiters';
 
 describe('Admin Media Library Management & Reference Protection', () => {
   const app = express();
@@ -70,6 +71,7 @@ describe('Admin Media Library Management & Reference Protection', () => {
   const testUnusedMediaId2 = 'bbbbbbbb-cccc-dddd-eeee-ffffffffffff';
 
   beforeEach(() => {
+    globalDistributedRateLimitStore.clearLocalHits();
     const data = readCmsData();
     data.media = data.media || [];
 
@@ -280,7 +282,8 @@ describe('Admin Media Library Management & Reference Protection', () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Cookie: adminCookie
+        Cookie: adminCookie,
+        'x-forwarded-for': '198.51.100.99'
       },
       body: JSON.stringify({
         filename: 'test.png',
@@ -318,4 +321,58 @@ describe('Admin Media Library Management & Reference Protection', () => {
     assert.ok(tokens.includes('special_asset_hero.png'));
     assert.ok(tokens.includes('https://example.com/storage/special_asset_hero.png'));
   });
+
+  test('12. Missing Storage Path Protection: Blocks deletion with HTTP 422 and preserves database record', async () => {
+    const testNoPathId = '99999999-8888-7777-6666-555555555555';
+    const data = readCmsData();
+    data.media = data.media || [];
+    data.media.push({
+      id: testNoPathId,
+      filename: 'orphan_no_path.png',
+      url: 'https://example.com/orphan_no_path.png',
+      size_bytes: 1200,
+      mime_type: 'image/png',
+      folder: 'general'
+      // storage_path intentionally missing
+    });
+    writeCmsData(data);
+
+    const res = await fetch(`${baseUrl}/api/cms/media/${testNoPathId}`, {
+      method: 'DELETE',
+      headers: { Cookie: adminCookie }
+    });
+
+    assert.strictEqual(res.status, 422, 'Must return HTTP 422 when storage_path is missing');
+    const resData = await res.json();
+    assert.ok(resData.error.includes('no valid Storage path'));
+
+    // Verify record is preserved in database
+    const postData = readCmsData();
+    const stillExists = postData.media.some((m: any) => m.id === testNoPathId);
+    assert.strictEqual(stillExists, true, 'Record without storage path must NOT be deleted silently');
+
+    // Clean up test fixture
+    postData.media = postData.media.filter((m: any) => m.id !== testNoPathId);
+    writeCmsData(postData);
+  });
+
+  test('13. Bulk Deletion Failure Reporting: Returns success: false when items fail and reports categories', async () => {
+    const res = await fetch(`${baseUrl}/api/cms/media/bulk-delete`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: adminCookie
+      },
+      body: JSON.stringify({
+        ids: ['invalid_id_format!', '00000000-0000-0000-0000-000000000000']
+      })
+    });
+
+    assert.strictEqual(res.status, 200);
+    const data = await res.json();
+    assert.strictEqual(data.success, false, 'Must return success: false when items fail');
+    assert.strictEqual(data.failed_count, 2);
+    assert.ok(Array.isArray(data.invalid_records) && data.invalid_records.length > 0);
+  });
 });
+
