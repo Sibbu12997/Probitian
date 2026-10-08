@@ -545,6 +545,8 @@ CREATE POLICY "Public insert messages" ON public.messages FOR INSERT TO anon, au
 CREATE POLICY "Public insert newsletter" ON public.newsletter FOR INSERT TO anon, authenticated WITH CHECK (true);
 
 -- Service role full access policies
+CREATE POLICY "Users can view own profile" ON public.profiles FOR SELECT TO authenticated USING (auth.uid() = id);
+CREATE POLICY "Service role all profiles" ON public.profiles FOR ALL TO service_role USING (true) WITH CHECK (true);
 CREATE POLICY "Service role all settings" ON public.settings FOR ALL TO service_role USING (true) WITH CHECK (true);
 CREATE POLICY "Service role all projects" ON public.projects FOR ALL TO service_role USING (true) WITH CHECK (true);
 CREATE POLICY "Service role all blogs" ON public.blogs FOR ALL TO service_role USING (true) WITH CHECK (true);
@@ -642,7 +644,7 @@ CREATE TABLE IF NOT EXISTS public.feedback (
   rating SMALLINT NOT NULL CHECK (rating >= 1 AND rating <= 5),
   feedback TEXT NOT NULL,
   service TEXT,
-  consent_public BOOLEAN NOT NULL DEFAULT true,
+  consent_public BOOLEAN NOT NULL DEFAULT false,
   status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
   featured BOOLEAN NOT NULL DEFAULT false,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -656,11 +658,11 @@ CREATE INDEX IF NOT EXISTS idx_feedback_created_at ON public.feedback(created_at
 ALTER TABLE public.feedback ENABLE ROW LEVEL SECURITY;
 
 DO $$ BEGIN
-  CREATE POLICY "Public can view approved feedback"
+  CREATE POLICY "Public read approved feedback"
     ON public.feedback
     FOR SELECT
     TO anon, authenticated
-    USING (status = 'approved');
+    USING (status = 'approved' AND consent_public = true);
 EXCEPTION
   WHEN duplicate_object THEN NULL;
 END $$;

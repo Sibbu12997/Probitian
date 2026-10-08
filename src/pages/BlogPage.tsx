@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { BlogArticle } from '../types';
-import { BLOG_ARTICLES } from '../data/mockData';
 import { cmsService } from '../services/cmsService';
 import { Search, Calendar, Clock, User, ChevronLeft, ChevronRight, ArrowRight } from 'lucide-react';
 import { trackBlogClick } from '../lib/analytics';

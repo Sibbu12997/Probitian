@@ -32,21 +32,22 @@ Official LinkedIn: [https://www.linkedin.com/company/probitian/](https://www.lin
 
 ## 2. Prohibition of Production Data Fallbacks
 
-To ensure consistency, reliability, and security:
-- **No Local JSON Production Fallback**: `/data/cms_settings.json` is strictly an offline local backup. Production CMS queries must **never** silently fall back to reading or writing local JSON files if database connection fails.
+To guarantee zero data contamination and total data consistency:
+- **No Local JSON Production Source**: Production Express APIs query Supabase PostgreSQL directly. `/data/cms_settings.json` is strictly an offline non-production development utility and must **never** be used as a production data source or fallback.
 - **No `localStorage` Production Fallback**: Browser `localStorage` is used exclusively for client-side UI preferences (such as light/dark mode selection). It is **not** a production database.
-- **No `mockData` Production Fallback**: `src/data/mockData.ts` provides baseline seed templates for brand initialization or testing. It is **never** used to serve production content.
-
-If Supabase PostgreSQL is unreachable or returns a database error, Express APIs return explicit HTTP error codes (`HTTP 503 Service Unavailable` or `HTTP 500 Internal Server Error`) rather than serving stale or fake fallback data.
+- **No `mockData` Production Fallback**: `src/data/mockData.ts` contains development and testing fixtures only. The production application must never display mock projects, blogs, courses, or videos merely because the Supabase database contains zero records. Empty tables return empty lists.
+- **No Stale Cached Content**: Production reads reflect live database state. Network or database errors produce explicit HTTP error responses (`HTTP 503 Service Unavailable`), not synthetic fallback content.
 
 ---
 
 ## 3. Major Production Database Tables
 
-The Supabase PostgreSQL database schema comprises 18 primary tables:
+The Supabase PostgreSQL database schema comprises 20 primary tables:
 
 | Table Name | Description | Key Fields |
 | :--- | :--- | :--- |
+| **`feedback`** | Authoritative visitor feedback & testimonials | `id`, `name`, `email`, `role`, `company`, `rating`, `feedback`, `service`, `consent_public`, `status`, `featured`, `created_at`, `updated_at` |
+| **`profiles`** | Authenticated user profiles & RBAC roles | `id` (references `auth.users`), `email`, `full_name`, `role` (`admin`/`editor`/`user`), `avatar_url`, `created_at`, `updated_at` |
 | **`leads`** | B2B CRM prospects and enterprise leads | `id`, `company_name`, `contact_person`, `email`, `phone`, `industry`, `location`, `linkedin`, `powerbi_use_case`, `lead_priority`, `status`, `follow_up_date`, `notes`, `created_at`, `updated_at` |
 | **`lead_campaigns`** | B2B lead outreach email campaigns | `id`, `name`, `campaign_type`, `subject`, `preheader`, `html_content`, `status`, `total_recipients`, `successful_count`, `failed_count`, `sent_at`, `created_at`, `updated_at` |
 | **`campaign_leads`** | Outreach & sequence delivery audit log per lead | `id`, `campaign_id`, `lead_id`, `lead_email`, `lead_company`, `status`, `provider_message_id`, `error_message`, `sent_at`, `created_at` |

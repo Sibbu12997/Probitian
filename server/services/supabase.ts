@@ -39,7 +39,7 @@ export const serverSupabase: SupabaseClient | null = isServerSupabaseConfigured(
 const CMS_DATA_FILE = path.join(process.cwd(), 'data', 'cms_settings.json');
 
 export function readCmsData(): Record<string, any> {
-  if (process.env.NODE_ENV === 'production' && !process.env.AI_STUDIO_APPLET_ID) {
+  if (process.env.NODE_ENV === 'production') {
     throw new Error('Local JSON fallback is strictly disabled in production. Supabase PostgreSQL is the required source of truth.');
   }
   try {
@@ -54,7 +54,7 @@ export function readCmsData(): Record<string, any> {
 }
 
 export function writeCmsData(data: Record<string, any>): void {
-  if (process.env.NODE_ENV === 'production' && !process.env.AI_STUDIO_APPLET_ID) {
+  if (process.env.NODE_ENV === 'production') {
     throw new Error('Local JSON fallback is strictly disabled in production. Supabase PostgreSQL is the required source of truth.');
   }
   try {

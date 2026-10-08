@@ -16,11 +16,15 @@ Prior to releasing a new deployment or major update, ensure every item below is 
 
 ### 1. Database & Infrastructure
 - [x] **Supabase Project Verified**: Target reference `dlaehchzzkjsrarktfsf.supabase.co` online.
+- [x] **Authoritative Database Source of Truth**: Supabase PostgreSQL is the sole production database source of truth. Zero production fallbacks to `mockData`, local JSON (`cms_settings.json`), or `localStorage`.
 - [x] **Supabase Credentials Configured**: `SUPABASE_SECRET_KEY` configured in server environment; `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` configured in client.
-- [x] **Database Schema Verified**: All 18 primary tables (`projects`, `blogs`, `courses`, `videos`, `categories`, `pages`, `settings`, `messages`, `newsletter`, `media`, `email_campaigns`, `email_campaign_recipients`, `leads`, `lead_campaigns`, `campaign_leads`, `rate_limits`, `audit_logs`, `content_revisions`, `admin_session_revocations`) present in Supabase PostgreSQL across all 15 sequential migrations (`0001` through `0015`).
-- [x] **RLS Verified**: Row Level Security enabled on all tables; direct public postgREST access blocked (HTTP 403).
+- [x] **Database Schema & Migrations Reconciled**: All 20 primary tables (`feedback`, `profiles`, `projects`, `blogs`, `courses`, `videos`, `categories`, `pages`, `settings`, `messages`, `newsletter`, `media`, `email_campaigns`, `email_campaign_recipients`, `leads`, `lead_campaigns`, `campaign_leads`, `rate_limits`, `audit_logs`, `content_revisions`, `admin_session_revocations`) reconciled in Supabase PostgreSQL through migration `0017` with forward-only security privilege reconciliation `0018`.
+- [x] **Function Privilege Lockdown**: Privileged RPC functions (`increment_rate_limit`, `prune_expired_session_revocations`, `handle_new_user`, `rls_auto_enable`) have EXECUTE revoked from `anon` and `authenticated`; granted strictly to `service_role`.
+- [x] **RLS Verified**: Row Level Security enabled on all tables; direct public postgREST access blocked on private tables (HTTP 403); content tables (`blogs`, `projects`, `courses`) only permit reading published records.
+- [x] **Profiles Privacy Enforced**: `public.profiles` has zero public access; `authenticated` can only read self (`auth.uid() = id`). Email addresses cannot be scraped via public Data API.
 - [x] **Backend CMS Permissions Verified**: Service role grants executed strictly for backend Express API (`GRANT ALL ON ALL TABLES IN SCHEMA public TO service_role;`).
 - [x] **Distributed Revocation Verified**: `admin_session_revocations` table operational with cluster-wide multi-instance session invalidation and automatic pruning.
+- [x] **Feedback System Verified**: Public submission writes to `public.feedback` in `pending` status; testimonials only display approved records with opt-in consent; submitter email addresses never returned publicly.
 - [x] **Firebase Absent**: Zero active code, imports, or dependencies on Firebase in production.
 - [x] **Cloud SQL Disabled**: Zero active code, imports, or dependencies on Cloud SQL in production.
 
@@ -86,7 +90,7 @@ Prior to releasing a new deployment or major update, ensure every item below is 
 ### 7. CI/CD, Quality & Security Automation
 - [x] **Dependency Lockfile Synchronized**: `package-lock.json` and `package.json` synchronized; `npm ci` installs cleanly.
 - [x] **Typecheck Passed**: `npm run lint` (`tsc --noEmit`) exits with code 0.
-- [x] **Security & Regression Test Suite Passed**: `npm test` runs across all 24 test suites and 171 automated assertions with 0 failures.
+- [x] **Security & Regression Test Suite Passed**: `npm test` runs across all 33 test suites and 194 automated assertions with 0 failures.
 - [x] **Dependency Audit Clean**: `npm audit --audit-level=high` reports 0 vulnerabilities.
 - [x] **Production Build Passed**: `npm run build` completes with zero errors.
 - [x] **Custom CodeQL SAST Configured**: `.github/workflows/codeql.yml` configured with `security-extended,security-and-quality`.

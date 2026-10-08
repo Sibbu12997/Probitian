@@ -326,7 +326,7 @@ npm start
 │   ├── PROBITIAN_USER_GUIDE.md             # Website Learner Guide
 │   ├── PROBITIAN_ADMIN_CONTROL_CENTER_USER_GUIDE.md # Admin Manual
 │   ├── DATABASE_ARCHITECTURE.md            # Supabase PostgreSQL Architecture
-│   ├── DATABASE_MIGRATIONS.md               # Migration Log & Procedure (0001 - 0013)
+│   ├── DATABASE_MIGRATIONS.md               # Migration Log & Procedure (0001 - 0018)
 │   ├── NEWSLETTER_WORKFLOW.md               # Subscription & Welcome Email Pipeline
 │   ├── EMAIL_CAMPAIGN_WORKFLOW.md           # Email Campaign Broadcast Engine
 │   ├── LEAD_OUTREACH_AND_SEQUENCES_WORKFLOW.md # B2B Outreach & Automated Drip Sequences
@@ -352,7 +352,7 @@ npm start
 │   ├── App.tsx                              # Main Application Router
 │   └── main.tsx                             # Entry Point
 ├── supabase/                                # Supabase Schema & Migrations
-│   └── migrations/                          # Sequential Migration Scripts (0001 - 0013)
+│   └── migrations/                          # Sequential Migration Scripts (0001 - 0018)
 ├── generate_docs.js                         # Documentation & PDF Generator Script
 ├── metadata.json                            # Platform Capabilities Config
 ├── package.json                             # Dependencies & Build Scripts
@@ -378,7 +378,7 @@ ProBitian maintains a zero-compromise automated CI/CD and security testing pipel
 ### CI Validation Pipeline (`.github/workflows/ci.yml`)
 - `npm ci`: Ensures clean, reproducible dependency installation from a synchronized `package-lock.json`.
 - `npm run lint`: Validates TypeScript strict type checking (`tsc --noEmit`).
-- `npm test`: Runs automated security, authorization, origin defense, upload sanitization, SEO, CRM, routing, and cryptographic session regression tests (`tsx --test` across 18 test suites and 83 assertions).
+- `npm test`: Runs automated security, authorization, origin defense, upload sanitization, SEO, CRM, routing, and cryptographic session regression tests (`tsx --test` across 33 test suites and 194 assertions).
 - `npm audit --audit-level=high`: Enforces zero high or critical dependency vulnerabilities.
 - `npm run build`: Validates production compilation of the React SPA (Vite) and backend server bundle (esbuild).
 
@@ -391,17 +391,17 @@ ProBitian maintains a zero-compromise automated CI/CD and security testing pipel
 
 ## 21. Production Checklist
 
-- [x] Supabase PostgreSQL project provisioned and configured.
-- [x] All 13 migration files applied (`0001` through `0013`).
-- [x] Table grants verified for `service_role`.
-- [x] RLS enabled and direct public postgREST access blocked.
+- [x] Supabase PostgreSQL project provisioned and configured (`dlaehchzzkjsrarktfsf`).
+- [x] Production database reconciled through migration `0017` with forward-only security privilege reconciliation `0018`.
+- [x] Database source of truth: Supabase PostgreSQL (mockData is strictly for development/test fixtures).
+- [x] Table grants verified for `service_role`; client roles `anon` and `authenticated` restricted via RLS.
+- [x] Privileged RPCs (`increment_rate_limit`, `prune_expired_session_revocations`, `handle_new_user`, `rls_auto_enable`) restricted strictly to `service_role`.
 - [x] Supabase Storage bucket `probitian-media` created and public.
 - [x] Gmail SMTP credentials (`GMAIL_USER`, `GMAIL_APP_PASSWORD`) active.
 - [x] Admin Passkey (`ADMIN_PASSKEY`) configured in server environment.
 - [x] GA4 Measurement ID (`VITE_GA4_MEASUREMENT_ID`) active.
-- [x] Firebase and Cloud SQL dependencies removed.
 - [x] Synchronized `package-lock.json` and clean `npm ci` installation.
-- [x] Production build, TypeScript checks, and security test suite passing cleanly.
+- [x] Production build, TypeScript checks, and security test suite passing cleanly (194 tests across 33 suites).
 - [x] Custom CodeQL advanced SAST workflow active.
 
 ---

@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { LearnTopic } from '../types';
-import { LEARN_TOPICS } from '../data/mockData';
 import { cmsService } from '../services/cmsService';
 import { BarChart3, Database, Table, Cpu, Play, CheckCircle2, BookOpen, Clock, Download, Sparkles, ExternalLink } from 'lucide-react';
 import { trackCourseClick, trackSocialClick, trackCtaClick, trackEvent } from '../lib/analytics';

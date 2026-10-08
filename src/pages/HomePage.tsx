@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { NavPage, ProjectItem, BlogArticle, YouTubeVideo, HomePageConfig, PublicFeedbackItem } from '../types';
-import { FEATURE_CARDS, PROJECTS, YOUTUBE_VIDEOS, BLOG_ARTICLES, WHY_PROBITIAN_CARDS } from '../data/mockData';
+import { FEATURE_CARDS, WHY_PROBITIAN_CARDS } from '../data/mockData';
 import { cmsService } from '../services/cmsService';
 import { BannerGraphic } from '../components/BannerGraphic';
 import { FeedbackModal } from '../components/FeedbackModal';
@@ -15,9 +15,9 @@ interface HomePageProps {
 
 export const HomePage: React.FC<HomePageProps> = ({ onNavigate, onSelectProject, onSelectBlog }) => {
   const [homeConfig, setHomeConfig] = useState<HomePageConfig | null>(null);
-  const [projects, setProjects] = useState<ProjectItem[]>(PROJECTS);
-  const [blogs, setBlogs] = useState<BlogArticle[]>(BLOG_ARTICLES);
-  const [videos, setVideos] = useState<YouTubeVideo[]>(YOUTUBE_VIDEOS);
+  const [projects, setProjects] = useState<ProjectItem[]>([]);
+  const [blogs, setBlogs] = useState<BlogArticle[]>([]);
+  const [videos, setVideos] = useState<YouTubeVideo[]>([]);
   const [feedbackTestimonials, setFeedbackTestimonials] = useState<PublicFeedbackItem[]>([]);
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
 
@@ -41,13 +41,13 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate, onSelectProject,
       if (results[0].status === 'fulfilled' && results[0].value) {
         setHomeConfig(results[0].value);
       }
-      if (results[1].status === 'fulfilled' && results[1].value && results[1].value.length > 0) {
+      if (results[1].status === 'fulfilled' && Array.isArray(results[1].value)) {
         setProjects(results[1].value);
       }
-      if (results[2].status === 'fulfilled' && results[2].value && results[2].value.length > 0) {
+      if (results[2].status === 'fulfilled' && Array.isArray(results[2].value)) {
         setBlogs(results[2].value);
       }
-      if (results[3].status === 'fulfilled' && results[3].value && results[3].value.length > 0) {
+      if (results[3].status === 'fulfilled' && Array.isArray(results[3].value)) {
         setVideos(results[3].value);
       }
       if (results[4].status === 'fulfilled' && Array.isArray(results[4].value)) {

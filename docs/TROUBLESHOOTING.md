@@ -362,6 +362,22 @@ Official LinkedIn: [https://www.linkedin.com/company/probitian/](https://www.lin
 - **Solution**: Reassign or replace the asset reference in the corresponding CMS module (e.g. choose a different cover image for the blog post), then retry the deletion. Alternatively, confirm intentional force removal if available.
 - **Prevention**: The Media Library provides pre-deletion verification and preserves the active selection state if an operation is blocked.
 
+### 36. Supabase Security Privilege Lockdown & Least-Privilege Verification
+- **Problem**: Security auditing or Supabase linting flags public execute permissions on stored procedures such as `increment_rate_limit()`, `prune_expired_session_revocations()`, `handle_new_user()`, or `rls_auto_enable()`.
+- **Cause**: Earlier migrations or automated scripts inadvertently granted `EXECUTE` on sensitive SECURITY DEFINER routines to `anon` or `authenticated` roles.
+- **How to Verify**: Inspect function privileges in Supabase dashboard or query `information_schema.routine_privileges`. Check that `grantee` only contains `service_role`.
+- **Solution**: Apply forward-only migration `0018_security_privilege_reconciliation.sql`. Never edit previously applied migrations `0001` through `0017` in place.
+- **Prevention**: Privileged functions must always follow least-privilege standards (`REVOKE ALL FROM anon, authenticated, PUBLIC; GRANT EXECUTE TO service_role;`).
+
+---
+
+### 37. Feedback Moderation & Public Privacy Isolation
+- **Problem**: Feedback submitted by visitors is not visible immediately on the homepage or testimonials section.
+- **Cause**: By security design, all visitor feedback is written to `public.feedback` with `status = 'pending'`, `featured = false`, and requires explicit consent (`consent_public = true`). Only feedback moderated and set to `status = 'approved'` appears publicly.
+- **How to Verify**: Log into the Admin Control Center, navigate to **Feedback Management**, and verify the submission status.
+- **Solution**: Review the feedback submission in the Admin Feedback Manager. When approved, change the status to `Approved`. If desired, toggle `Featured` (only permitted for approved items).
+- **Privacy Assurance**: The public feedback API (`GET /api/feedback`) strictly excludes submitter email addresses and private administrative metadata, returning only displayable author name, rating, role, company, service, and quote.
+
 ---
 
 *Documentation maintained by Shivam Singh — ProBitian.*

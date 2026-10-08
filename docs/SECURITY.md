@@ -77,7 +77,25 @@ Probitian is designed with a defense-in-depth, zero-trust security architecture 
 ## 3. Database Security & Row Level Security (RLS)
 
 - **Least-Privilege Schema Grants:** Public/unauthenticated clients (`anon`, `authenticated`) have zero direct privileges on private tables.
-- **Strict Private Isolation:** Tables `leads`, `lead_campaigns`, `campaign_leads`, `email_campaigns`, and `email_campaign_recipients` are completely inaccessible to `anon` and `authenticated` roles.
+- **Privileged Helper & RPC Function Lockdown:**
+  - `public.increment_rate_limit(TEXT, BIGINT, INT)`: EXECUTE revoked from `anon`, `authenticated`, and `PUBLIC`; granted strictly to `service_role`.
+  - `public.prune_expired_session_revocations(BIGINT)`: EXECUTE revoked from `anon`, `authenticated`, and `PUBLIC`; granted strictly to `service_role`.
+  - `public.handle_new_user()` / `public.handle_auth_user_profile()`: EXECUTE revoked from `anon`, `authenticated`, and `PUBLIC`; granted strictly to `service_role`.
+  - `public.rls_auto_enable()`: EXECUTE revoked from `anon`, `authenticated`, and `PUBLIC`; granted strictly to `service_role`.
+  - No SECURITY DEFINER function is ever exposed as an unauthenticated or public API.
+- **Profiles Table RLS & Privacy (`public.profiles`):**
+  - Profiles contain user emails and RBAC role assignments.
+  - Row Level Security is enabled with zero permissions for `anon`.
+  - Authenticated users can only read their own record (`auth.uid() = id`).
+  - Public Data API access is blocked to prevent email harvesting. Full administrative access is mediated exclusively via the Express backend with `service_role`.
+- **Public Feedback & Testimonials Security (`public.feedback`):**
+  - Public submissions write to `public.feedback` with `status = 'pending'`, `featured = false`, and opt-in `consent_public = true`.
+  - Public read queries return only approved records with public consent (`status = 'approved' AND consent_public = true`).
+  - Submitter email addresses and moderation metadata are never exposed in public responses.
+- **Content Table RLS Protection (`blogs`, `projects`, `courses`):**
+  - Direct Supabase Data API queries can only read published items (`blogs.status = 'published'`, `projects.published = true`, `courses.published = true`).
+  - Draft, scheduled, or unpublished records are never exposed to public or authenticated clients through direct PostgREST calls.
+- **Strict Private Isolation:** Tables `leads`, `lead_campaigns`, `campaign_leads`, `email_campaigns`, `email_campaign_recipients`, `admin_session_revocations`, and `audit_logs` are completely inaccessible to `anon` and `authenticated` roles.
 - **Backend Exclusivity:** All management operations are mediated exclusively through the Express backend using the Supabase `service_role` key.
 - **Inbound Submissions:** Contact messages and newsletter subscriptions are granted `INSERT-only` permissions; client roles cannot read or list submitted records.
 
@@ -119,7 +137,7 @@ Rate limiters protect critical endpoints from brute force, distributed scanning,
 The continuous integration pipeline validates code quality, type safety, regression suites, dependency integrity, and production build readiness on every push and pull request:
 1. **Clean Installation:** `npm ci` (verifies synchronized dependency tree in `package-lock.json`).
 2. **Typecheck & Static Analysis:** `npm run lint` (`tsc --noEmit`).
-3. **Security & Regression Tests:** `npm test` (`tsx --test tests/**/*.test.ts` across all 24 test suites and 171 automated assertions).
+3. **Security & Regression Tests:** `npm test` (`tsx --test tests/**/*.test.ts` across all 33 test suites and 194 automated assertions).
 4. **Vulnerability Audit:** `npm audit --audit-level=high` (verifies zero high/critical severity dependency advisories).
 5. **Production Build:** `npm run build` (compiles Vite React SPA and bundles `server.ts` with `esbuild`).
 

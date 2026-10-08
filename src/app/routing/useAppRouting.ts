@@ -2,20 +2,19 @@ import { useState, useEffect, useCallback } from 'react';
 import { NavPage, BlogArticle } from '../../types';
 import { parseRoute, getBlogSlug } from '../../lib/routing';
 import { trackNavigationClick } from '../../lib/analytics';
-import { BLOG_ARTICLES } from '../../data/mockData';
 import { cmsService } from '../../services/cmsService';
 import { RoutingControls } from './types';
 
 export function useAppRouting(): RoutingControls {
   const [currentPage, setCurrentPage] = useState<NavPage>('home');
   const [currentBlogSlug, setCurrentBlogSlug] = useState<string | null>(null);
-  const [blogsList, setBlogsList] = useState<BlogArticle[]>(BLOG_ARTICLES);
+  const [blogsList, setBlogsList] = useState<BlogArticle[]>([]);
   const [selectedBlog, setSelectedBlog] = useState<BlogArticle | null>(null);
 
   // Fetch blogs list early so slug matching can resolve CMS-created blogs
   useEffect(() => {
     cmsService.getBlogs().then((data) => {
-      if (data && data.length > 0) {
+      if (Array.isArray(data)) {
         setBlogsList(data);
       }
     }).catch((err) => {

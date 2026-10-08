@@ -41,9 +41,9 @@ The ProBitian documentation follows a strict source-of-truth build pipeline:
 
 ### 🗄 Database & Storage Architecture
 - 🏛 **[Database Architecture Specification](DATABASE_ARCHITECTURE.md)**  
-  Detailed specification of Supabase PostgreSQL as the single authoritative production database, 18 primary table schemas (including `audit_logs`, `content_revisions`, `admin_session_revocations`), distributed revocation, and RLS policies.
+  Detailed specification of Supabase PostgreSQL as the single authoritative production database, 20 primary table schemas (including `feedback`, `profiles`, `audit_logs`, `content_revisions`, `admin_session_revocations`), distributed revocation, and RLS policies.
 - 🔄 **[Database Migrations & Schema Management](DATABASE_MIGRATIONS.md)**  
-  Sequential migration log (`0001` to `0015`), non-destructive schema rules, and migration execution procedures.
+  Sequential migration log (`0001` to `0018`), non-destructive schema rules, live production reconciliation state, and migration execution procedures.
 - 🖼 **[Media Library & Supabase Storage Specification](MEDIA_LIBRARY.md)**  
   Supabase Storage (`probitian-media` bucket) architecture, folder organization, upload API, multi-select, bulk delete, pre-deletion referential usage check, and SVG DOMPurify sanitization.
 

@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { ProjectItem } from '../types';
-import { PROJECTS } from '../data/mockData';
 import { cmsService } from '../services/cmsService';
 import { ExternalLink, Filter, Search } from 'lucide-react';
 import { trackProjectClick } from '../lib/analytics';
