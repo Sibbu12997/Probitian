@@ -58,13 +58,30 @@ describe('Supabase Storage Object RLS & Security Boundary Verification', () => {
   });
 
   test('4. Anonymous direct deletion from probitian-media is blocked (returns 0 deleted items)', async () => {
-    const { data, error } = await anonClient.storage
-      .from('probitian-media')
-      .remove(['uploads/1788251642865_7b06f22b_WhatsApp_Image_2026-08-13_at_10.42.41__1_.jpeg']);
+    // SECURITY COMPLIANCE: Never target a real production asset.
+    // Create an isolated disposable probe via privileged client first.
+    const probePath = `uploads/audit_disposable_probe_${Date.now()}.txt`;
+    const serviceKey = (process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
+    if (serviceKey) {
+      const adminClient = createClient(url, serviceKey, { auth: { persistSession: false } });
+      await adminClient.storage.from('probitian-media').upload(probePath, Buffer.from('test-probe'), { contentType: 'text/plain' });
+    }
 
-    assert.strictEqual(error, null);
-    assert.ok(Array.isArray(data));
-    assert.strictEqual(data.length, 0, 'Anonymous client must not delete storage objects');
+    try {
+      const { data, error } = await anonClient.storage
+        .from('probitian-media')
+        .remove([probePath]);
+
+      assert.strictEqual(error, null);
+      assert.ok(Array.isArray(data));
+      assert.strictEqual(data.length, 0, 'Anonymous client must not delete storage objects');
+    } finally {
+      // Safe cleanup of probe
+      if (serviceKey) {
+        const adminClient = createClient(url, serviceKey, { auth: { persistSession: false } });
+        await adminClient.storage.from('probitian-media').remove([probePath]);
+      }
+    }
   });
 
   test('5. Legacy buckets (blogs, media, projects, settings) block anonymous direct uploads via RLS', async () => {
