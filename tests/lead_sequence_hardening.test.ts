@@ -328,7 +328,7 @@ describe('Lead Sequence Hardening & Validation Suite', () => {
       assert.match(migration, /CREATE TABLE public[.]crm_sequence_lock_tokens/i, 'used owner tokens must be retained to fence delayed workers');
       assert.match(migration, /INSERT INTO public[.]crm_sequence_lock_tokens \(owner_token, lock_key\)/i);
       assert.match(migration, /FROM public[.]crm_sequence_lock_tokens[\s\S]*WHERE owner_token = p_owner_token/i);
-      assert.match(migration, /IF FOUND THEN[\\s\\S]*expires_at > pg_catalog[.]clock_timestamp\\(\\)/i);
+      assert.match(migration, /IF FOUND THEN[\s\S]*expires_at > pg_catalog[.]clock_timestamp\(\)/i);
       assert.doesNotMatch(migration, /DELETE FROM public[.]crm_sequence_locks/i, 'released lock rows must be retained as tombstones');
       assert.equal((migration.match(/SET search_path = ''/g) || []).length, 2, 'both SECURITY DEFINER functions must use an empty search_path');
       assert.match(migration, /REVOKE ALL ON TABLE public[.]crm_sequence_locks FROM PUBLIC, anon, authenticated, service_role/i);
