@@ -10,7 +10,7 @@ import { serverSupabase, readCmsData, writeCmsData } from '../services/supabase'
 import { sanitizeSvgString, validateFileSignature } from '../security/sanitizer';
 import { emailService } from '../../src/services/emailService';
 import { recordAuditLog } from '../services/audit';
-import { findMediaReferences, MediaReferenceCheckError } from '../services/mediaReferenceService';
+import { findMediaReferences } from '../services/mediaReferenceService';
 import { getStorageService } from '../services/storage';
 
 const router = express.Router();
