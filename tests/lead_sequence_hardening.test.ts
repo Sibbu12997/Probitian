@@ -309,10 +309,12 @@ describe('Lead Sequence Hardening & Validation Suite', () => {
     test('production sequence locks use owner-token lease RPCs rather than rate-limit counters', () => {
       const processor = readFileSync(resolve(process.cwd(), 'server/services/sequenceProcessor.ts'), 'utf8');
       const migration = readFileSync(resolve(process.cwd(), 'supabase/migrations/20261012131500_add_crm_sequence_processing_locks.sql'), 'utf8');
+      const crmRoutes = readFileSync(resolve(process.cwd(), 'server/routes/crm.ts'), 'utf8');
 
       assert.match(processor, /try_acquire_crm_sequence_lock/);
       assert.match(processor, /release_crm_sequence_lock/);
       assert.doesNotMatch(processor, /increment_rate_limit/);
+      assert.doesNotMatch(crmRoutes, /req\.query\.key/, 'scheduler secrets must not be accepted in URLs where they can leak into logs');
       assert.match(processor, /leaseRenewed/);
       assert.match(migration, /lock_key text PRIMARY KEY/i);
       assert.match(migration, /owner_token uuid NOT NULL/i);
