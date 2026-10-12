@@ -1,4 +1,6 @@
 import { test, describe } from 'node:test';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import { campaignEmailService } from '../src/services/campaignEmailService';
@@ -304,29 +306,19 @@ describe('Lead Sequence Hardening & Validation Suite', () => {
   });
 
   describe('6. Distributed Locking & Fail-Closed Guard', () => {
-    test('distributed cycle lock fails closed when database RPC throws or is unavailable', async () => {
-      // Simulate RPC error condition
-      const mockRpcError = new Error('RPC increment_rate_limit service down');
-      const acquireLockSimulation = async (rpcFails: boolean, isProd: boolean): Promise<boolean> => {
-        if (rpcFails) {
-          if (isProd) return false; // Must strictly fail closed in production
-          return false; // Fail closed
-        }
-        return true;
-      };
+    test('production sequence locks use owner-token lease RPCs rather than rate-limit counters', () => {
+      const processor = readFileSync(resolve(process.cwd(), 'server/services/sequenceProcessor.ts'), 'utf8');
+      const migration = readFileSync(resolve(process.cwd(), 'supabase/migrations/20261012131500_add_crm_sequence_processing_locks.sql'), 'utf8');
 
-      const lockAcquiredInFailure = await acquireLockSimulation(true, true);
-      assert.strictEqual(lockAcquiredInFailure, false, 'Distributed lock must fail closed on RPC error');
-    });
-
-    test('step claim fails closed to prevent duplicate dispatch across concurrent instances', async () => {
-      const acquireStepClaimSimulation = async (rpcFails: boolean): Promise<boolean> => {
-        if (rpcFails) return false; // Strictly fail closed
-        return true;
-      };
-
-      const stepClaimInFailure = await acquireStepClaimSimulation(true);
-      assert.strictEqual(stepClaimInFailure, false, 'Step claim must fail closed to prevent concurrent sends');
+      assert.match(processor, /try_acquire_crm_sequence_lock/);
+      assert.match(processor, /release_crm_sequence_lock/);
+      assert.doesNotMatch(processor, /increment_rate_limit/);
+      assert.match(processor, /leaseRenewed/);
+      assert.match(migration, /lock_key text PRIMARY KEY/i);
+      assert.match(migration, /owner_token uuid NOT NULL/i);
+      assert.match(migration, /expires_at <= clock_timestamp\(\)/i);
+      assert.match(migration, /GRANT EXECUTE ON FUNCTION public\.try_acquire_crm_sequence_lock[^\n]* TO service_role/i);
+      assert.match(migration, /GRANT EXECUTE ON FUNCTION public\.release_crm_sequence_lock[^\n]* TO service_role/i);
     });
   });
 });
