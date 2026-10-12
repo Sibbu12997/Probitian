@@ -93,6 +93,8 @@ CREATE TABLE IF NOT EXISTS public.videos (
   category TEXT DEFAULT 'Power BI',
   playlist TEXT,
   tags TEXT[] DEFAULT '{}',
+  published BOOLEAN NOT NULL DEFAULT FALSE,
+  published_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 

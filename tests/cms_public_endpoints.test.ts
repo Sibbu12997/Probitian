@@ -139,6 +139,29 @@ describe('Public CMS Endpoints Resiliency & Production Regression Tests', () => 
     }
   });
 
+  test('GET /api/cms/videos returns only published videos to authenticated USER without EDIT_CONTENT', async () => {
+    const userToken = createSignedSessionToken('user@probitian.com', UserRole.USER);
+    const res = await fetch(`${baseUrl}/api/cms/videos`, {
+      headers: { Cookie: `admin_session=${userToken}` }
+    });
+    assert.strictEqual(res.status, 200);
+    const data = await res.json();
+    assert.ok(Array.isArray(data));
+    for (const video of data) {
+      assert.strictEqual(video.published, true, 'Unpublished videos must never be returned to non-editors');
+    }
+  });
+
+  test('GET /api/cms/videos allows authenticated EDITOR to access video list', async () => {
+    const editorToken = createSignedSessionToken('editor@probitian.com', UserRole.EDITOR);
+    const res = await fetch(`${baseUrl}/api/cms/videos`, {
+      headers: { Cookie: `admin_session=${editorToken}` }
+    });
+    assert.strictEqual(res.status, 200);
+    const data = await res.json();
+    assert.ok(Array.isArray(data));
+  });
+
   test('GET /api/cms/categories returns HTTP 200 with JSON array', async () => {
     const res = await fetch(`${baseUrl}/api/cms/categories`);
     assert.strictEqual(res.status, 200);

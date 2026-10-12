@@ -25,7 +25,7 @@ This document outlines the step-by-step production deployment workflow for ProBi
         ↓
 2. AUTOMATED CI/CD VALIDATION
    ├── Typecheck & Lint: `npm run lint` (`tsc --noEmit`)
-   ├── Security & Regression Suite: `npm test` (`tsx --test tests/**/*.test.ts` across 24 test suites & 171 assertions)
+   ├── Security & Regression Suite: `npm test` (runs the repository test suites)
    ├── Dependency Vulnerability Audit: `npm audit --audit-level=high`
    └── Custom CodeQL Security Analysis: `+security-extended,security-and-quality`
         ↓
@@ -87,3 +87,13 @@ Immediately following a deployment:
 ---
 
 *Documentation maintained by Shivam Singh — ProBitian.*
+
+
+## 8. Pull Request-Only GitHub Workflow
+
+- Never push commits directly to `main` from AI Studio or a local workspace.
+- Create a dedicated feature or fix branch from the latest `main`.
+- Commit related changes to that branch and open a pull request targeting `main`.
+- Review the complete diff and wait for typecheck, tests, dependency audit, build, and security analysis to pass before merging.
+- Do not merge merely because local tests pass; inspect the actual GitHub Actions results for the PR head commit.
+- Configure production-only secrets in the hosting secret manager before deploying. Never use CI test credentials in production.
