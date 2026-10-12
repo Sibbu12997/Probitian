@@ -20,7 +20,7 @@ router.post(['/newsletter', '/newsletter/subscribe'], newsletterLimiter, async (
   const { email } = req.body;
   const cleanEmail = (email || '').trim().toLowerCase();
 
-  console.log(`[NEWSLETTER] Subscription request received for: ${cleanEmail}`);
+  console.log('[NEWSLETTER] Subscription request received.');
 
   if (!cleanEmail || !cleanEmail.includes('@') || !cleanEmail.includes('.')) {
     return res.status(400).json({ success: false, message: 'Valid email address is required' });
@@ -121,7 +121,7 @@ router.post(['/newsletter', '/newsletter/subscribe'], newsletterLimiter, async (
   const unsubUrl = `${reqProtocol}://${reqHost}/api/newsletter/unsubscribe?token=${unsubToken}`;
 
   // Send welcome email with signed unsubscribe token
-  console.log(`[NEWSLETTER] Sending welcome email for: ${cleanEmail}`);
+  console.log('[NEWSLETTER] Sending welcome email.');
   const emailRes = await emailService.sendWelcomeEmail(cleanEmail, unsubUrl);
 
   return res.status(200).json({
