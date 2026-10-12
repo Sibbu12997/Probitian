@@ -35,13 +35,14 @@ export interface StorageService {
 }
 
 export class DefaultStorageService implements StorageService {
+  constructor(private readonly client: typeof serverSupabase = serverSupabase) {}
   async uploadFile(
     storagePath: string,
     buffer: Buffer,
     contentType: string
   ): Promise<StorageUploadResult> {
-    if (serverSupabase) {
-      const { data: uploadData, error: uploadErr } = await serverSupabase.storage
+    if (this.client) {
+      const { data: uploadData, error: uploadErr } = await this.client.storage
         .from(PROBITIAN_MEDIA_BUCKET)
         .upload(storagePath, buffer, {
           contentType,
@@ -53,7 +54,7 @@ export class DefaultStorageService implements StorageService {
         throw new Error(`Upload failed: ${uploadErr.message}`);
       }
 
-      const { data: publicUrlData } = serverSupabase.storage
+      const { data: publicUrlData } = this.client.storage
         .from(PROBITIAN_MEDIA_BUCKET)
         .getPublicUrl(uploadData.path);
 
@@ -70,8 +71,8 @@ export class DefaultStorageService implements StorageService {
   }
 
   async removeFile(storagePath: string): Promise<boolean> {
-    if (serverSupabase) {
-      const { error } = await serverSupabase.storage
+    if (this.client) {
+      const { error } = await this.client.storage
         .from(PROBITIAN_MEDIA_BUCKET)
         .remove([storagePath]);
       return !error;
@@ -80,16 +81,19 @@ export class DefaultStorageService implements StorageService {
   }
 
   async saveMediaRecord(record: MediaRecord): Promise<MediaRecord> {
-    if (serverSupabase) {
-      await serverSupabase.from('media').upsert(record);
+    if (this.client) {
+      const { error } = await this.client.from('media').upsert(record);
+      if (error) {
+        throw new Error(`Media metadata persistence failed: ${error.message}`);
+      }
       return record;
     }
     return record;
   }
 
   async deleteMediaRecord(id: string): Promise<boolean> {
-    if (serverSupabase) {
-      const { error } = await serverSupabase.from('media').delete().eq('id', id);
+    if (this.client) {
+      const { error } = await this.client.from('media').delete().eq('id', id);
       return !error;
     }
     return true;
@@ -113,9 +117,9 @@ export function resetStorageService(): void {
 export async function ensureStorageBucket(): Promise<void> {
   if (!serverSupabase) return;
   try {
-    const { data: bucket, error } = await serverSupabase.storage.getBucket(PROBITIAN_MEDIA_BUCKET);
+    const { data: bucket, error } = await this.client.storage.getBucket(PROBITIAN_MEDIA_BUCKET);
     if (error || !bucket) {
-      await serverSupabase.storage.createBucket(PROBITIAN_MEDIA_BUCKET, { public: true });
+      await this.client.storage.createBucket(PROBITIAN_MEDIA_BUCKET, { public: true });
       console.log(`[Supabase Storage] Created bucket "${PROBITIAN_MEDIA_BUCKET}" successfully.`);
     }
   } catch (err) {

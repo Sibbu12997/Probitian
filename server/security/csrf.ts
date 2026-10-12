@@ -18,6 +18,9 @@ export function csrfDefenseMiddleware(req: express.Request, res: express.Respons
     }
 
     const referer = req.headers.referer;
+    if (!origin && !referer) {
+      return res.status(403).json({ error: 'Forbidden: Origin or Referer header required for state-changing request' });
+    }
     if (!origin && referer) {
       try {
         const refOrigin = new URL(referer).origin;

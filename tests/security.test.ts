@@ -386,6 +386,41 @@ describe('4. CORS, CSRF & Origin Security', () => {
     }
   });
 
+
+  test('csrfDefenseMiddleware rejects state-changing admin, cms, and crm requests without Origin and Referer', () => {
+    const protectedPaths = [
+      '/api/admin/roles/assign',
+      '/api/cms/projects',
+      '/api/crm/leads'
+    ];
+    for (const path of protectedPaths) {
+      let statusCalled = 0;
+      const fakeReq: any = {
+        method: 'POST',
+        path,
+        get: (header: string) => header.toLowerCase() === 'host' ? 'probitian.com' : undefined,
+        headers: {}
+      };
+      const fakeRes: any = {
+        status: (code: number) => { statusCalled = code; return { json: () => {} }; }
+      };
+      let nextCalled = false;
+      csrfDefenseMiddleware(fakeReq, fakeRes, () => { nextCalled = true; });
+      assert.strictEqual(statusCalled, 403, `Expected 403 for missing Origin/Referer on ${path}`);
+      assert.strictEqual(nextCalled, false, `Expected next() not to be called for ${path}`);
+    }
+  });
+
+  test('CORS does not trust arbitrary AI Studio or Cloud Run tenant origins', async () => {
+    const { isAllowedOrigin } = await import('../server/security/cors');
+    const fakeReq: any = {
+      get: (header: string) => header.toLowerCase() === 'host' ? 'probitian.com' : undefined
+    };
+    assert.strictEqual(isAllowedOrigin('https://probitian.ai.studio', fakeReq), true);
+    assert.strictEqual(isAllowedOrigin('https://attacker.ai.studio', fakeReq), false);
+    assert.strictEqual(isAllowedOrigin('https://ais-dev-attacker.run.app', fakeReq), false);
+  });
+
   test('csrfDefenseMiddleware preserves public form endpoints exemptions', () => {
     const publicEndpoints = [
       { path: '/api/newsletter', method: 'POST' },
@@ -1647,4 +1682,59 @@ describe('10. Server RBAC, Authentication & Session Hardening Verification', () 
     assert.strictEqual(checkAfter.verified, true);
     assert.strictEqual(checkAfter.reason, 'NONE');
   });
+});
+
+
+import { DefaultStorageService, type MediaRecord } from '../server/services/storage';
+
+test('DefaultStorageService throws when media metadata upsert fails', async () => {
+  const fakeClient: any = {
+    from: () => ({
+      upsert: async () => ({ error: { message: 'simulated database failure' } })
+    })
+  };
+  const service = new DefaultStorageService(fakeClient);
+  const record = {
+    id: 'media-test',
+    filename: 'image.png',
+    original_filename: 'image.png',
+    storage_path: 'uploads/image.png',
+    public_url: 'https://example.test/image.png',
+    url: 'https://example.test/image.png',
+    size_bytes: 1,
+    file_size: 1,
+    mime_type: 'image/png',
+    alt_text: '',
+    category: 'test',
+    folder: 'uploads',
+    uploaded_at: new Date(0).toISOString(),
+    created_at: new Date(0).toISOString()
+  } satisfies MediaRecord;
+  await assert.rejects(() => service.saveMediaRecord(record), /Media metadata persistence failed: simulated database failure/);
+});
+
+test('DefaultStorageService returns media record after successful metadata upsert', async () => {
+  const fakeClient: any = {
+    from: () => ({
+      upsert: async () => ({ error: null })
+    })
+  };
+  const service = new DefaultStorageService(fakeClient);
+  const record = {
+    id: 'media-test-success',
+    filename: 'image.png',
+    original_filename: 'image.png',
+    storage_path: 'uploads/image.png',
+    public_url: 'https://example.test/image.png',
+    url: 'https://example.test/image.png',
+    size_bytes: 1,
+    file_size: 1,
+    mime_type: 'image/png',
+    alt_text: '',
+    category: 'test',
+    folder: 'uploads',
+    uploaded_at: new Date(0).toISOString(),
+    created_at: new Date(0).toISOString()
+  } satisfies MediaRecord;
+  assert.strictEqual(await service.saveMediaRecord(record), record);
 });

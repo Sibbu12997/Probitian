@@ -78,6 +78,7 @@ describe('25. Sensitive Rate Limiter Production & RPC Health', () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Origin': baseUrl,
         'x-forwarded-for': '198.51.100.101'
       },
       body: JSON.stringify({ passkey: adminPasskey })
@@ -115,6 +116,7 @@ describe('25. Sensitive Rate Limiter Production & RPC Health', () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Origin': baseUrl,
         'x-forwarded-for': '198.51.100.102'
       },
       body: JSON.stringify({ passkey: adminPasskey })
@@ -146,6 +148,7 @@ describe('25. Sensitive Rate Limiter Production & RPC Health', () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Origin': baseUrl,
         'x-forwarded-for': '198.51.100.103'
       },
       body: JSON.stringify({ passkey: adminPasskey })
@@ -164,6 +167,7 @@ describe('25. Sensitive Rate Limiter Production & RPC Health', () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Origin': baseUrl,
         'x-forwarded-for': '198.51.100.104'
       },
       body: JSON.stringify({ passkey: adminPasskey })
@@ -206,6 +210,7 @@ describe('25. Sensitive Rate Limiter Production & RPC Health', () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Origin': baseUrl,
           'Cookie': sensitiveCookie,
           'x-forwarded-for': '198.51.100.105'
         },
