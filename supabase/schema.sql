@@ -470,7 +470,6 @@ CREATE INDEX IF NOT EXISTS idx_blogs_slug ON public.blogs(slug);
 CREATE INDEX IF NOT EXISTS idx_blogs_status ON public.blogs(status);
 CREATE INDEX IF NOT EXISTS idx_projects_published ON public.projects(published);
 CREATE INDEX IF NOT EXISTS idx_courses_published ON public.courses(published);
-CREATE INDEX IF NOT EXISTS idx_videos_published_created_at ON public.videos(published, created_at DESC);
 
 -- ============================================================
 -- 6. STRICT ROW LEVEL SECURITY (RLS) & PRIVILEGES
