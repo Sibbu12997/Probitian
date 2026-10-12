@@ -1,43 +1,35 @@
 # Production Readiness: Secrets and Schema History
 
-This document records deployment checks that cannot be proven by repository CI alone. It does not change production data or the Supabase migration ledger.
+This document records deployment checks that cannot be proven by repository CI alone. Repository migration consolidation does not change production data or the Supabase migration ledger.
 
 ## Unsubscribe signing secret
 
 - The server validates `UNSUBSCRIBE_SECRET` before listening in production.
 - The value must be at least 32 UTF-8 bytes.
-- CI's `UNSUBSCRIBE_SECRET` is explicitly test-only and must never be copied to production.
-- Before deploying, configure a unique random secret in the actual hosting provider's runtime environment and restart/redeploy the service.
-- Verify configuration without exposing the secret value: check that the provider reports the variable as configured, then check startup logs and test the unsubscribe-token flow. Never print the value in logs or paste it into tickets.
-- If the secret is absent/weak, startup is expected to fail. Do not weaken the validation to make deployment pass.
+- CI's secret is test-only and must never be copied to production.
+- Configure a unique random secret in the actual hosting provider's runtime environment and restart/redeploy the service.
+- Verify configuration without exposing the value: check that the variable is configured, inspect startup logs, and test the unsubscribe-token flow. Never print the value in logs or paste it into tickets.
+- If the secret is absent or weak, startup is expected to fail. Do not weaken validation to make deployment pass.
 
 **Status:** repository validation is implemented; live hosting configuration is not verifiable from this repository. An operator with hosting access must confirm it.
 
-## Supabase migration history reconciliation
+## Consolidated database baseline
 
-The production migration ledger currently records these nine applied migrations (version → ledger name):
+- The single maintained fresh-install baseline is `supabase/migrations/0001_probitian_baseline.sql`.
+- The old individual migration files were removed from the active directory; their history remains in Git and the filenames are listed in `supabase/legacy-migrations.md`.
+- The baseline is for a new/empty Supabase project only. It must not be run against the existing production project.
+- The live production migration ledger contains nine applied entries. It remains authoritative historical metadata; do not reset or edit it to match the single repository baseline.
+- The baseline uses `'user'` as the default profile role for least privilege and follows production's integer feedback rating type and current auth profile trigger/function.
+- CMS content remains intentionally unseeded.
 
-| Version | Recorded name |
-| --- | --- |
-| `20261007044036` | `0017_reconcile_production_schema` |
-| `20261007051339` | `0018_public_cms_visibility_hardening` |
-| `20261008044849` | `0019_reconcile_migration_18_drift` |
-| `20261008085420` | `0020_harden_settings_rls` |
-| `20261009164408` | `restrict_storage_object_policies` |
-| `20261012050720` | `add_video_publication_controls` |
-| `20261012050802` | `harden_public_insert_and_feedback_access` |
-| `20261012062531` | `consolidate_permissive_rls_policies` |
-| `20261012063805` | `drop_redundant_admin_revocation_index` |
+## Before any new-project bootstrap
 
-The repository also contains numbered SQL files whose names do not map one-to-one to these timestamped ledger versions (for example, `0019_harden_settings_rls.sql` represents the settings-hardening change recorded in production as `0020_harden_settings_rls`; `0021_restrict_storage_object_policies.sql` is the storage-policy change recorded without the numeric prefix).
+1. Create a disposable Supabase project with the required platform-managed schemas, roles and extensions.
+2. Apply the baseline once to that empty project.
+3. Compare columns, types, defaults, constraints, indexes, RLS policies, grants, functions and triggers.
+4. Test auth/profile creation, public reads, admin writes, forms, media metadata persistence, newsletter and unsubscribe flows.
+5. Fix any bootstrap errors before using the baseline elsewhere.
 
-### Safe reconciliation rules
+## Existing production changes
 
-1. Treat the live Supabase migration ledger and live schema as the production record. Do not rerun applied DDL just to make filenames match.
-2. Do not rewrite `0001_initial_schema.sql` as if it were a current snapshot. It is a historical baseline and includes old defaults that differ from production.
-3. For every ledger entry, maintain an explicit mapping to its repository SQL file and verify the file's statements against the intended production change.
-4. For schema parity, compare columns, types, nullability, defaults, indexes, constraints, RLS state/policies, grants, and relevant functions/triggers—not only table names.
-5. Any missing historical migration source must be recovered from version control/deployment artifacts or documented as unrecoverable. Do not create fake historical migration entries or mark unverified changes as applied.
-6. Once the mapping is reviewed, add a forward-only reconciliation migration only for a demonstrated schema difference. Test it on a disposable database before applying it to production.
-
-**Status:** the production ledger is captured above, but complete schema parity is not claimed by this document. The mapping and full structural diff still require review.
+Use reviewed forward-only migrations for future production changes. Do not apply the fresh-install baseline, reset migration history, fake historical entries, or assume that repository file consolidation upgrades the live database.
