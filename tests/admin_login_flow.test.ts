@@ -48,7 +48,7 @@ describe('24. Admin Authentication & Iframe Warning Differentiation', () => {
   test('2. Normal passkey login -> returns HTTP 200, Sets HttpOnly session cookie, and returns authenticated admin details', async () => {
     const res = await fetch(`${baseUrl}/api/admin/verify-passkey`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-forwarded-for': '198.51.100.42' },
+      headers: { 'Content-Type': 'application/json', 'Origin': baseUrl, 'x-forwarded-for': '198.51.100.42' },
       body: JSON.stringify({ passkey: adminPasskey })
     });
 
@@ -70,7 +70,7 @@ describe('24. Admin Authentication & Iframe Warning Differentiation', () => {
     // Obtain session cookie
     const loginRes = await fetch(`${baseUrl}/api/admin/verify-passkey`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-forwarded-for': '198.51.100.43' },
+      headers: { 'Content-Type': 'application/json', 'Origin': baseUrl, 'x-forwarded-for': '198.51.100.43' },
       body: JSON.stringify({ passkey: adminPasskey })
     });
     assert.strictEqual(loginRes.status, 200);
@@ -113,7 +113,7 @@ describe('24. Admin Authentication & Iframe Warning Differentiation', () => {
   test('5. Invalid passkey -> returns HTTP 401 with standard invalid-credentials error', async () => {
     const res = await fetch(`${baseUrl}/api/admin/verify-passkey`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-forwarded-for': '198.51.100.44' },
+      headers: { 'Content-Type': 'application/json', 'Origin': baseUrl, 'x-forwarded-for': '198.51.100.44' },
       body: JSON.stringify({ passkey: 'completely_incorrect_passkey_999' })
     });
 
