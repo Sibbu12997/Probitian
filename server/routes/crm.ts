@@ -1562,7 +1562,7 @@ router.post(['/cron/process-sequences', '/api/cron/process-sequences'], async (r
   try {
     const authHeader = (req.headers.authorization || '').trim();
     const bearerToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : authHeader;
-    const cronKey = String(req.headers['x-cron-key'] || req.query.key || '').trim();
+    const cronKey = String(req.headers['x-cron-key'] || '').trim();
     const expectedSecret = (process.env.CRON_SECRET || '').trim();
 
     // Check authorization: Bearer token, x-cron-key, or authenticated admin session
