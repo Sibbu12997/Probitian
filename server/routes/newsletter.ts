@@ -103,7 +103,6 @@ router.post(['/newsletter', '/newsletter/subscribe'], newsletterLimiter, async (
         });
       }
       existingLocal.status = 'active';
-      subscriberRecord = existingLocal;
     } else {
       subscriberRecord = {
         id: 'sub-' + Date.now(),
