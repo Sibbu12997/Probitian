@@ -316,6 +316,8 @@ describe('Lead Sequence Hardening & Validation Suite', () => {
       assert.doesNotMatch(processor, /increment_rate_limit/);
       assert.doesNotMatch(crmRoutes, /req\.query\.key/, 'scheduler secrets must not be accepted in URLs where they can leak into logs');
       assert.match(processor, /leaseRenewed/);
+      assert.match(processor, /cycleLockLost/);
+      assert.match(processor, /State snapshot was not persisted/);
       assert.match(migration, /lock_key text PRIMARY KEY/i);
       assert.match(migration, /owner_token uuid NOT NULL/i);
       assert.match(migration, /expires_at <= clock_timestamp\(\)/i);
