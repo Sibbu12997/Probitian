@@ -39,10 +39,11 @@ The consolidated SQL baseline at `supabase/migrations/0001_probitian_baseline.sq
 4. DATABASE SCHEMA REVIEW
    └── Identify if changes require database schema updates
         ├── If Schema Updated: Create new migration in `supabase/migrations/`
-        ├── Review SQL for idempotency (CREATE IF NOT EXISTS, ADD COLUMN IF NOT EXISTS)
-        ├── Apply SQL in Supabase Dashboard SQL Editor
-        ├── Execute Grants (`GRANT ALL ON ALL TABLES IN SCHEMA public TO service_role;` for backend API only)
-        └── Verify RLS and Table Permissions
+        ├── Review data-loss risk, lock impact, effective privileges, and safe re-run behavior
+        ├── Use `IF NOT EXISTS` only when it cannot conceal schema drift; inspect existing object definitions
+        ├── Apply reviewed SQL through the approved migration process
+        ├── Grant only the specific table/column privileges required; avoid blanket `GRANT ALL` statements
+        └── Verify RLS, grants, and server-side filtering (privileged Supabase clients can bypass RLS)
         ↓
 5. API & SYSTEM SMOKE TESTS
    └── Test API endpoints (`/api/health`, `/api/cms/settings`)
