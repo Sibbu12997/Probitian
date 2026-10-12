@@ -1,103 +1,64 @@
 # ProBitian — Production Release Checklist
 
-Official Pre-Release Audit & Verification Checklist for ProBitian.
+Use this checklist for each release. Check an item only after verifying it in the target environment; this document does not certify the current production state.
 
-Project Owner: **Shivam Singh**  
-Official Website: [https://probitian.ai.studio/](https://probitian.ai.studio/)  
-Official Communication Email: [probitianofficial@gmail.com](mailto:probitianofficial@gmail.com)  
-Official X: [https://x.com/Probitian](https://x.com/Probitian) (@Probitian)  
-Official LinkedIn: [https://www.linkedin.com/company/probitian/](https://www.linkedin.com/company/probitian/)  
+## 1. Code and build
 
----
+- [ ] Confirm the target commit and review its diff.
+- [ ] Run `npm ci`.
+- [ ] Run `npm run lint`.
+- [ ] Run `npm test`; verify integration tests are configured for a non-production project only.
+- [ ] Run `npm run build`.
+- [ ] Review dependency audit results and resolve or explicitly accept relevant findings.
+- [ ] Confirm CI and CodeQL checks passed for the commit.
 
-## 📋 Comprehensive Production Verification Checklist
+## 2. Database and migrations
 
-Prior to releasing a new deployment or major update, ensure every item below is verified and checked:
+- [ ] Compare `supabase/migrations/` with the live Supabase migration history; repository files alone do not prove application.
+- [ ] Review new SQL for data loss, grants, RLS behavior, lock impact and idempotency.
+- [ ] Back up production data using the approved recovery process before a risky schema change.
+- [ ] Apply only the reviewed forward-only migration to the intended environment.
+- [ ] Verify affected columns, indexes, policies, grants and functions in the live database.
+- [ ] Confirm public inserts have only intended column-level privileges.
+- [ ] Confirm public endpoints using a privileged Supabase client explicitly filter published/public records.
+- [ ] Confirm no historical migration, table reset or destructive seed ran against production.
 
-### 1. Database & Infrastructure
-- [x] **Supabase Project Verified**: Target reference `dlaehchzzkjsrarktfsf.supabase.co` online.
-- [x] **Authoritative Database Source of Truth**: Supabase PostgreSQL is the sole production database source of truth. Zero production fallbacks to `mockData`, local JSON (`cms_settings.json`), or `localStorage`.
-- [x] **Supabase Credentials Configured**: `SUPABASE_SECRET_KEY` configured in server environment; `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` configured in client.
-- [x] **Database Schema & Migrations Reconciled**: All 20 primary tables (`feedback`, `profiles`, `projects`, `blogs`, `courses`, `videos`, `categories`, `pages`, `settings`, `messages`, `newsletter`, `media`, `email_campaigns`, `email_campaign_recipients`, `leads`, `lead_campaigns`, `campaign_leads`, `rate_limits`, `audit_logs`, `content_revisions`, `admin_session_revocations`) reconciled in Supabase PostgreSQL through migration `0017` with forward-only security privilege reconciliation `0018`.
-- [x] **Function Privilege Lockdown**: Privileged RPC functions (`increment_rate_limit`, `prune_expired_session_revocations`, `handle_new_user`, `rls_auto_enable`) have EXECUTE revoked from `anon` and `authenticated`; granted strictly to `service_role`.
-- [x] **RLS Verified**: Row Level Security enabled on all tables; direct public postgREST access blocked on private tables (HTTP 403); content tables (`blogs`, `projects`, `courses`) only permit reading published records.
-- [x] **Profiles Privacy Enforced**: `public.profiles` has zero public access; `authenticated` can only read self (`auth.uid() = id`). Email addresses cannot be scraped via public Data API.
-- [x] **Backend CMS Permissions Verified**: Service role grants executed strictly for backend Express API (`GRANT ALL ON ALL TABLES IN SCHEMA public TO service_role;`).
-- [x] **Distributed Revocation Verified**: `admin_session_revocations` table operational with cluster-wide multi-instance session invalidation and automatic pruning.
-- [x] **Feedback System Verified**: Public submission writes to `public.feedback` in `pending` status; testimonials only display approved records with opt-in consent; submitter email addresses never returned publicly.
-- [x] **Firebase Absent**: Zero active code, imports, or dependencies on Firebase in production.
-- [x] **Cloud SQL Disabled**: Zero active code, imports, or dependencies on Cloud SQL in production.
+## 3. Authentication and security
 
-### 2. Authentication, RBAC & Admin Session Security
-- [x] **HttpOnly Cookie Transport**: Session token transmitted strictly inside `admin_session` cookie (`HttpOnly`, `Secure`, `SameSite=Lax`); omitted from JSON response bodies.
-- [x] **HMAC-SHA-256 Signatures**: Tamper-proof session payloads containing user ID, role, timestamps, and cryptographic nonces.
-- [x] **Distributed Revocation Check**: Server verifies token against `public.admin_session_revocations` with fail-closed security in production (`STORE_UNAVAILABLE`).
-- [x] **Server-Authoritative RBAC**: `requireAdmin`, `requireRole`, and `requirePermission` enforced on all protected API endpoints.
-- [x] **Timing Attack Defense**: Constant-time passkey validation via `crypto.timingSafeEqual`.
-- [x] **Top-Level vs Iframe Context**: Native top-level browser tabs persist HttpOnly cookies cleanly without warnings; embedded preview iframes provide informative guidance and "Open in New Tab" navigation.
+- [ ] Verify admin login, session verification, logout and session revocation.
+- [ ] Verify server-side RBAC for sensitive routes; do not rely on client-side visibility.
+- [ ] Confirm secrets are configured server-side and absent from client bundles and repository changes.
+- [ ] Verify public contact, newsletter and feedback flows cannot set administrative/moderation fields.
+- [ ] Verify direct Storage upload/list/update/delete behavior matches the intended policy; separately confirm public asset delivery.
+- [ ] Review Supabase Security Advisor and dependency findings; record any accepted limitations.
 
-### 3. Email, Lead Outreach & Automated Sequences
-- [x] **Newsletter Subscriptions Tested**: `POST /api/newsletter` saves subscribers to Supabase.
-- [x] **Welcome Email Tested**: Welcome email dispatched via Gmail SMTP (`probitianofficial@gmail.com`) only after DB persistence.
-- [x] **Contact Form Tested**: Visitor enquiries saved to Supabase `messages` table and alert emails sent.
-- [x] **Admin Reply Tested**: Direct email replies sent from Admin Messages Inbox via Gmail SMTP.
-- [x] **Campaign Save Tested**: `POST /api/admin/email-campaigns` upserts drafts to Supabase `email_campaigns`.
-- [x] **Campaign Test Email Tested**: Test emails dispatched successfully.
-- [x] **Campaign Status Tracking Tested**: Campaign status lifecycle (`draft` → `sending` → `sent`) and recipient delivery logs (`email_campaign_recipients`) functioning.
-- [x] **B2B Lead CRM Tested**: Manual lead creation, editing, status filtering, and search verified in `public.leads`.
-- [x] **CSV Lead Import Tested**: Header aliases, quote handling, and duplicate modes (Skip/Update) verified with Supabase persistence.
-- [x] **Selective Lead Enrollment Tested**: Multi-select CRM checkboxes enroll only targeted leads into sequences.
-- [x] **Multi-Step Sequences Tested**: Multi-step delay scheduling (`delay_days`), subjects, and dynamic personalization tags (`{{company_name}}`, `{{contact_person}}`, etc.) verified.
-- [x] **Background Worker Tested**: 60-second automated interval worker and "Process Due Steps Now" trigger evaluated successfully.
-- [x] **Automatic Safety Stop Tested**: Sequence halts immediately when a lead transitions to terminal status (`Replied`, `Interested`, `Converted`, `Do Not Contact`, `Bounced`).
-- [x] **Lead Drawer Inspection Tested**: Real-time sequence progress and manual single-lead Stop button tested.
+## 4. Functional smoke tests
 
-### 4. Media & Storage
-- [x] **Media Upload Tested**: Files uploaded to Supabase Storage `probitian-media` bucket and metadata written to `public.media`.
-- [x] **Single & Multi-Select Tested**: Checkbox selection, Select All / Deselect All, and dynamic selected counter verified.
-- [x] **Pre-Deletion Usage Verification Tested**: Pre-check endpoint (`GET /api/cms/media/:id/usage`) detects asset usage across settings, blogs, projects, courses, and pages before deletion.
-- [x] **Bulk Deletion Tested**: Batch removal (`POST /api/cms/media/bulk-delete`) removes storage files and database metadata with confirmation modal dialogs and non-destructive failure handling.
-- [x] **SVG Security Verified**: DOMPurify sanitization strips scripts and malicious XML entities from uploaded SVG graphics.
-- [x] **Branding Tested**: Logo and banner assets selectable from Media Library and rendered globally.
+- [ ] Open the public website and check primary navigation and responsive layout.
+- [ ] Verify public content only exposes records intended for publication.
+- [ ] Verify admin content creation/editing and publish/unpublish behavior.
+- [ ] Submit a contact message and verify it is stored with safe initial status.
+- [ ] Submit a newsletter subscription and verify duplicate/invalid inputs are handled safely.
+- [ ] Upload and view an approved media asset; test media reference checks before deletion.
+- [ ] Verify analytics, email workflows and CRM features affected by the release.
+- [ ] Verify sitemap, robots rules, canonical URLs and not-found handling.
 
-### 5. Analytics, Routing & Security
-- [x] **GA4 Verified**: Google Analytics 4 Measurement ID configured and client events firing.
-- [x] **API 404 Handling Verified**: Catch-all `app.all('/api/*', ...)` returns JSON `404` errors before SPA fallback.
-- [x] **Secrets Isolated**: Zero client exposures of `SUPABASE_SECRET_KEY`, `GMAIL_APP_PASSWORD`, `ADMIN_PASSKEY`, or `GEMINI_API_KEY`.
+## 5. Deployment and rollback readiness
 
-### 6. SEO, Crawling & Metadata Verification
-- [x] **Production Domain Verified**: Normalized to `https://probitian.ai.studio/` across canonicals, Open Graph, Twitter, JSON-LD, sitemap, and robots.
-- [x] **HTTPS Protocol Verified**: All internal URLs enforce HTTPS without redirect loops.
-- [x] **Path-Based Routes Verified**: Navigation uses clean browser paths (`/`, `/about`, `/projects`, `/blog`, `/learn`, `/contact`, `/privacy`, `/terms`) without `#` fragments.
-- [x] **Canonical URLs Verified**: Dynamic canonical `<link rel="canonical">` updates on every route without trailing query strings.
-- [x] **Page Titles Verified**: Unique, descriptive titles with `\| ProBItian` suffix rendered across all pages.
-- [x] **Meta Descriptions Verified**: Informative meta descriptions populated for each public page.
-- [x] **Robots Directives Verified**: Public pages use `index, follow`; `/admin` and 404 views use `noindex, nofollow`.
-- [x] **Open Graph & Twitter Cards Verified**: `og:*` and `twitter:*` tags render with image fallbacks and exact URLs.
-- [x] **JSON-LD Structured Data Verified**: `EducationalOrganization`, `WebSite`, `BreadcrumbList`, and `BlogPosting` schemas serialize valid JSON.
-- [x] **robots.txt Verified**: Accessible at `/robots.txt` with `Allow: /`, disallowing `/admin` & `/api/`, and pointing to sitemap.
-- [x] **sitemap.xml Verified**: Accessible at `/sitemap.xml` with valid XML tags, updated `lastmod` dates, and priorities.
-- [x] **Blog Article SEO Verified**: Direct URL `/blog/:slug` access loads full content with custom article metadata and schema.
-- [x] **Draft Articles Excluded**: Unpublished blogs omitted from `sitemap.xml` and public listing.
-- [x] **Admin Noindex Verified**: Admin portal is protected with `noindex, nofollow` and excluded from crawling.
-- [x] **HTTP 404 Status Verified**: Invalid URLs return true `HTTP 404 Not Found` response with 404 UI.
-- [x] **Internal Links Verified**: Standard semantic `<a href="...">` links used across menus, cards, and footers.
-- [x] **Image Alt-Text Verified**: Descriptive `alt` attributes present across all meaningful imagery.
-- [x] **Mobile Responsiveness Verified**: Mobile layouts tested and verified at 375px, 390px, and 412px widths.
-- [x] **Technical Performance Status**: Bundle minification and fast local response times verified (Real-world Core Web Vitals: NOT VERIFIED pending live PageSpeed run).
-- [x] **Google Search Console Status**: Technical prerequisites complete (Live indexing status: NOT VERIFIED pending site owner console setup).
+- [ ] Confirm deployment configuration, environment variables and health checks.
+- [ ] Deploy the reviewed build using the normal release pipeline.
+- [ ] Re-run smoke tests against the deployed service.
+- [ ] Inspect application logs and error rates.
+- [ ] Confirm a documented rollback path exists for the application and database change.
+- [ ] Record commit SHA, migration versions, checks run, exceptions and verification results.
 
-### 7. CI/CD, Quality & Security Automation
-- [x] **Dependency Lockfile Synchronized**: `package-lock.json` and `package.json` synchronized; `npm ci` installs cleanly.
-- [x] **Typecheck Passed**: `npm run lint` (`tsc --noEmit`) exits with code 0.
-- [x] **Security & Regression Test Suite Passed**: `npm test` runs across all 33 test suites and 194 automated assertions with 0 failures.
-- [x] **Dependency Audit Clean**: `npm audit --audit-level=high` reports 0 vulnerabilities.
-- [x] **Production Build Passed**: `npm run build` completes with zero errors.
-- [x] **Custom CodeQL SAST Configured**: `.github/workflows/codeql.yml` configured with `security-extended,security-and-quality`.
-- [x] **CodeQL Default Setup Disabled**: GitHub CodeQL Default Setup disabled to avoid conflicts with custom advanced workflow.
-- [x] **Fresh Deployment Tested**: Application verified live at `https://probitian.ai.studio/`.
-- [x] **Data Persistence Verified**: Subscriptions, messages, and settings persist safely across container restarts.
+## 6. Recent database controls to remember
 
----
+Production migrations applied on 12 October 2026 include:
 
-*Checklist verified by Shivam Singh — ProBitian.*
+- `20261012050720_add_video_publication_controls.sql`: video publication fields and public published-only RLS policy.
+- `20261012050802_harden_public_insert_and_feedback_access.sql`: feedback direct-read restriction and column-limited public inserts for messages/newsletter.
+
+Because the Express server can use a privileged Supabase client, the public video API must independently filter `published = true`. Verify that route and its fallback path before declaring this control complete.
+
+See [Architecture](ARCHITECTURE.md), [Database Migrations](DATABASE_MIGRATIONS.md), [Security](SECURITY.md), and [Deployment Workflow](DEPLOYMENT_WORKFLOW.md).
