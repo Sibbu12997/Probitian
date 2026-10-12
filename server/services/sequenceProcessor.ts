@@ -127,6 +127,7 @@ export async function executeSequenceProcessingCycle(options?: {
   const claimedStepLocks: Array<{ key: string; ownerToken: string }> = [];
   let cycleLockLost = false;
   let leaseRenewalInFlight = false;
+  let leaseRenewalPromise: Promise<void> | null = null;
   const startTime = Date.now();
 
   // Keep the lease alive during a slow provider call or a long batch, not only
@@ -134,7 +135,7 @@ export async function executeSequenceProcessingCycle(options?: {
   const leaseHeartbeat = setInterval(() => {
     if (leaseRenewalInFlight || cycleLockLost) return;
     leaseRenewalInFlight = true;
-    void (async () => {
+    leaseRenewalPromise = (async () => {
       const cycleRenewed = await acquireDistributedLock(CYCLE_LOCK_KEY, cycleLockToken);
       if (!cycleRenewed) {
         cycleLockLost = true;
@@ -153,6 +154,7 @@ export async function executeSequenceProcessingCycle(options?: {
       })
       .finally(() => {
         leaseRenewalInFlight = false;
+        leaseRenewalPromise = null;
       });
   }, 60_000);
 
@@ -715,6 +717,9 @@ export async function executeSequenceProcessingCycle(options?: {
     };
   } finally {
     clearInterval(leaseHeartbeat);
+    // Wait for an already-started renewal before releasing ownership, otherwise a late
+    // renewal could recreate the lock after release and strand it until lease expiry.
+    if (leaseRenewalPromise) await leaseRenewalPromise;
     isLocalProcessingActive = false;
     await releaseDistributedLock(CYCLE_LOCK_KEY, cycleLockToken);
   }
