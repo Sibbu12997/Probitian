@@ -1,4 +1,6 @@
-# ProBitian — SEO User Acceptance Testing (UAT) Report
+# ProBitian — Historical SEO UAT Snapshot (2026-08-26)
+
+**Historical evidence notice:** The PASS results below describe checks recorded on 26 August 2026 only. They are not evidence that the current production deployment still passes. Re-run this matrix before using it for a release decision, update the test date and evidence, and record any failures instead of carrying old PASS values forward.
 
 ## 1. Environment & Scope
 

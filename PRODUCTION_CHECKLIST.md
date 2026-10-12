@@ -1,36 +1,9 @@
-# ProBitian Production Readiness & Governance Checklist
+# Production checklist entry point
 
-This checklist must be verified prior to every production release and deployment.
+The previous version of this file used pre-checked boxes for security, database, accessibility, and backup claims without attaching release-specific evidence. Those checks should not be treated as proof of the current production state.
 
----
+Use the maintained [Production Release Checklist](docs/PRODUCTION_RELEASE_CHECKLIST.md) for each release. It is intentionally unchecked until an operator verifies each item in the target environment.
 
-## 1. Security & Authentication
-- [x] Admin session token omitted from all login JSON response bodies.
-- [x] `HttpOnly`, `Secure`, `SameSite` cookies configured for session transport.
-- [x] Dedicated `SESSION_SECRET` configured in production environment.
-- [x] Server-authoritative RBAC (`USER`, `EDITOR`, `ADMIN`) enforced on every protected route.
-- [x] Passwords, passkeys, and API secrets are never logged in plaintext.
-- [x] Admin audit trail records all sensitive administrative operations with automatic metadata sanitization.
+Repository CI can validate code, tests, dependency audit, and build. It cannot by itself prove live hosting configuration, production database state, backup recoverability, end-to-end production behavior, or accessibility conformance.
 
-## 2. Database & Migrations
-- [x] All database schema changes versioned sequentially in `/supabase/migrations/`.
-- [x] Row Level Security (RLS) enabled on all public tables with strict least privilege.
-- [x] Sensitive tables (`leads`, `campaigns`, `audit_logs`, `content_revisions`) strictly restricted to `service_role`.
-- [x] Media storage bucket (`probitian-media`) allows public read while rejecting direct unauthorized client uploads.
-
-## 3. SEO, Observability & Health
-- [x] Dynamic server-side SEO prerendering active for all canonical SPA routes.
-- [x] `robots.txt` and `sitemap.xml` dynamically generated and accessible.
-- [x] Admin paths (`/admin`, `/api/*`) flagged with `noindex, nofollow` headers.
-- [x] `/api/health` returns status, uptime, version, and database connectivity.
-- [x] Error handling masks internal database stack traces from public API callers.
-
-## 4. UI/UX, Accessibility & Brand
-- [x] Semantic HTML headings and WCAG 2.2 AA compliant contrast.
-- [x] Responsive layout tested across mobile, tablet, laptop, and desktop viewports.
-- [x] Canonical branding assets served securely from verified storage/public paths.
-
-## 5. Release & Disaster Recovery
-- [x] Semantic Versioning synchronized across `package.json`, `metadata.json`, and backend constants.
-- [x] `CHANGELOG.md` updated with release highlights.
-- [x] Backup export verified via Admin Backup Manager.
+**Database safety:** `supabase/migrations/0001_probitian_baseline.sql` is for new/empty Supabase projects only. Never apply it to the existing production database. Use reviewed forward-only migrations for production changes.

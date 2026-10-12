@@ -38,7 +38,7 @@ See [Architecture](docs/ARCHITECTURE.md) and [Documentation Index](docs/README.m
 
 ## Quick start
 
-Requirements: a supported Node.js version and npm. Read [Connection and Environment Setup](docs/CONNECTION_SETUP.md) before configuring credentials.
+Requirements: Node.js 22 (the version used by CI) and npm. **npm is the supported package manager; `package-lock.json` is the authoritative lockfile.** Do not mix package managers or rely on an out-of-date secondary lockfile. Read [Connection and Environment Setup](docs/CONNECTION_SETUP.md) before configuring credentials.
 
 ```bash
 npm ci
