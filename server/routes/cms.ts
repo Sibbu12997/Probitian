@@ -1961,6 +1961,8 @@ const handleUpload = async (req: express.Request, res: express.Response) => {
   const { fileData, fileName, filename, contentType, mimeType, category, folder, altText } = req.body;
   const rawFileName = fileName || filename;
   const rawContentType = contentType || mimeType;
+  let uploadedStoragePath: string | null = null;
+  let mediaRecordSaved = false;
 
   if (!fileData || !rawFileName) {
     return res.status(400).json({ error: 'fileData (base64) and fileName are required' });
@@ -2006,6 +2008,7 @@ const handleUpload = async (req: express.Request, res: express.Response) => {
     const storageService = getStorageService();
 
     const uploadRes = await storageService.uploadFile(uniquePath, bufferToUpload, effectiveMime);
+    uploadedStoragePath = uploadRes.path;
     publicUrl = uploadRes.publicUrl;
 
     const mediaItem = {
@@ -2026,6 +2029,7 @@ const handleUpload = async (req: express.Request, res: express.Response) => {
     };
 
     await storageService.saveMediaRecord(mediaItem);
+    mediaRecordSaved = true;
 
     if (!serverSupabase) {
       const data = readCmsData();
@@ -2052,6 +2056,18 @@ const handleUpload = async (req: express.Request, res: express.Response) => {
 
     return res.json({ success: true, url: publicUrl, media: mediaItem });
   } catch (err: any) {
+    // Compensate for a successful storage upload when its database metadata write fails.
+    // Never remove an existing file unless this request actually uploaded it and the record was not saved.
+    let cleanupError: string | null = null;
+    if (uploadedStoragePath && !mediaRecordSaved) {
+      try {
+        const removed = await getStorageService().removeFile(uploadedStoragePath);
+        if (!removed) cleanupError = 'Storage cleanup returned an unsuccessful result';
+      } catch (cleanupErr: any) {
+        cleanupError = cleanupErr?.message || 'Storage cleanup failed';
+      }
+    }
+
     const session = (req as any).adminSession;
     await recordAuditLog(req, {
       actor: session?.email || 'admin',
@@ -2061,10 +2077,14 @@ const handleUpload = async (req: express.Request, res: express.Response) => {
       result: 'FAILURE',
       metadata: {
         filename: rawFileName,
-        error: err?.message || 'File upload failed'
+        error: err?.message || 'File upload failed',
+        storage_cleanup_error: cleanupError
       }
     });
-    return res.status(500).json({ error: err.message || 'File upload failed' });
+    if (cleanupError) {
+      console.error('[Media Upload Cleanup Failure]', { storagePath: uploadedStoragePath, error: cleanupError });
+    }
+    return res.status(500).json({ error: 'File upload failed' });
   }
 };
 
