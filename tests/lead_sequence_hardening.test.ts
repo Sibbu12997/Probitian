@@ -329,6 +329,9 @@ describe('Lead Sequence Hardening & Validation Suite', () => {
       assert.match(migration, /REVOKE ALL ON TABLE public[.]crm_sequence_locks FROM PUBLIC, anon, authenticated, service_role/i);
       assert.doesNotMatch(migration, /GRANT (SELECT|INSERT|UPDATE|DELETE).*crm_sequence_locks TO service_role/i, 'table DML must remain private behind the RPCs');
       assert.match(migration, /expires_at <= pg_catalog[.]clock_timestamp\(\)/i);
+      assert.match(migration, /expires_at > pg_catalog[.]clock_timestamp\(\)[\s\S]*owner_token = EXCLUDED[.]owner_token/i, 'only a live owner can renew its lease');
+      assert.match(migration, /expires_at <= pg_catalog[.]clock_timestamp\(\)[\s\S]*owner_token <> EXCLUDED[.]owner_token/i, 'an expired owner token cannot revive its lease');
+      assert.match(migration, /UPDATE public[.]crm_sequence_locks[\s\S]*SET expires_at = pg_catalog[.]clock_timestamp\(\)/i, 'release must expire a tombstone instead of deleting the row');
       assert.match(migration, /GRANT EXECUTE ON FUNCTION public\.try_acquire_crm_sequence_lock[^\n]* TO service_role/i);
       assert.match(migration, /GRANT EXECUTE ON FUNCTION public\.release_crm_sequence_lock[^\n]* TO service_role/i);
     });
