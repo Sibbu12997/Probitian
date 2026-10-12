@@ -26,7 +26,6 @@ router.post(['/newsletter', '/newsletter/subscribe'], newsletterLimiter, async (
     return res.status(400).json({ success: false, message: 'Valid email address is required' });
   }
 
-  let subscriberRecord: any = null;
 
   if (serverSupabase) {
     try {
@@ -104,13 +103,13 @@ router.post(['/newsletter', '/newsletter/subscribe'], newsletterLimiter, async (
       }
       existingLocal.status = 'active';
     } else {
-      subscriberRecord = {
+      const newSubscriber = {
         id: 'sub-' + Date.now(),
         email: cleanEmail,
         status: 'active',
         created_at: new Date().toISOString()
       };
-      data.subscribers.unshift(subscriberRecord);
+      data.subscribers.unshift(newSubscriber);
     }
     writeCmsData(data);
   }
