@@ -9,7 +9,13 @@ export function csrfDefenseMiddleware(req: express.Request, res: express.Respons
     return next();
   }
 
-  if (isStateChanging && (req.path.startsWith('/api/admin') || req.path.startsWith('/api/cms') || req.path.startsWith('/api/crm'))) {
+  // External schedulers authenticate with a secret header; browser/session-authenticated
+  // cron requests must still pass the same Origin/Referer checks as other privileged writes.
+  const isCronSecretRequest = req.path.startsWith('/api/cron') &&
+    (Boolean(req.headers.authorization) || Boolean(req.headers['x-cron-key']));
+  if (isCronSecretRequest) return next();
+
+  if (isStateChanging && (req.path.startsWith('/api/admin') || req.path.startsWith('/api/cms') || req.path.startsWith('/api/crm') || req.path.startsWith('/api/cron'))) {
     const origin = req.headers.origin;
     const isAllowed = isAllowedOrigin(origin, req);
 

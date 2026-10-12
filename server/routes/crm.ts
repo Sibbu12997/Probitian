@@ -1540,7 +1540,7 @@ router.post(['/admin/lead-sequences/process', '/api/admin/lead-sequences/process
       forceProductionSend: Boolean(forceProductionSend)
     });
 
-    return res.json({
+    return res.status(result.success ? 200 : 503).json({
       success: result.success,
       message: result.message,
       stats: result.stats,
@@ -1557,7 +1557,7 @@ router.post(['/cron/process-sequences', '/api/cron/process-sequences'], async (r
   try {
     const authHeader = (req.headers.authorization || '').trim();
     const bearerToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : authHeader;
-    const cronKey = String(req.headers['x-cron-key'] || req.query.key || '').trim();
+    const cronKey = String(req.headers['x-cron-key'] || '').trim();
     const expectedSecret = (process.env.CRON_SECRET || '').trim();
 
     // Check authorization: Bearer token, x-cron-key, or authenticated admin session

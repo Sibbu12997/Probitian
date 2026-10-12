@@ -1,4 +1,6 @@
 import { test, describe } from 'node:test';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import { campaignEmailService } from '../src/services/campaignEmailService';
@@ -304,29 +306,39 @@ describe('Lead Sequence Hardening & Validation Suite', () => {
   });
 
   describe('6. Distributed Locking & Fail-Closed Guard', () => {
-    test('distributed cycle lock fails closed when database RPC throws or is unavailable', async () => {
-      // Simulate RPC error condition
-      const mockRpcError = new Error('RPC increment_rate_limit service down');
-      const acquireLockSimulation = async (rpcFails: boolean, isProd: boolean): Promise<boolean> => {
-        if (rpcFails) {
-          if (isProd) return false; // Must strictly fail closed in production
-          return false; // Fail closed
-        }
-        return true;
-      };
+    test('production sequence locks use owner-token lease RPCs rather than rate-limit counters', () => {
+      const processor = readFileSync(resolve(process.cwd(), 'server/services/sequenceProcessor.ts'), 'utf8');
+      const migration = readFileSync(resolve(process.cwd(), 'supabase/migrations/20261012131500_add_crm_sequence_processing_locks.sql'), 'utf8');
+      const crmRoutes = readFileSync(resolve(process.cwd(), 'server/routes/crm.ts'), 'utf8');
 
-      const lockAcquiredInFailure = await acquireLockSimulation(true, true);
-      assert.strictEqual(lockAcquiredInFailure, false, 'Distributed lock must fail closed on RPC error');
-    });
-
-    test('step claim fails closed to prevent duplicate dispatch across concurrent instances', async () => {
-      const acquireStepClaimSimulation = async (rpcFails: boolean): Promise<boolean> => {
-        if (rpcFails) return false; // Strictly fail closed
-        return true;
-      };
-
-      const stepClaimInFailure = await acquireStepClaimSimulation(true);
-      assert.strictEqual(stepClaimInFailure, false, 'Step claim must fail closed to prevent concurrent sends');
+      assert.match(processor, /try_acquire_crm_sequence_lock/);
+      assert.match(processor, /release_crm_sequence_lock/);
+      assert.doesNotMatch(processor, /increment_rate_limit/);
+      assert.doesNotMatch(crmRoutes, /req\.query\.key/, 'scheduler secrets must not be accepted in URLs where they can leak into logs');
+      assert.match(processor, /leaseRenewed/);
+      assert.match(processor, /setInterval\(\(\) =>/);
+      assert.match(processor, /claimedStepLocks\.map\(lock => acquireDistributedLock/);
+      assert.match(processor, /ownsLeaseBeforeSend/);
+      assert.match(processor, /ownsLeaseBeforePersist/);
+      assert.match(processor, /clearInterval\(leaseHeartbeat\)/);
+      assert.match(processor, /cycleLockLost/);
+      assert.match(processor, /State snapshot was not persisted/);
+      assert.match(migration, /lock_key text PRIMARY KEY/i);
+      assert.match(migration, /owner_token uuid NOT NULL/i);
+      assert.match(migration, /CREATE TABLE public[.]crm_sequence_lock_tokens/i, 'used owner tokens must be retained to fence delayed workers');
+      assert.match(migration, /INSERT INTO public[.]crm_sequence_lock_tokens \(owner_token, lock_key\)/i);
+      assert.match(migration, /FROM public[.]crm_sequence_lock_tokens[\s\S]*WHERE owner_token = p_owner_token/i);
+      assert.match(migration, /IF FOUND THEN[\s\S]*expires_at > pg_catalog[.]clock_timestamp\(\)/i);
+      assert.doesNotMatch(migration, /DELETE FROM public[.]crm_sequence_locks/i, 'released lock rows must be retained as tombstones');
+      assert.equal((migration.match(/SET search_path = ''/g) || []).length, 2, 'both SECURITY DEFINER functions must use an empty search_path');
+      assert.match(migration, /REVOKE ALL ON TABLE public[.]crm_sequence_locks FROM PUBLIC, anon, authenticated, service_role/i);
+      assert.doesNotMatch(migration, /GRANT (SELECT|INSERT|UPDATE|DELETE).*crm_sequence_locks TO service_role/i, 'table DML must remain private behind the RPCs');
+      assert.match(migration, /expires_at <= pg_catalog[.]clock_timestamp\(\)/i);
+      assert.match(migration, /expires_at > pg_catalog[.]clock_timestamp\(\)[\s\S]*owner_token = EXCLUDED[.]owner_token/i, 'only a live owner can renew its lease');
+      assert.match(migration, /expires_at <= pg_catalog[.]clock_timestamp\(\)[\s\S]*owner_token <> EXCLUDED[.]owner_token/i, 'an expired owner token cannot revive its lease');
+      assert.match(migration, /UPDATE public[.]crm_sequence_locks[\s\S]*SET expires_at = pg_catalog[.]clock_timestamp\(\)/i, 'release must expire a tombstone instead of deleting the row');
+      assert.match(migration, /GRANT EXECUTE ON FUNCTION public\.try_acquire_crm_sequence_lock[^\n]* TO service_role/i);
+      assert.match(migration, /GRANT EXECUTE ON FUNCTION public\.release_crm_sequence_lock[^\n]* TO service_role/i);
     });
   });
 });

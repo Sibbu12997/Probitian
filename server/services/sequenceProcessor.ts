@@ -46,61 +46,40 @@ export interface SequenceProcessingResult {
 // In-process mutex as fast local guard
 let isLocalProcessingActive = false;
 
-/**
- * Acquire a distributed atomic lock for sequence processing cycle across all worker instances.
- * Backed by Supabase increment_rate_limit RPC.
- * CRITICAL: Fails closed. If distributed lock is unavailable or throws, returns false and does not process.
- */
-async function acquireDistributedCycleLock(timeoutSeconds: number = 30): Promise<boolean> {
-  if (!serverSupabase) {
-    if (process.env.NODE_ENV === 'production') return false;
-    return true;
-  }
+const CYCLE_LOCK_KEY = 'crm_seq_worker_cycle_lock';
+const LOCK_LEASE_SECONDS = 900;
+
+function getStepLockKey(sequenceLeadId: string, stepNumber: number): string {
+  return `crm_claim_sl_${sequenceLeadId}_s${stepNumber}`;
+}
+
+/** Owner-token lease locks. Rate-limit counters are not suitable for mutual exclusion. */
+async function acquireDistributedLock(lockKey: string, ownerToken: string, leaseSeconds = LOCK_LEASE_SECONDS): Promise<boolean> {
+  if (!serverSupabase) return process.env.NODE_ENV !== 'production';
   try {
-    const { data, error } = await serverSupabase.rpc('increment_rate_limit', {
-      p_key: 'crm_seq_worker_cycle_lock',
-      p_window_ms: timeoutSeconds * 1000,
-      p_max: 1
+    const { data, error } = await serverSupabase.rpc('try_acquire_crm_sequence_lock', {
+      p_key: lockKey, p_owner_token: ownerToken, p_lease_seconds: leaseSeconds
     });
     if (error) {
-      console.error('[Distributed Cycle Lock RPC Error - Fail Closed]', error.message);
-      return false; // Fail closed: never allow processing if lock RPC fails
+      console.error('[Distributed Sequence Lock Error - Fail Closed]', { code: error.code, message: error.message });
+      return false;
     }
-    const row = Array.isArray(data) ? data[0] : data;
-    return Boolean(row?.allowed);
+    return data === true;
   } catch (err: any) {
-    console.error('[Distributed Cycle Lock Exception - Fail Closed]', err?.message || err);
-    return false; // Fail closed
+    console.error('[Distributed Sequence Lock Exception - Fail Closed]', err?.message || err);
+    return false;
   }
 }
 
-/**
- * Acquire an atomic lock for a specific sequence enrollment step send to prevent duplicate sends across workers.
- * Backed by Supabase increment_rate_limit RPC.
- * CRITICAL: Fails closed. If distributed step claim fails, returns false and prevents email send.
- */
-async function acquireEnrollmentStepClaim(sequenceLeadId: string, stepNumber: number): Promise<boolean> {
-  if (!serverSupabase) {
-    if (process.env.NODE_ENV === 'production') return false;
-    return true;
-  }
+async function releaseDistributedLock(lockKey: string, ownerToken: string): Promise<void> {
+  if (!serverSupabase) return;
   try {
-    const claimKey = `crm_claim_sl_${sequenceLeadId}_s${stepNumber}`;
-    // Claim window: 10 minutes (600,000 ms)
-    const { data, error } = await serverSupabase.rpc('increment_rate_limit', {
-      p_key: claimKey,
-      p_window_ms: 10 * 60 * 1000,
-      p_max: 1
+    const { error } = await serverSupabase.rpc('release_crm_sequence_lock', {
+      p_key: lockKey, p_owner_token: ownerToken
     });
-    if (error) {
-      console.error('[Step Claim RPC Error - Fail Closed]', error.message);
-      return false; // Fail closed: never send if step claim failed
-    }
-    const row = Array.isArray(data) ? data[0] : data;
-    return Boolean(row?.allowed);
+    if (error) console.error('[Distributed Sequence Lock Release Warning]', { code: error.code, message: error.message });
   } catch (err: any) {
-    console.error('[Step Claim Exception - Fail Closed]', err?.message || err);
-    return false; // Fail closed
+    console.error('[Distributed Sequence Lock Release Exception]', err?.message || err);
   }
 }
 
@@ -133,27 +112,51 @@ export async function executeSequenceProcessingCycle(options?: {
     };
   }
 
-  const hasCycleLock = await acquireDistributedCycleLock(30);
+  const cycleLockToken = crypto.randomUUID();
+  const hasCycleLock = await acquireDistributedLock(CYCLE_LOCK_KEY, cycleLockToken);
   if (!hasCycleLock) {
     return {
-      success: true,
-      message: 'Sequence processing cycle is currently active on another server instance.',
-      stats: {
-        totalSequences: 0,
-        eligibleEnrollments: 0,
-        processed: 0,
-        sent: 0,
-        failed: 0,
-        completed: 0,
-        stopped: 0,
-        skipped: 0
-      },
+      success: false,
+      message: 'Could not acquire the distributed sequence-processing lock; no work was processed. Another worker may hold it, or the lock migration/service may be unavailable.',
+      stats: { totalSequences: 0, eligibleEnrollments: 0, processed: 0, sent: 0, failed: 0, completed: 0, stopped: 0, skipped: 0 },
       details: []
     };
   }
 
   isLocalProcessingActive = true;
+  const claimedStepLocks: Array<{ key: string; ownerToken: string }> = [];
+  let cycleLockLost = false;
+  let leaseRenewalInFlight = false;
+  let leaseRenewalPromise: Promise<void> | null = null;
   const startTime = Date.now();
+
+  // Keep the lease alive during a slow provider call or a long batch, not only
+  // at enrollment boundaries. Never allow overlapping renewals to race.
+  const leaseHeartbeat = setInterval(() => {
+    if (leaseRenewalInFlight || cycleLockLost) return;
+    leaseRenewalInFlight = true;
+    leaseRenewalPromise = (async () => {
+      const cycleRenewed = await acquireDistributedLock(CYCLE_LOCK_KEY, cycleLockToken);
+      if (!cycleRenewed) {
+        cycleLockLost = true;
+        return;
+      }
+
+      // A provider call can outlive a cycle; renew every claimed step lease too.
+      // If any claim was lost, stop before persisting a potentially duplicate dispatch.
+      const stepRenewals = await Promise.all(
+        claimedStepLocks.map(lock => acquireDistributedLock(lock.key, lock.ownerToken))
+      );
+      if (stepRenewals.some(renewed => !renewed)) cycleLockLost = true;
+    })()
+      .catch(() => {
+        cycleLockLost = true;
+      })
+      .finally(() => {
+        leaseRenewalInFlight = false;
+        leaseRenewalPromise = null;
+      });
+  }, 60_000);
 
   try {
     const protocol = options?.reqProtocol || 'https';
@@ -232,6 +235,23 @@ export async function executeSequenceProcessingCycle(options?: {
     const toProcess = eligibleEnrollments.slice(0, batchLimit);
 
     for (const sl of toProcess) {
+      if (cycleLockLost) break;
+      const leaseRenewed = await acquireDistributedLock(CYCLE_LOCK_KEY, cycleLockToken);
+      if (!leaseRenewed) {
+        cycleLockLost = true;
+        stats.skipped++;
+        details.push({
+          sequenceId: sl.sequence_id,
+          sequenceName: activeSeqMap.get(sl.sequence_id)?.name || 'Unknown Sequence',
+          leadId: sl.lead_id,
+          companyName: 'Unknown',
+          email: 'Unknown',
+          stepNumber: Number(sl.current_step) || 1,
+          action: 'skipped',
+          reason: 'Distributed processing lease could not be renewed; cycle stopped safely.'
+        });
+        break;
+      }
       stats.processed++;
       const seq = activeSeqMap.get(sl.sequence_id);
       const seqName = seq?.name || 'Unknown Sequence';
@@ -420,7 +440,9 @@ export async function executeSequenceProcessingCycle(options?: {
       }
 
       // Section 6: Atomic Claim per Enrollment Step across multi-instance workers
-      const stepClaimed = await acquireEnrollmentStepClaim(sl.id, currentStepNum);
+      const stepLockKey = getStepLockKey(sl.id, currentStepNum);
+      const stepLockToken = crypto.randomUUID();
+      const stepClaimed = await acquireDistributedLock(stepLockKey, stepLockToken);
       if (!stepClaimed) {
         stats.skipped++;
         details.push({
@@ -431,10 +453,11 @@ export async function executeSequenceProcessingCycle(options?: {
           email: leadEmail,
           stepNumber: currentStepNum,
           action: 'skipped',
-          reason: `Step #${currentStepNum} is currently claimed by another concurrent worker instance`
+          reason: `Step #${currentStepNum} is claimed by another worker or the lock service is unavailable`
         });
         continue;
       }
+      claimedStepLocks.push({ key: stepLockKey, ownerToken: stepLockToken });
 
       // Section 15: EMAIL SAFETY GUARD
       // In development/test mode, only send to approved test recipient or explicitly targeted email
@@ -476,6 +499,26 @@ export async function executeSequenceProcessingCycle(options?: {
         continue;
       }
       const unsubscribeUrl = `${baseUrl}/api/crm/unsubscribe?token=${unsubToken}`;
+
+      // Verify lease ownership immediately before an irreversible external email send.
+      // Heartbeats cover long provider calls; this check prevents dispatch after observed lock loss.
+      const ownsLeaseBeforeSend = !cycleLockLost &&
+        await acquireDistributedLock(CYCLE_LOCK_KEY, cycleLockToken);
+      if (!ownsLeaseBeforeSend) {
+        cycleLockLost = true;
+        stats.skipped++;
+        details.push({
+          sequenceId: sl.sequence_id,
+          sequenceName: seqName,
+          leadId: sl.lead_id,
+          companyName,
+          email: leadEmail,
+          stepNumber: currentStepNum,
+          action: 'skipped',
+          reason: 'Distributed processing lease was lost before dispatch; email was not sent.'
+        });
+        break;
+      }
 
       // Section 7: Send sequence email using existing campaignEmailService
       try {
@@ -614,6 +657,22 @@ export async function executeSequenceProcessingCycle(options?: {
       await new Promise(r => setTimeout(r, 250));
     }
 
+    // Never persist a stale whole-table snapshot after losing the distributed lease;
+    // another worker may already own the cycle. Leave step leases to expire as a duplicate-send guard.
+    // A final owner-token renewal fences off stale snapshots immediately before persistence.
+    // If ownership was lost, do not write the in-memory whole-table snapshot.
+    const ownsLeaseBeforePersist = !cycleLockLost &&
+      await acquireDistributedLock(CYCLE_LOCK_KEY, cycleLockToken);
+    if (!ownsLeaseBeforePersist) {
+      cycleLockLost = true;
+      return {
+        success: false,
+        message: 'Sequence processing lease was lost. State snapshot was not persisted to avoid overwriting another worker; claimed steps remain protected until their leases expire.',
+        stats,
+        details
+      };
+    }
+
     // 3. Persist state changes back to Supabase
     try {
       await saveSupabaseSequenceDeliveries(allDeliveries);
@@ -621,6 +680,8 @@ export async function executeSequenceProcessingCycle(options?: {
       if (hasModifiedLeads) {
         await saveSupabaseCrmLeads(allCrmLeads);
       }
+      await Promise.all(claimedStepLocks.map(lock => releaseDistributedLock(lock.key, lock.ownerToken)));
+      claimedStepLocks.length = 0;
     } catch (persistErr: any) {
       console.error('[CRITICAL: Sequence State Persistence Error]', persistErr);
       return {
@@ -656,6 +717,11 @@ export async function executeSequenceProcessingCycle(options?: {
       details: []
     };
   } finally {
+    clearInterval(leaseHeartbeat);
+    // Wait for an already-started renewal before releasing ownership, otherwise a late
+    // renewal could recreate the lock after release and strand it until lease expiry.
+    if (leaseRenewalPromise) await leaseRenewalPromise;
     isLocalProcessingActive = false;
+    await releaseDistributedLock(CYCLE_LOCK_KEY, cycleLockToken);
   }
 }
