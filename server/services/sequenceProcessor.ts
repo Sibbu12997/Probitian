@@ -126,7 +126,25 @@ export async function executeSequenceProcessingCycle(options?: {
   isLocalProcessingActive = true;
   const claimedStepLocks: Array<{ key: string; ownerToken: string }> = [];
   let cycleLockLost = false;
+  let leaseRenewalInFlight = false;
   const startTime = Date.now();
+
+  // Keep the lease alive during a slow provider call or a long batch, not only
+  // at enrollment boundaries. Never allow overlapping renewals to race.
+  const leaseHeartbeat = setInterval(() => {
+    if (leaseRenewalInFlight || cycleLockLost) return;
+    leaseRenewalInFlight = true;
+    void acquireDistributedLock(CYCLE_LOCK_KEY, cycleLockToken)
+      .then(renewed => {
+        if (!renewed) cycleLockLost = true;
+      })
+      .catch(() => {
+        cycleLockLost = true;
+      })
+      .finally(() => {
+        leaseRenewalInFlight = false;
+      });
+  }, 60_000);
 
   try {
     const protocol = options?.reqProtocol || 'https';
@@ -469,6 +487,26 @@ export async function executeSequenceProcessingCycle(options?: {
       }
       const unsubscribeUrl = `${baseUrl}/api/crm/unsubscribe?token=${unsubToken}`;
 
+      // Verify lease ownership immediately before an irreversible external email send.
+      // Heartbeats cover long provider calls; this check prevents dispatch after observed lock loss.
+      const ownsLeaseBeforeSend = !cycleLockLost &&
+        await acquireDistributedLock(CYCLE_LOCK_KEY, cycleLockToken);
+      if (!ownsLeaseBeforeSend) {
+        cycleLockLost = true;
+        stats.skipped++;
+        details.push({
+          sequenceId: sl.sequence_id,
+          sequenceName: seqName,
+          leadId: sl.lead_id,
+          companyName,
+          email: leadEmail,
+          stepNumber: currentStepNum,
+          action: 'skipped',
+          reason: 'Distributed processing lease was lost before dispatch; email was not sent.'
+        });
+        break;
+      }
+
       // Section 7: Send sequence email using existing campaignEmailService
       try {
         const sendRes = await campaignEmailService.sendLeadSingleRecipient({
@@ -608,7 +646,12 @@ export async function executeSequenceProcessingCycle(options?: {
 
     // Never persist a stale whole-table snapshot after losing the distributed lease;
     // another worker may already own the cycle. Leave step leases to expire as a duplicate-send guard.
-    if (cycleLockLost) {
+    // A final owner-token renewal fences off stale snapshots immediately before persistence.
+    // If ownership was lost, do not write the in-memory whole-table snapshot.
+    const ownsLeaseBeforePersist = !cycleLockLost &&
+      await acquireDistributedLock(CYCLE_LOCK_KEY, cycleLockToken);
+    if (!ownsLeaseBeforePersist) {
+      cycleLockLost = true;
       return {
         success: false,
         message: 'Sequence processing lease was lost. State snapshot was not persisted to avoid overwriting another worker; claimed steps remain protected until their leases expire.',
@@ -661,6 +704,7 @@ export async function executeSequenceProcessingCycle(options?: {
       details: []
     };
   } finally {
+    clearInterval(leaseHeartbeat);
     isLocalProcessingActive = false;
     await releaseDistributedLock(CYCLE_LOCK_KEY, cycleLockToken);
   }
