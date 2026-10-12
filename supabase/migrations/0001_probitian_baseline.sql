@@ -8,6 +8,9 @@
 BEGIN;
 CREATE SCHEMA IF NOT EXISTS public;
 CREATE SCHEMA IF NOT EXISTS private;
+GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
+GRANT USAGE ON SCHEMA private TO authenticated, service_role;
+REVOKE ALL ON SCHEMA private FROM anon;
 SET LOCAL search_path = public, auth, private, extensions;
 
 CREATE TABLE public.admin_session_revocations (
