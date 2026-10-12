@@ -2,6 +2,10 @@
 
 This guide covers local setup and configuration for ProBitian. Never paste real secrets into GitHub, issue trackers, AI prompts, screenshots, or logs.
 
+## Scheduled CRM sequence processing
+
+Configure `CRON_SECRET` as a dedicated high-entropy secret in the production hosting environment and in the external scheduler. Send it as a Bearer token or `x-cron-key` header when calling `POST /api/cron/process-sequences`. Do not reuse `SUPABASE_SERVICE_ROLE_KEY` or another database credential for scheduler authentication. If the secret is absent, secret-based cron requests are rejected; an authorized admin session remains a separate supported path.
+
 ## Local installation
 
 ```bash
