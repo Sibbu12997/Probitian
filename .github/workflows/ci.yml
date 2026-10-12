@@ -37,6 +37,7 @@ jobs:
         CI_SESSION_SECRET: ${{ secrets.CI_SESSION_SECRET || 'ci-test-session-secret-at-least-32-chars-long' }}
         ADMIN_PASSKEY: ${{ secrets.CI_ADMIN_PASSKEY || 'ci-test-dedicated-admin-passkey-never-used-in-production' }}
         SESSION_SECRET: ${{ secrets.CI_SESSION_SECRET || 'ci-test-session-secret-at-least-32-chars-long' }}
+        UNSUBSCRIBE_SECRET: ci-only-unsubscribe-secret-32-bytes-long-never-production
         NODE_ENV: test
       run: npm test
 
