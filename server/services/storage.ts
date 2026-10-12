@@ -1,6 +1,5 @@
 import { serverSupabase } from './supabase';
 import { PROBITIAN_MEDIA_BUCKET } from '../config/constants';
-import crypto from 'crypto';
 
 export interface StorageUploadResult {
   path: string;
