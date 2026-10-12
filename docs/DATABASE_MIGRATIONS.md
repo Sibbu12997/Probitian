@@ -29,6 +29,10 @@ The live production migration ledger has these recorded entries:
 
 These are historical records. Removing old repository files does not reset or rewrite this ledger. Never fake, reset, or bulk-mark entries merely to align names.
 
+## Forward-only production migration: sequence worker leases
+
+`supabase/migrations/20261012131500_add_crm_sequence_processing_locks.sql` creates an owner-token lease table and narrowly granted RPCs to serialize sequence cycles and claim each enrollment step. It is **not** part of the fresh-install baseline. Validate it on a disposable database, inspect its grants/functions, then apply it to production before deploying code that uses these RPCs. If it is not applied, sequence processing fails closed rather than reverting to the previous rate-limit-counter pseudo-lock.
+
 ## Baseline scope
 
 - 23 public tables with columns, types, defaults and constraints
