@@ -320,6 +320,9 @@ describe('Lead Sequence Hardening & Validation Suite', () => {
       assert.match(processor, /State snapshot was not persisted/);
       assert.match(migration, /lock_key text PRIMARY KEY/i);
       assert.match(migration, /owner_token uuid NOT NULL/i);
+      assert.equal((migration.match(/SET search_path = ''/g) || []).length, 2, 'both SECURITY DEFINER functions must use an empty search_path');
+      assert.match(migration, /REVOKE ALL ON TABLE public\\.crm_sequence_locks FROM PUBLIC, anon, authenticated, service_role/i);
+      assert.doesNotMatch(migration, /GRANT (SELECT|INSERT|UPDATE|DELETE).*crm_sequence_locks TO service_role/i, 'table DML must remain private behind the RPCs');
       assert.match(migration, /expires_at <= clock_timestamp\(\)/i);
       assert.match(migration, /GRANT EXECUTE ON FUNCTION public\.try_acquire_crm_sequence_lock[^\n]* TO service_role/i);
       assert.match(migration, /GRANT EXECUTE ON FUNCTION public\.release_crm_sequence_lock[^\n]* TO service_role/i);
