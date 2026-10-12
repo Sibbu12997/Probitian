@@ -117,11 +117,24 @@ export function resetStorageService(): void {
 export async function ensureStorageBucket(): Promise<void> {
   if (!serverSupabase) return;
   try {
-    const { data: bucket, error } = await this.client.storage.getBucket(PROBITIAN_MEDIA_BUCKET);
-    if (error || !bucket) {
-      await this.client.storage.createBucket(PROBITIAN_MEDIA_BUCKET, { public: true });
-      console.log(`[Supabase Storage] Created bucket "${PROBITIAN_MEDIA_BUCKET}" successfully.`);
+    const { data: bucket, error } = await serverSupabase.storage.getBucket(PROBITIAN_MEDIA_BUCKET);
+    if (!error && bucket) return;
+
+    // Only create the bucket when the lookup confirms it is missing.
+    // Transient/auth errors must not be interpreted as proof that it does not exist.
+    const status = Number((error as any)?.statusCode || (error as any)?.status || 0);
+    const code = String((error as any)?.error || (error as any)?.code || '').toLowerCase();
+    const isMissing = status === 404 || code === 'bucket_not_found';
+    if (!isMissing) {
+      console.warn('[Supabase Storage Bucket Notice] Unable to verify bucket:', error?.message || 'Unknown lookup error');
+      return;
     }
+
+    const { error: createError } = await serverSupabase.storage.createBucket(PROBITIAN_MEDIA_BUCKET, { public: true });
+    if (createError && !String(createError.message || '').toLowerCase().includes('already exists')) {
+      throw createError;
+    }
+    console.log(`[Supabase Storage] Bucket "${PROBITIAN_MEDIA_BUCKET}" is available.`);
   } catch (err) {
     console.warn('[Supabase Storage Bucket Notice]', err);
   }

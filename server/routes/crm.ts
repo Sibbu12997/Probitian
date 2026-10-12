@@ -1,4 +1,5 @@
 import express from 'express';
+import { rateLimit } from 'express-rate-limit';
 import crypto from 'crypto';
 import { requireAuth, requirePermission, hasPermission } from '../auth/rbac';
 import { getAdminSession } from '../auth/session';
@@ -37,6 +38,17 @@ export {
 };
 
 const router = express.Router();
+
+// Explicit, standard Express rate limiter so static security analysis can verify
+// that both public unsubscribe endpoints are throttled. The distributed limiter
+// remains in place as a second layer across application instances.
+const unsubscribeRouteRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 20,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'Too many unsubscribe requests. Please try again later.' }
+});
 
 // Helper to query Supabase Lead Campaigns with relational source of truth
 export async function getSupabaseCrmCampaigns(): Promise<any[]> {
@@ -1551,7 +1563,7 @@ router.post(['/cron/process-sequences', '/api/cron/process-sequences'], async (r
     const authHeader = (req.headers.authorization || '').trim();
     const bearerToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : authHeader;
     const cronKey = String(req.headers['x-cron-key'] || req.query.key || '').trim();
-    const expectedSecret = (process.env.CRON_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
+    const expectedSecret = (process.env.CRON_SECRET || '').trim();
 
     // Check authorization: Bearer token, x-cron-key, or authenticated admin session
     const isSecretAuthorized = Boolean(
@@ -1615,9 +1627,30 @@ router.get('/admin/leads/:id/sequences', requireAuth, requirePermission(Permissi
   }
 });
 
-// GET /api/crm/unsubscribe (Public with rate limiter: Lead Outreach Unsubscribe)
-router.get('/crm/unsubscribe', unsubscribeLimiter, async (req, res) => {
+// GET only displays a confirmation page. Link scanners must not mutate subscription state.
+router.get('/crm/unsubscribe', unsubscribeRouteRateLimit, unsubscribeLimiter, (req, res) => {
   const token = (req.query.token || '').toString().trim();
+  if (!token || !verifyUnsubscribeToken(token)) {
+    return res.status(400).send('Invalid or expired unsubscribe link.');
+  }
+  return res.status(200).set({ 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' }).send(`
+    <!DOCTYPE html>
+    <html lang="en">
+      <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Confirm Unsubscribe - ProBitian</title></head>
+      <body style="font-family:system-ui,sans-serif;max-width:560px;margin:60px auto;padding:24px;color:#1e293b">
+        <h1>Confirm unsubscribe</h1>
+        <p>Confirm that you want to stop receiving B2B outreach emails from ProBitian.</p>
+        <form method="post" action="/api/crm/unsubscribe">
+          <input type="hidden" name="token" value="${escapeHtml(token)}">
+          <button type="submit" style="padding:12px 18px;cursor:pointer">Unsubscribe</button>
+        </form>
+      </body>
+    </html>
+  `);
+});
+
+router.post('/crm/unsubscribe', unsubscribeRouteRateLimit, unsubscribeLimiter, async (req, res) => {
+  const token = (req.body?.token || req.query.token || '').toString().trim();
   let verifiedEmail: string | null = null;
   if (token) {
     verifiedEmail = verifyUnsubscribeToken(token);
