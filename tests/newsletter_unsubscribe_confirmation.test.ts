@@ -38,7 +38,12 @@ test('newsletter unsubscribe GET only renders confirmation; it does not report c
       assert.equal(response.status, 200);
       assert.match(body, /Confirm unsubscribe/);
       assert.match(body, /method="post"/);
-      assert.ok(body.includes(`value="${token}"`));
+      const confirmationCookie = response.headers.get('set-cookie') || '';
+      assert.ok(confirmationCookie.includes('newsletter_unsubscribe_confirm='));
+      assert.match(confirmationCookie, /HttpOnly/i);
+      assert.match(confirmationCookie, /SameSite=Strict/i);
+      assert.match(confirmationCookie, /Max-Age=600/i);
+      assert.ok(!body.includes(token));
       assert.doesNotMatch(body, /audit-test@example\.invalid/);
       assert.doesNotMatch(body, /Unsubscribed successfully/i);
       assert.equal(response.headers.get('cache-control'), 'no-store');
@@ -60,6 +65,17 @@ test('newsletter unsubscribe GET only renders confirmation; it does not report c
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: ''
+      });
+
+      assert.equal(response.status, 400);
+      assert.match(await response.text(), /Invalid or expired unsubscribe link/);
+    });
+
+    await t.test('POST rejects an unsigned confirmation cookie', async () => {
+      const token = generateUnsubscribeToken('audit-test@example.invalid');
+      const response = await fetch(`${baseUrl}/api/newsletter/unsubscribe`, {
+        method: 'POST',
+        headers: { Cookie: `newsletter_unsubscribe_confirm=${encodeURIComponent(token)}` }
       });
 
       assert.equal(response.status, 400);
@@ -152,4 +168,3 @@ test('canonical public origin ignores non-HTTPS origins in production', () => {
     else process.env.VITE_SITE_URL = previousSiteUrl;
   }
 });
-
