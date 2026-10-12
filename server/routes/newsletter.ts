@@ -117,7 +117,13 @@ router.post(['/newsletter', '/newsletter/subscribe'], newsletterLimiter, async (
   // Generate signed unsubscribe URL
   const reqProtocol = req.headers['x-forwarded-proto'] || req.protocol;
   const reqHost = req.headers['x-forwarded-host'] || req.headers.host;
-  const unsubToken = generateUnsubscribeToken(cleanEmail);
+  let unsubToken: string;
+  try {
+    unsubToken = generateUnsubscribeToken(cleanEmail);
+  } catch {
+    console.error('[NEWSLETTER] Unsubscribe token configuration unavailable.');
+    return res.status(503).json({ success: false, message: 'Newsletter service is temporarily unavailable.' });
+  }
   const unsubUrl = `${reqProtocol}://${reqHost}/api/newsletter/unsubscribe?token=${unsubToken}`;
 
   // Send welcome email with signed unsubscribe token
@@ -473,7 +479,14 @@ router.post('/admin/email-campaigns/:id/send', requireAuth, requirePermission(Pe
 
   for (const subscriber of activeSubscribers) {
     const subEmail = subscriber.email;
-    const unsubToken = generateUnsubscribeToken(subEmail);
+    let unsubToken: string;
+    try {
+      unsubToken = generateUnsubscribeToken(subEmail);
+    } catch {
+      failedCount++;
+      recipientsLog.push({ email: subEmail, status: 'failed', error_message: 'Unsubscribe token configuration unavailable.' });
+      continue;
+    }
     const unsubUrl = `${baseUrl}/api/newsletter/unsubscribe?token=${unsubToken}`;
 
     const sendRes = await campaignEmailService.sendSingleRecipient({
