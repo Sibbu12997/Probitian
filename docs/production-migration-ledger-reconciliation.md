@@ -4,6 +4,8 @@
 
 ## Confirmed production intent
 
+The production ledger snapshot recorded in the 12 October 2026 audit contains nine entries, including the two later entries shown below. Re-check the live ledger before relying on this snapshot; this file is historical evidence, not a live connection.
+
 The following CMS tables are intentionally empty in production as confirmed by the project owner: `projects`, `blogs`, `courses`, `videos`, and `categories`. Do not seed or restore content into these tables as part of schema/security maintenance.
 
 ## Migration-history drift
@@ -19,6 +21,8 @@ Production migration metadata and repository filenames do not currently form a o
 | `20261009164408` | `restrict_storage_object_policies` | Related repository file is `0021_restrict_storage_object_policies.sql` |
 | `20261012050720` | `add_video_publication_controls` | `20261012050720_add_video_publication_controls.sql` |
 | `20261012050802` | `harden_public_insert_and_feedback_access` | `20261012050802_harden_public_insert_and_feedback_access.sql` |
+| `20261012062531` | `consolidate_permissive_rls_policies` | `20261012062531_consolidate_permissive_rls_policies.sql` |
+| `20261012063805` | `drop_redundant_admin_revocation_index` | `20261012063805_drop_redundant_admin_revocation_index.sql` |
 
 This table records observed names; it does **not** certify that differently named historical migrations are semantically identical.
 
