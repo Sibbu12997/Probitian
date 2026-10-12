@@ -17,7 +17,7 @@ Browser
 
 - **Frontend:** `src/` contains app routing/shell, public pages, admin portal modules, shared components, and client-side libraries.
 - **Backend:** `server.ts` mounts API routes; `server/routes/` contains CMS, auth, analytics, CRM, feedback, newsletter and SEO endpoints. Security middleware and domain services live under `server/`.
-- **Data platform:** Supabase PostgreSQL is the production data store. SQL migrations are versioned in `supabase/migrations/`; `supabase/schema.sql` is a schema reference and must be checked against the live database before use.
+- **Data platform:** Supabase PostgreSQL is the production data store. SQL migrations are versioned in `supabase/migrations/0001_probitian_baseline.sql` (fresh installs only); `supabase/schema.sql` is a schema reference and must be checked against the live database before use.
 - **Media:** Supabase Storage bucket `probitian-media` is the active application bucket. Public object delivery does not imply public permission to list or mutate objects.
 - **Tests:** `tests/` contains API, security, routing, media and database-integration checks. Tests that touch a real Supabase project must be opt-in and guarded against production.
 - **Automation:** `.github/workflows/` contains CI and CodeQL workflows; Dependabot configuration is in `.github/dependabot.yml`.
@@ -75,3 +75,8 @@ Use the repository's configured scripts as the source of truth. Review `package.
 - Do not commit generated PDF copies or duplicate public documentation exports.
 - Keep dated audit results as dated evidence only; do not present old point-in-time counts as current state.
 - When schema or security behavior changes, update the relevant source document and verify it against the code and production state.
+
+
+## Database bootstrap note
+
+The repository keeps one canonical SQL baseline at `supabase/migrations/0001_probitian_baseline.sql` for new/empty Supabase projects. It is not a production upgrade script. Existing production retains its historical migration ledger; never reset that ledger or apply the baseline to the existing database. See [Database Migration Guide](DATABASE_MIGRATIONS.md) and [Connection Setup](CONNECTION_SETUP.md).
