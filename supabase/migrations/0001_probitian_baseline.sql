@@ -879,4 +879,7 @@ DROP TRIGGER IF EXISTS "on_auth_user_created_profile" ON auth.users;
 CREATE TRIGGER on_auth_user_created_profile AFTER INSERT ON auth.users FOR EACH ROW EXECUTE FUNCTION handle_auth_user_profile();
 
 
+-- Project-owned event trigger: automatically enable RLS on newly created public tables.
+CREATE EVENT TRIGGER ensure_rls ON ddl_command_end EXECUTE FUNCTION public.rls_auto_enable();
+
 COMMIT;
