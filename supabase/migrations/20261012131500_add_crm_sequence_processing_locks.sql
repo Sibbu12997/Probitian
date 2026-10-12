@@ -39,8 +39,13 @@ BEGIN
     SET owner_token = EXCLUDED.owner_token,
         expires_at = EXCLUDED.expires_at,
         updated_at = EXCLUDED.updated_at
-    WHERE public.crm_sequence_locks.expires_at <= pg_catalog.clock_timestamp()
-       OR public.crm_sequence_locks.owner_token = EXCLUDED.owner_token
+    WHERE (
+      public.crm_sequence_locks.expires_at > pg_catalog.clock_timestamp()
+      AND public.crm_sequence_locks.owner_token = EXCLUDED.owner_token
+    ) OR (
+      public.crm_sequence_locks.expires_at <= pg_catalog.clock_timestamp()
+      AND public.crm_sequence_locks.owner_token <> EXCLUDED.owner_token
+    )
   RETURNING owner_token INTO v_owner;
 
   RETURN FOUND AND v_owner = p_owner_token;
@@ -57,7 +62,14 @@ DECLARE
   v_deleted integer;
 BEGIN
   IF p_key IS NULL OR p_owner_token IS NULL THEN RETURN false; END IF;
-  DELETE FROM public.crm_sequence_locks WHERE lock_key = p_key AND owner_token = p_owner_token;
+  -- Keep a tombstone with the old owner token. Deleting the row would let a delayed
+  -- callback from the old worker INSERT it again and resurrect an already released lease.
+  UPDATE public.crm_sequence_locks
+     SET expires_at = pg_catalog.clock_timestamp(),
+         updated_at = pg_catalog.clock_timestamp()
+   WHERE lock_key = p_key
+     AND owner_token = p_owner_token
+     AND expires_at > pg_catalog.clock_timestamp();
   GET DIAGNOSTICS v_deleted = ROW_COUNT;
   RETURN v_deleted > 0;
 END;
