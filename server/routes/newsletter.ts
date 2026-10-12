@@ -1,4 +1,5 @@
 import express from 'express';
+import escapeHtml from 'escape-html';
 import { requireAuth, requirePermission } from '../auth/rbac';
 import { Permission } from '../auth/types';
 import { getCanonicalAppUrl, isValidId, isValidUuid } from '../config/constants';
@@ -145,8 +146,9 @@ router.get('/newsletter/unsubscribe', unsubscribeLimiter, (req, res) => {
       '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Invalid unsubscribe link - ProBitian</title></head><body><main><h1>Invalid or expired unsubscribe link</h1><p>Please use the original link from your ProBitian email.</p></main></body></html>'
     );
   }
+  const safeToken = escapeHtml(token);
   return res.status(200).set({ 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' }).send(
-    '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Confirm unsubscribe - ProBitian</title></head><body><main><h1>Confirm unsubscribe</h1><p>Confirm that you want to stop receiving ProBitian newsletter emails.</p><form method="post" action="/api/newsletter/unsubscribe"><input type="hidden" name="token" value="' + token + '"><button type="submit">Unsubscribe</button></form></main></body></html>'
+    '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Confirm unsubscribe - ProBitian</title></head><body><main><h1>Confirm unsubscribe</h1><p>Confirm that you want to stop receiving ProBitian newsletter emails.</p><form method="post" action="/api/newsletter/unsubscribe"><input type="hidden" name="token" value="' + safeToken + '"><button type="submit">Unsubscribe</button></form></main></body></html>'
   );
 });
 
