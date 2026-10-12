@@ -386,6 +386,41 @@ describe('4. CORS, CSRF & Origin Security', () => {
     }
   });
 
+
+  test('csrfDefenseMiddleware rejects state-changing admin, cms, and crm requests without Origin and Referer', () => {
+    const protectedPaths = [
+      '/api/admin/roles/assign',
+      '/api/cms/projects',
+      '/api/crm/leads'
+    ];
+    for (const path of protectedPaths) {
+      let statusCalled = 0;
+      const fakeReq: any = {
+        method: 'POST',
+        path,
+        get: (header: string) => header.toLowerCase() === 'host' ? 'probitian.com' : undefined,
+        headers: {}
+      };
+      const fakeRes: any = {
+        status: (code: number) => { statusCalled = code; return { json: () => {} }; }
+      };
+      let nextCalled = false;
+      csrfDefenseMiddleware(fakeReq, fakeRes, () => { nextCalled = true; });
+      assert.strictEqual(statusCalled, 403, `Expected 403 for missing Origin/Referer on ${path}`);
+      assert.strictEqual(nextCalled, false, `Expected next() not to be called for ${path}`);
+    }
+  });
+
+  test('CORS does not trust arbitrary AI Studio or Cloud Run tenant origins', async () => {
+    const { isAllowedOrigin } = await import('../server/security/cors');
+    const fakeReq: any = {
+      get: (header: string) => header.toLowerCase() === 'host' ? 'probitian.com' : undefined
+    };
+    assert.strictEqual(isAllowedOrigin('https://probitian.ai.studio', fakeReq), true);
+    assert.strictEqual(isAllowedOrigin('https://attacker.ai.studio', fakeReq), false);
+    assert.strictEqual(isAllowedOrigin('https://ais-dev-attacker.run.app', fakeReq), false);
+  });
+
   test('csrfDefenseMiddleware preserves public form endpoints exemptions', () => {
     const publicEndpoints = [
       { path: '/api/newsletter', method: 'POST' },
