@@ -19,7 +19,7 @@ This document records deployment checks that cannot be proven by repository CI a
 - The old individual migration files were removed from the active directory; their history remains in Git and the filenames are listed in `supabase/legacy-migrations.md`.
 - The baseline is for a new/empty Supabase project only. It must not be run against the existing production project.
 - The live production migration ledger contains nine applied entries. It remains authoritative historical metadata; do not reset or edit it to match the single repository baseline.
-- The baseline uses `'user'` as the default profile role for least privilege and follows production's integer feedback rating type and current auth profile trigger/function.
+- The baseline uses `'user'` as the default profile role for least privilege and follows production's integer feedback rating type and current auth profile trigger/function. It includes the project-owned `ensure_rls` event trigger; Supabase-managed internal event triggers are not recreated.
 - CMS content remains intentionally unseeded.
 
 ## Before any new-project bootstrap
