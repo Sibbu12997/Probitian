@@ -92,7 +92,7 @@ export const emailService = {
     const pass = getGmailPass();
     const cleanEmail = email.trim().toLowerCase();
     if (!pass || process.env.NODE_ENV === 'test') {
-      console.log(`[EMAIL INFO] Welcome email recorded for ${cleanEmail}.${process.env.NODE_ENV === 'test' ? ' [TEST MODE: email dispatch suppressed]' : ' Set GMAIL_APP_PASSWORD in environment to enable live SMTP delivery.'}`);
+      console.info('[EMAIL INFO] Welcome email dispatch skipped because SMTP is unavailable or test mode is active.');
       return { success: true, message: 'Welcome email queued.' };
     }
 
