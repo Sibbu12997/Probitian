@@ -134,10 +134,20 @@ export async function executeSequenceProcessingCycle(options?: {
   const leaseHeartbeat = setInterval(() => {
     if (leaseRenewalInFlight || cycleLockLost) return;
     leaseRenewalInFlight = true;
-    void acquireDistributedLock(CYCLE_LOCK_KEY, cycleLockToken)
-      .then(renewed => {
-        if (!renewed) cycleLockLost = true;
-      })
+    void (async () => {
+      const cycleRenewed = await acquireDistributedLock(CYCLE_LOCK_KEY, cycleLockToken);
+      if (!cycleRenewed) {
+        cycleLockLost = true;
+        return;
+      }
+
+      // A provider call can outlive a cycle; renew every claimed step lease too.
+      // If any claim was lost, stop before persisting a potentially duplicate dispatch.
+      const stepRenewals = await Promise.all(
+        claimedStepLocks.map(lock => acquireDistributedLock(lock.key, lock.ownerToken))
+      );
+      if (stepRenewals.some(renewed => !renewed)) cycleLockLost = true;
+    })()
       .catch(() => {
         cycleLockLost = true;
       })
