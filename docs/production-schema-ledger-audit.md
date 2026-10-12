@@ -41,6 +41,6 @@ This is a **repository organization change**, not a production migration. It doe
 
 ## Validation still required
 
-The baseline was assembled from the live catalog and includes table definitions, non-constraint indexes, RLS policies, application function definitions and observed execute grants, table/column grants, and the auth profile trigger. It does not recreate Supabase-managed internal event triggers or seed data. It must be applied and tested on a disposable Supabase project before being treated as a verified new-project bootstrap.
+The baseline was assembled from the live catalog and includes table definitions, non-constraint indexes, RLS policies, application function definitions and observed execute grants, table/column grants, the auth profile trigger, and the project-owned `ensure_rls` event trigger. It does not recreate Supabase-managed internal event triggers or seed data. It must be applied and tested on a disposable Supabase project before being treated as a verified new-project bootstrap.
 
 The production migration ledger remains historical evidence and is not expected to become a one-entry ledger merely because the repository now has one baseline file.
