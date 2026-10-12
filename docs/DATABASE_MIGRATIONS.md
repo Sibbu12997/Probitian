@@ -1,69 +1,61 @@
-# ProBitian — Database Migration Guide
+# ProBitian Database Migration Guide
 
-> Updated: 12 October 2026. This guide is based on the migration files currently present in the repository and production migration results known at the time of update. Verify live Supabase migration history before applying anything.
+> Updated: 12 October 2026. This guide describes the consolidated fresh-install baseline and the separate production migration history.
 
-## Source of truth and safety
+## Canonical SQL file
 
-- `supabase/migrations/` contains forward-only SQL changes.
-- `supabase/schema.sql` is a schema snapshot/reference, not proof that the live database matches it.
-- Supabase production migration history and catalog state are authoritative for what has actually been applied.
-- Never reset production, rerun historical migrations, or edit a migration that has already been applied.
-- Do not assume numeric filenames perfectly correspond to Supabase migration names/timestamps; this repository has historical naming drift.
+- `supabase/migrations/0001_probitian_baseline.sql` is the single maintained schema baseline for a **new, empty Supabase project**.
+- `supabase/schema.sql` is a pointer to the canonical baseline, not a second independently maintained schema.
+- `supabase/legacy-migrations.md` records the old file inventory. Historical contents remain in Git history.
+- The baseline was generated from the live production catalog and includes public tables/columns/defaults/constraints, non-constraint indexes, RLS policies, function definitions/execute grants, table/column grants and the auth profile trigger. It uses a least-privilege `user` default for new profiles.
 
-## Migration files currently in the repository
+## Critical: fresh install versus existing production
 
-The repository includes the baseline migrations `0001`–`0019`, `0021_restrict_storage_object_policies.sql`, and these timestamped production changes:
+**Never run the baseline against the existing production database.** It is a schema creation script, not an upgrade or reconciliation migration.
 
-| File | Purpose |
+The live production migration ledger has these recorded entries:
+
+| Version | Ledger name |
 |---|---|
-| `0001_initial_schema.sql` – `0017_reconcile_production_schema.sql` | Historical baseline and incremental schema/security changes; see each SQL file for exact operations |
-| `0018_security_privilege_reconciliation.sql` | Security and privilege reconciliation |
-| `0019_harden_settings_rls.sql` | Restricts direct public access to allowlisted settings |
-| `0021_restrict_storage_object_policies.sql` | Removes broad historical policies from `storage.objects` |
-| `20261012050720_add_video_publication_controls.sql` | Adds video publication state and public read policy |
-| `20261012050802_harden_public_insert_and_feedback_access.sql` | Hardens feedback visibility and public insert permissions |
+| `20261007044036` | `0017_reconcile_production_schema` |
+| `20261007051339` | `0018_public_cms_visibility_hardening` |
+| `20261008044849` | `0019_reconcile_migration_18_drift` |
+| `20261008085420` | `0020_harden_settings_rls` |
+| `20261009164408` | `restrict_storage_object_policies` |
+| `20261012050720` | `add_video_publication_controls` |
+| `20261012050802` | `harden_public_insert_and_feedback_access` |
+| `20261012062531` | `consolidate_permissive_rls_policies` |
+| `20261012063805` | `drop_redundant_admin_revocation_index` |
 
-There is no `0020` file in the repository. Do not create or renumber a historical migration merely to close the gap.
+These are historical records. Removing old repository files does not reset or rewrite this ledger. Never fake, reset, or bulk-mark entries merely to align names.
 
-## Production changes applied on 12 October 2026
+## Baseline scope
 
-### Video publication controls
+- 23 public tables with columns, types, defaults and constraints
+- Non-constraint indexes
+- RLS state and 74 public policies
+- Public/private function definitions and observed execute grants
+- Table-level and explicit column-level grants
+- Non-internal auth profile synchronization trigger
 
-The migration added:
+The baseline intentionally does not seed CMS content, upload media, or recreate Supabase-managed internal event triggers. Required Supabase-managed roles, auth/storage schemas and platform extensions must exist in the target project.
 
-- `public.videos.published boolean NOT NULL DEFAULT false`
-- `public.videos.published_at timestamptz`
-- Public SELECT policy constrained to `published = true`
-- Partial index `idx_videos_published_created_at`
+## Security-relevant differences
 
-The existing admin/editor policy remains. **Important:** RLS does not filter a query made with a privileged service-role client. Public API routes must also explicitly filter `published = true`, including any local fallback path.
+- Production `profiles.role` default was `admin`; the fresh-install baseline intentionally uses `user` for least privilege.
+- Production `feedback.rating` uses `integer`; the baseline follows that live type.
+- Production auth trigger/function is `on_auth_user_created_profile` / `handle_auth_user_profile()`; do not replace it with historical `handle_new_user()` without review.
+- Some historical migration source files were missing or differently named in the previous repository layout. See [Production schema audit](production-schema-ledger-audit.md).
 
-### Public insert and feedback access hardening
+## Validate before use
 
-The migration:
+1. Create a disposable Supabase project matching required features/extensions.
+2. Apply the baseline once to that empty project with an appropriately privileged migration connection.
+3. Inspect tables, types, defaults, constraints, indexes, policies, grants, functions and triggers.
+4. Test auth/profile creation, public CMS reads, forms, admin writes, media upload metadata persistence and newsletter/unsubscribe flows.
+5. Review behavior and access control; successful DDL execution is not proof of authorization correctness.
+6. Back up and obtain explicit approval before any production DDL.
 
-- Revokes direct SELECT on `public.feedback` from `anon` and `authenticated`
-- Restricts public `messages` inserts to the user-submitted columns `name, email, subject, message, phone, course_interested`
-- Requires contact submissions to retain server-owned moderation/reply/delivery fields at their safe initial values
-- Restricts public `newsletter` inserts to the `email` column and requires `status = 'active'`
+## Future changes
 
-Admin/editor policies and service-role access are retained. Validate the API code still uses server-side queries for operations that need private feedback or management fields.
-
-## Standard forward-only workflow
-
-1. Inspect current schema, RLS policies, grants, indexes and Supabase migration history.
-2. Add a new migration file with a unique version/name. Never modify an applied migration.
-3. Prefer safe, idempotent DDL where practical; avoid destructive changes without a reviewed data migration and explicit approval.
-4. Review privilege changes carefully. RLS and SQL grants are separate controls.
-5. Apply the migration in the intended environment using the approved Supabase workflow.
-6. Verify the live catalog, policies, grants, indexes and application behavior.
-7. Run unit tests, integration tests (only with a guarded non-production project), typecheck and production build.
-8. Record what was applied, where, and how it was verified. A committed file alone is not evidence of production application.
-
-## Production precautions
-
-- Never place a production service-role/secret key in frontend code or documentation.
-- Do not run destructive integration tests against production.
-- Do not grant table-wide public INSERT when column-level grants are intended.
-- When using the service-role client, explicitly apply public-content filters and select only safe fields.
-- Before changing policies, inspect every dependent API route and its tests.
+For existing production, create reviewed forward-only migrations for future changes and apply through the controlled deployment process. Keep the baseline stable until a tested baseline release is intentionally made. Do not add CMS content seeds unless separately approved.
