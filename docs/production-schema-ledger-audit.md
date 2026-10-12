@@ -2,45 +2,45 @@
 
 Audit date: 2026-10-12  
 Supabase project: `dlaehchzzkjsrarktfsf`  
-Scope: read-only inspection of the live Supabase migration ledger and PostgreSQL catalog, compared with `supabase/migrations/` on `main`.
+Scope: read-only inspection of the live Supabase migration ledger and PostgreSQL catalog before repository migration consolidation.
 
-## Summary
+## Live catalog snapshot
 
-The live database currently exposes 23 public base tables, 243 public columns, 54 public indexes, and 74 public RLS policies. All 23 public base tables have RLS enabled. The live database has an auth trigger named `auth.on_auth_user_created_profile` which calls `public.handle_auth_user_profile()`. The live function ACLs for `increment_rate_limit` and `prune_expired_session_revocations` restrict execution to `service_role` (and the database owner), not `anon` or `authenticated`.
+- 23 public base tables
+- 243 public columns
+- 54 public indexes
+- 74 public RLS policies
+- RLS enabled on all 23 public base tables
+- One non-internal auth trigger: `on_auth_user_created_profile` on `auth.users`, invoking `public.handle_auth_user_profile()`
+- Five application functions in `public` / `private` were inspected, including rate limiting, session revocation pruning, profile sync and the admin/editor helper.
+- Table-level and explicit column-level grants were inspected.
 
-This audit found **migration history/source drift** and at least one **column-default drift**. It does not authorize applying schema changes to production.
+The rate-limit and session-revocation maintenance functions are executable by `service_role` and the database owner, not `anon` or `authenticated`.
 
-## Live ledger ↔ repository mapping
+## Confirmed differences between historical SQL and live production
 
-| Live ledger version | Live ledger name | Repository file / status | Notes |
-|---|---|---|---|
-| `20261007044036` | `0017_reconcile_production_schema` | `0017_reconcile_production_schema.sql` | Filename suffix matches, but the live profile trigger/function differ from this file's `handle_new_user()` / `on_auth_user_created` definitions. |
-| `20261007051339` | `0018_public_cms_visibility_hardening` | **No file with this name found** | Do not assume `0018_security_privilege_reconciliation.sql` is equivalent; its contents are different and cover function ACLs, feedback consent, and content policies. |
-| `20261008044849` | `0019_reconcile_migration_18_drift` | **No file with this name found** | Exact source for the applied migration was not recoverable from the current migration directory listing. |
-| `20261008085420` | `0020_harden_settings_rls` | `0019_harden_settings_rls.sql` | The source filename has a one-step numbering mismatch relative to the live ledger name. Its settings allowlist policy corresponds to the current intended behavior. |
-| `20261009164408` | `restrict_storage_object_policies` | `0021_restrict_storage_object_policies.sql` | Suffix differs by the repository's numeric prefix; inspect SQL before assuming exact byte-for-byte identity. |
-| `20261012050720` | `add_video_publication_controls` | `20261012050720_add_video_publication_controls.sql` | Filename/version aligns. |
-| `20261012050802` | `harden_public_insert_and_feedback_access` | `20261012050802_harden_public_insert_and_feedback_access.sql` | Filename/version aligns. |
-| `20261012062531` | `consolidate_permissive_rls_policies` | `20261012062531_consolidate_permissive_rls_policies.sql` | Filename/version aligns. |
-| `20261012063805` | `drop_redundant_admin_revocation_index` | `20261012063805_drop_redundant_admin_revocation_index.sql` | Filename/version aligns. |
+1. **Profile role default:** live `public.profiles.role` default was `'admin'`; the new clean-install baseline intentionally uses `'user'` for least privilege.
+2. **Feedback rating type:** live `public.feedback.rating` is PostgreSQL `integer`; historical migration 0017 declared `SMALLINT`. The consolidated baseline follows the live integer type.
+3. **Auth profile trigger/function:** production uses `on_auth_user_created_profile` and `handle_auth_user_profile()`; historical migration 0017 defines `on_auth_user_created` and `handle_new_user()`. The baseline follows the current production trigger/function instead of replacing it with the older implementation.
+4. **Migration ledger mapping:** production has nine recorded entries. Some old repository filenames did not match ledger names, and two applied migration source files were absent from the former directory listing.
 
-The directory has no `0020_*.sql` file. Do **not** rename or delete historical migration files as a quick fix: migration filenames and the Supabase ledger are historical records, and a rename does not recreate missing applied SQL or repair the ledger. Preserve history and add new forward-only migrations for any confirmed live schema changes.
+## Consolidation decision
 
-## Confirmed schema drift / follow-up
+The active repository migration directory now contains one canonical baseline: `supabase/migrations/0001_probitian_baseline.sql`. The previous individual migration files were removed from the active directory and remain recoverable from Git history. Their inventory is recorded in `supabase/legacy-migrations.md`.
 
-1. **Profile role default:** live `public.profiles.role` defaults to `'admin'`; repository migration `0017_reconcile_production_schema.sql` declares `DEFAULT 'user'`. The live auth trigger explicitly sets a validated role, but the database default remains a privilege-sensitive mismatch. Review and correct via a forward-only migration after confirming intended behavior.
-2. **Feedback rating type:** live `public.feedback.rating` is PostgreSQL `integer` (`int4`); repository migration `0017_reconcile_production_schema.sql` declares `SMALLINT` (`int2`). The existing range check constrains values to 1–5. Decide whether to align the live type or document the live type as canonical; do not cast production data without an explicit migration.
-3. **Auth profile trigger/function:** live trigger is `on_auth_user_created_profile` and invokes `public.handle_auth_user_profile()`. Migration 0017 instead creates `on_auth_user_created` and `public.handle_new_user()`. The live function validates app metadata role values; do not replace it with the older function without a behavior/security review.
-4. **Missing applied migration source:** the live ledger records `0018_public_cms_visibility_hardening` and `0019_reconcile_migration_18_drift`, but those exact source files are absent from the current directory listing. Recover them from Git history/backups if possible. If unrecoverable, document that fact and use catalog-derived snapshots plus reviewed forward-only migrations; do not invent their original SQL.
+This is a **repository organization change**, not a production migration. It does not remove production database objects, rewrite the live Supabase migration ledger, or make the baseline safe to apply to an existing project.
 
-## Catalog checks performed
+## Required operational boundaries
 
-- Public tables: 23; columns: 243; indexes: 54; RLS policies: 74.
-- No public base table was found with RLS disabled.
-- Public functions inspected include `handle_auth_user_profile()`, `increment_rate_limit(text,bigint,integer)`, `prune_expired_session_revocations(bigint)`, and `rls_auto_enable()`.
-- Non-internal trigger inspection found the auth-user profile trigger described above; no non-internal triggers were found in `public`.
-- Current live function ACLs show `increment_rate_limit` and `prune_expired_session_revocations` executable by `service_role` and the owner, not `anon` or `authenticated`.
+- Never run `0001_probitian_baseline.sql` against the existing production database.
+- Never reset, fake, or bulk-mark the production migration ledger to match the consolidated filename.
+- Use the baseline only for a new/empty Supabase project after applying it to a disposable test project and validating the resulting schema and behavior.
+- Existing production schema changes must use reviewed forward-only migrations, with a backup and explicit approval before DDL.
+- CMS content tables are intentionally empty; no content was seeded as part of consolidation.
+- A successful catalog snapshot or schema creation is not proof that every application flow has passed end-to-end tests.
 
-## Safety boundary
+## Validation still required
 
-This PR is documentation only. No production DDL, migration history, RLS policy, grant, row, or storage object was changed. A complete automated, machine-diffable comparison of every baseline migration against the live schema remains a separate task because historical source migrations are missing or differently named; the concrete discrepancies above are confirmed from live catalog output and current repository SQL.
+The baseline was assembled from the live catalog and includes table definitions, non-constraint indexes, RLS policies, application function definitions and observed execute grants, table/column grants, and the auth profile trigger. It does not recreate Supabase-managed internal event triggers or seed data. It must be applied and tested on a disposable Supabase project before being treated as a verified new-project bootstrap.
+
+The production migration ledger remains historical evidence and is not expected to become a one-entry ledger merely because the repository now has one baseline file.
