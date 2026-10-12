@@ -1,5 +1,5 @@
 import express from 'express';
-import escapeHtml from 'escape-html';
+import { rateLimit } from 'express-rate-limit';
 import { requireAuth, requirePermission } from '../auth/rbac';
 import { Permission } from '../auth/types';
 import { getCanonicalAppUrl, isValidId, isValidUuid } from '../config/constants';
@@ -13,8 +13,42 @@ import {
 import { serverSupabase, readCmsData, writeCmsData } from '../services/supabase';
 import { emailService } from '../../src/services/emailService';
 import { campaignEmailService } from '../../src/services/campaignEmailService';
+import { escapeHtml } from '../../src/lib/htmlSanitizer';
 
 const router = express.Router();
+
+// Keep the standard in-process limiter alongside the distributed limiter so
+// requests remain throttled when the shared rate-limit store is unavailable.
+const newsletterUnsubscribeRouteRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 20,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'Too many unsubscribe requests. Please try again later.' }
+});
+
+const newsletterAdminSubscribersRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 60,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'Too many subscriber-list requests. Please try again later.' }
+});
+
+function requireVerifiedUnsubscribeToken(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const rawToken = req.body?.token;
+  const token = typeof rawToken === 'string' ? rawToken.trim() : '';
+  const verifiedEmail = token ? verifyUnsubscribeToken(token) : null;
+
+  if (verifiedEmail === null) {
+    return res.status(400).set({ 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' }).send(
+      '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Invalid unsubscribe link - ProBitian</title></head><body><main><h1>Invalid or expired unsubscribe link</h1><p>Please use the original link from your ProBitian email.</p></main></body></html>'
+    );
+  }
+
+  res.locals.verifiedUnsubscribeEmail = verifiedEmail;
+  return next();
+}
 
 // Public Newsletter Subscription
 router.post(['/newsletter', '/newsletter/subscribe'], newsletterLimiter, async (req, res) => {
@@ -139,27 +173,20 @@ router.post(['/newsletter', '/newsletter/subscribe'], newsletterLimiter, async (
 
 // GET displays a confirmation page only. Email security scanners and link previews
 // routinely follow links; unsubscribe state changes must require an explicit POST.
-router.get('/newsletter/unsubscribe', unsubscribeLimiter, (req, res) => {
+router.get('/newsletter/unsubscribe', newsletterUnsubscribeRouteRateLimit, unsubscribeLimiter, (req, res) => {
   const token = (req.query.token || '').toString().trim();
   if (!token || !verifyUnsubscribeToken(token)) {
     return res.status(400).set({ 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' }).send(
       '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Invalid unsubscribe link - ProBitian</title></head><body><main><h1>Invalid or expired unsubscribe link</h1><p>Please use the original link from your ProBitian email.</p></main></body></html>'
     );
   }
-  const safeToken = escapeHtml(token);
   return res.status(200).set({ 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' }).send(
-    '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Confirm unsubscribe - ProBitian</title></head><body><main><h1>Confirm unsubscribe</h1><p>Confirm that you want to stop receiving ProBitian newsletter emails.</p><form method="post" action="/api/newsletter/unsubscribe"><input type="hidden" name="token" value="' + safeToken + '"><button type="submit">Unsubscribe</button></form></main></body></html>'
+    '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Confirm unsubscribe - ProBitian</title></head><body><main><h1>Confirm unsubscribe</h1><p>Confirm that you want to stop receiving ProBitian newsletter emails.</p><form method="post" action="/api/newsletter/unsubscribe"><input type="hidden" name="token" value="' + escapeHtml(token) + '"><button type="submit">Unsubscribe</button></form></main></body></html>'
   );
 });
 
-router.post('/newsletter/unsubscribe', unsubscribeLimiter, async (req, res) => {
-  const token = (req.body?.token || req.query.token || '').toString().trim();
-  const verifiedEmail = token ? verifyUnsubscribeToken(token) : null;
-  if (!verifiedEmail) {
-    return res.status(400).set({ 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' }).send(
-      '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Invalid unsubscribe link - ProBitian</title></head><body><main><h1>Invalid or expired unsubscribe link</h1><p>Please use the original link from your ProBitian email.</p></main></body></html>'
-    );
-  }
+router.post('/newsletter/unsubscribe', newsletterUnsubscribeRouteRateLimit, unsubscribeLimiter, requireVerifiedUnsubscribeToken, async (_req, res) => {
+  const verifiedEmail = res.locals.verifiedUnsubscribeEmail as string;
   if (serverSupabase) {
     try {
       const { error } = await serverSupabase.from('newsletter').update({ status: 'unsubscribed' }).ilike('email', verifiedEmail);
@@ -182,7 +209,7 @@ router.post('/newsletter/unsubscribe', unsubscribeLimiter, async (req, res) => {
   );
 });
 // Admin Subscribers List
-router.get('/admin/subscribers', requireAuth, requirePermission(Permission.VIEW_ANALYTICS), async (req, res) => {
+router.get('/admin/subscribers', requireAuth, requirePermission(Permission.VIEW_ANALYTICS), newsletterAdminSubscribersRateLimit, async (req, res) => {
   if (serverSupabase) {
     try {
       const { data, error } = await serverSupabase.from('newsletter').select('*').order('created_at', { ascending: false });
@@ -534,3 +561,4 @@ router.post('/admin/email-campaigns/:id/send', requireAuth, requirePermission(Pe
 });
 
 export default router;
+
