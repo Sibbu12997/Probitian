@@ -235,6 +235,7 @@ export async function executeSequenceProcessingCycle(options?: {
     const toProcess = eligibleEnrollments.slice(0, batchLimit);
 
     for (const sl of toProcess) {
+      if (cycleLockLost) break;
       const leaseRenewed = await acquireDistributedLock(CYCLE_LOCK_KEY, cycleLockToken);
       if (!leaseRenewed) {
         cycleLockLost = true;
