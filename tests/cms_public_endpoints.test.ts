@@ -128,12 +128,15 @@ describe('Public CMS Endpoints Resiliency & Production Regression Tests', () => 
     }
   });
 
-  test('GET /api/cms/videos returns HTTP 200 with JSON array', async () => {
+  test('GET /api/cms/videos returns only published videos to anonymous users', async () => {
     const res = await fetch(`${baseUrl}/api/cms/videos`);
     assert.strictEqual(res.status, 200);
     assert.match(res.headers.get('content-type') || '', /application\/json/);
     const data = await res.json();
     assert.ok(Array.isArray(data));
+    for (const video of data) {
+      assert.strictEqual(video.published, true, 'Unpublished videos must never be returned publicly');
+    }
   });
 
   test('GET /api/cms/categories returns HTTP 200 with JSON array', async () => {

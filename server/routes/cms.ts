@@ -398,22 +398,32 @@ router.delete('/cms/courses/:id', requireAuth, requirePermission(Permission.EDIT
 
 // ==================== VIDEOS ====================
 
-// GET /api/cms/videos (Public)
+// GET /api/cms/videos (Public; editors/admins can preview unpublished videos)
 router.get('/cms/videos', async (req, res) => {
+  const session = await getAdminSession(req);
+  const canViewAll = Boolean(session && hasPermission(session.role, Permission.EDIT_CONTENT));
+
   if (serverSupabase) {
     try {
-      const { data, error } = await serverSupabase.from('videos').select('*').order('created_at', { ascending: false });
+      let query = serverSupabase.from('videos').select('*').order('created_at', { ascending: false });
+      if (!canViewAll) {
+        // The server client uses service-role credentials and bypasses RLS.
+        // Always enforce publication visibility at this API boundary.
+        query = query.eq('published', true);
+      }
+      const { data, error } = await query;
       if (error) {
         return res.status(503).json({ error: 'Database service unavailable' });
       }
       return res.json(Array.isArray(data) ? data : []);
-    } catch (err: any) {
+    } catch {
       return res.status(503).json({ error: 'Database service unavailable' });
     }
   }
   try {
     const data = readCmsData();
-    return res.json(data.videos || []);
+    const videos = Array.isArray(data.videos) ? data.videos : [];
+    return res.json(canViewAll ? videos : videos.filter((video: any) => video?.published === true));
   } catch {
     return res.json([]);
   }
@@ -444,6 +454,17 @@ router.post('/cms/videos', requireAuth, requirePermission(Permission.EDIT_CONTEN
         tags: Array.isArray(video.tags) ? video.tags : []
       };
 
+      // Editors can create/update content but cannot publish it. Only users with
+      // PUBLISH_CONTENT may change publication state; omitted fields preserve an
+      // existing publication state on editor updates and use DB defaults for new drafts.
+      const canPublish = hasPermission((req as any).userRole, Permission.PUBLISH_CONTENT);
+      if (canPublish) {
+        dbPayload.published = video.published === true;
+        dbPayload.published_at = dbPayload.published
+          ? (video.published_at || new Date().toISOString())
+          : null;
+      }
+
       if (isValidUuid(video.id)) {
         dbPayload.id = video.id;
       }
@@ -464,7 +485,24 @@ router.post('/cms/videos', requireAuth, requirePermission(Permission.EDIT_CONTEN
   if (!savedVideo.id) savedVideo.id = 'video-' + Date.now();
   const data = readCmsData();
   data.videos = data.videos || [];
+  const canPublish = hasPermission((req as any).userRole, Permission.PUBLISH_CONTENT);
   const idx = data.videos.findIndex((v: any) => v.id === savedVideo.id);
+  if (!canPublish) {
+    if (idx >= 0) {
+      // Editors must not alter the publication state of an existing video.
+      savedVideo.published = data.videos[idx].published === true;
+      savedVideo.published_at = data.videos[idx].published_at ?? null;
+    } else {
+      // New videos created by editors are always drafts.
+      delete savedVideo.published;
+      delete savedVideo.published_at;
+    }
+  } else {
+    savedVideo.published = video.published === true;
+    savedVideo.published_at = savedVideo.published
+      ? (video.published_at || new Date().toISOString())
+      : null;
+  }
   if (idx >= 0) {
     data.videos[idx] = savedVideo;
   } else {
