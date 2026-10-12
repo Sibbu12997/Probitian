@@ -32,6 +32,22 @@ GMAIL_APP_PASSWORD="<configured in server environment>"
 
 ---
 
+## 2.1 Unsubscribe Token Signing Secret
+
+Unsubscribe tokens are signed with a dedicated server-side `UNSUBSCRIBE_SECRET`. In production, the server validates this setting before opening its HTTP listener. The value must contain at least 32 bytes of secret material and must remain stable across restarts.
+
+Generate a secret with:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+Store the generated value in the hosting provider's server-side secret manager under `UNSUBSCRIBE_SECRET`. Never use a `VITE_` prefix, commit the real value, or fall back to `SESSION_SECRET`. If the secret is absent or invalid, production startup must fail.
+
+Rotating the secret invalidates unsubscribe tokens signed with the previous value. Plan rotation accordingly and provide users a working way to request a fresh unsubscribe link.
+
+---
+
 ## 3. Strict Security & Credential Isolation Guidelines
 
 > 🚨 **CRITICAL SECURITY REQUIREMENT**:
