@@ -4,6 +4,8 @@ This guide covers local setup and configuration for ProBitian. Never paste real 
 
 ## Scheduled CRM sequence processing
 
+The sequence worker uses PostgreSQL owner-token leases, not the rate-limit counter. Before deploying a version that calls `try_acquire_crm_sequence_lock` / `release_crm_sequence_lock`, apply and verify `supabase/migrations/20261012131500_add_crm_sequence_processing_locks.sql` in the target database using the approved migration process. This is a forward-only migration for an existing project; do not apply the fresh-install baseline. The worker deliberately fails closed if the lock RPCs are unavailable.
+
 Configure `CRON_SECRET` as a dedicated high-entropy secret in the production hosting environment and in the external scheduler. Send it as a Bearer token or `x-cron-key` header when calling `POST /api/cron/process-sequences`. Do not reuse `SUPABASE_SERVICE_ROLE_KEY` or another database credential for scheduler authentication. If the secret is absent, secret-based cron requests are rejected; an authorized admin session remains a separate supported path.
 
 ## Local installation
