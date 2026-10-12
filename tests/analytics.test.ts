@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import express from 'express';
 import http from 'node:http';
 import analyticsRouter from '../server/routes/analytics';
+import { sanitizeAnalyticsLink, sanitizeAnalyticsPagePath } from '../src/lib/analytics';
 import { 
   createSignedSessionToken, 
   setRevocationStore, 
@@ -76,4 +77,23 @@ describe('Analytics API Routes Verification', () => {
     assert.ok(Array.isArray(data.sources));
     assert.ok(Array.isArray(data.devices));
   });
+});
+
+test('analytics URL sanitizers remove query strings, fragments, and sensitive path details', () => {
+  assert.equal(
+    sanitizeAnalyticsPagePath('/contact?email=person%40example.com#token=secret', 'https://probitian.ai.studio'),
+    '/contact'
+  );
+  assert.equal(
+    sanitizeAnalyticsPagePath('https://probitian.ai.studio/blog/post?token=secret#section', 'https://probitian.ai.studio'),
+    '/blog/post'
+  );
+  assert.equal(
+    sanitizeAnalyticsLink('https://external.example/path/person@example.com?token=secret#fragment', 'https://probitian.ai.studio'),
+    'https://external.example'
+  );
+  assert.equal(
+    sanitizeAnalyticsLink('/unsubscribe?token=secret', 'https://probitian.ai.studio'),
+    'https://probitian.ai.studio'
+  );
 });
