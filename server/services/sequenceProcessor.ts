@@ -456,8 +456,25 @@ export async function executeSequenceProcessingCycle(options?: {
         continue;
       }
 
-      // Generate Unsubscribe token & URL
-      const unsubToken = generateUnsubscribeToken(leadEmail);
+      // Generate the unsubscribe token before dispatch. Fail this enrollment safely
+      // if signing configuration is unavailable; never send an email without a valid link.
+      let unsubToken: string;
+      try {
+        unsubToken = generateUnsubscribeToken(leadEmail);
+      } catch {
+        stats.failed++;
+        details.push({
+          sequenceId: sl.sequence_id,
+          sequenceName: seqName,
+          leadId: sl.lead_id,
+          companyName,
+          email: leadEmail,
+          stepNumber: currentStepNum,
+          action: 'failed',
+          reason: 'Unsubscribe token signing is not configured; email was not sent.'
+        });
+        continue;
+      }
       const unsubscribeUrl = `${baseUrl}/api/crm/unsubscribe?token=${unsubToken}`;
 
       // Section 7: Send sequence email using existing campaignEmailService
