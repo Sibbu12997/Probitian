@@ -16,6 +16,10 @@ This document outlines the step-by-step production deployment workflow for ProBi
 
 ---
 
+## Database deployment boundary
+
+The consolidated SQL baseline at `supabase/migrations/0001_probitian_baseline.sql` is for fresh/empty Supabase projects only. Do not apply it during routine production deploys, and do not reset the existing production migration ledger. Existing production schema changes require a separately reviewed, forward-only database change with backup and validation. See [Database Migration Guide](DATABASE_MIGRATIONS.md).
+
 ## 2. Standard Deployment Pipeline
 
 ```

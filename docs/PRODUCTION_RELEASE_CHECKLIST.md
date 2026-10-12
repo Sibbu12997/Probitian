@@ -1,5 +1,8 @@
 # ProBitian — Production Release Checklist
 
+> Database note: `supabase/migrations/0001_probitian_baseline.sql` is for new/empty projects only. Never apply it to existing production or reset the live migration ledger. See [Database Migration Guide](DATABASE_MIGRATIONS.md).
+
+
 Use this checklist for each release. Check an item only after verifying it in the target environment; this document does not certify the current production state.
 
 ## 1. Code and build

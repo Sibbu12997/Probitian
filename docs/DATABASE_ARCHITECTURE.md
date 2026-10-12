@@ -10,6 +10,10 @@ Official LinkedIn: [https://www.linkedin.com/company/probitian/](https://www.lin
 
 ---
 
+## Canonical schema baseline
+
+The repository maintains one SQL baseline at `supabase/migrations/0001_probitian_baseline.sql` for creating a new, empty Supabase project. `supabase/schema.sql` is only a pointer to that baseline. The baseline must not be run against the existing production database and does not reset or replace production's historical migration ledger. See [Database Migration Guide](DATABASE_MIGRATIONS.md) and [Connection Setup](CONNECTION_SETUP.md).
+
 ## 1. Authoritative Production Source of Truth
 
 **Supabase PostgreSQL** is the **SINGLE AUTHORITATIVE PRODUCTION DATABASE** for all website content, administrative settings, contact enquiries, email subscribers, media metadata, and email campaigns across ProBitian.

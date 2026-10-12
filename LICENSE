@@ -22,21 +22,25 @@ SOFTWARE.
 
 ---
 
-### TRADEMARKS, BRAND ASSETS, AND EDUCATIONAL CONTENT RESERVATION
+## ProBitian brand, trademarks, and separately owned content
 
-The open-source MIT license granted above applies strictly to the software code,
-application logic, build scripts, and developer tooling within this repository.
-It does NOT grant permission to use proprietary trademarks, brand assets, or
-proprietary educational content:
+The MIT license above applies to software code and accompanying documentation
+to the extent those materials are owned by the copyright holder and are not
+identified below as excluded assets. It does not transfer ownership of the
+ProBitian name, trademarks, logos, brand identity, or separately owned content.
 
-1. **Brand Names and Logos**: The names "ProBitian", "ProBitian Community Hub",
-   associated logos, icons (`public/logo.svg`, `public/favicon.svg`, `public/banner.svg`),
-   trade dress, and branding assets are the proprietary trademarks of Shivam Singh
-   and ProBitian. They may not be used in derivative commercial products or for
-   promotional endorsements without prior written consent.
-2. **Original Educational Content & Datasets**: Original curriculum designs, course
-   walkthrough scripts, proprietary sample datasets, and specific educational guides
-   authored by ProBitian are protected by copyright. They are made available for
-   individual personal learning, research, and non-commercial educational use.
-   Redistribution or republishing of course curricula as paid third-party offerings
-   is strictly prohibited without explicit authorization.
+1. **Brand and logos.** “ProBitian”, “ProBitian Community Hub”, associated logos,
+   icons, trade dress, and branding assets (including logo, favicon and banner
+   files) are reserved brand assets. This MIT grant does not grant trademark
+   rights, imply endorsement, or permit confusing use of the brand.
+2. **Original educational content.** Original curricula, course scripts, guides,
+   proprietary sample datasets and other content identified as ProBitian-owned
+   remain subject to their own copyright. No additional redistribution or
+   commercial-content license is granted for those excluded materials by this
+   software license.
+3. **Third-party assets.** Fonts, libraries, images, icons, datasets and other
+   third-party materials remain subject to their own licenses and terms.
+
+If a file or asset has a separate license notice, that notice governs that asset.
+This section clarifies the scope of the software license; it does not change
+rights attached to third-party materials.
