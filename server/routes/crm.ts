@@ -2,7 +2,7 @@ import express from 'express';
 import crypto from 'crypto';
 import { requireAuth, requirePermission, hasPermission } from '../auth/rbac';
 import { getAdminSession } from '../auth/session';
-import { Permission, UserRole } from '../auth/types';
+import { Permission } from '../auth/types';
 import { isValidId, isValidUuid, constantTimeCompare } from '../config/constants';
 import { generateUnsubscribeToken, verifyUnsubscribeToken } from '../security/tokens';
 import { emailSendLimiter, emailTestLimiter, unsubscribeLimiter } from '../middleware/rateLimiters';
