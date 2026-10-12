@@ -19,7 +19,7 @@ import { globalDistributedRateLimitStore } from '../server/middleware/rateLimite
 
 describe('Admin Media Library Management & Reference Protection', () => {
   const app = express();
-  app.use(express.json({ limit: '10mb' }));
+  app.use(express.json({ limit: '15mb' }));
   app.use((req, res, next) => {
     (req as any).cookies = parseCookies(req);
     next();

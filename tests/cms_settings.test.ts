@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import express from 'express';
 import http from 'node:http';
 import cmsRouter from '../server/routes/cms';
+import { createSignedSessionToken } from '../server/auth/session';
+import { UserRole } from '../server/auth/types';
 
 describe('CMS Settings and Endpoints Verification', () => {
   const app = express();
@@ -74,10 +76,18 @@ describe('CMS Settings and Endpoints Verification', () => {
     assert.ok(Array.isArray(data));
   });
 
-  test('GET /api/cms/media returns 200 array', async () => {
-    const res = await fetch(`${baseUrl}/api/cms/media`);
-    assert.strictEqual(res.status, 200);
-    const data = await res.json();
+  test('GET /api/cms/media requires authentication (401 unauthenticated, 200 for editor)', async () => {
+    // Unauthenticated request is rejected with 401
+    const unauthRes = await fetch(`${baseUrl}/api/cms/media`);
+    assert.strictEqual(unauthRes.status, 401);
+
+    // Authenticated editor request succeeds with 200 array
+    const editorToken = createSignedSessionToken('editor@probitian.com', UserRole.EDITOR);
+    const authRes = await fetch(`${baseUrl}/api/cms/media`, {
+      headers: { Cookie: `admin_session=${editorToken}` }
+    });
+    assert.strictEqual(authRes.status, 200);
+    const data = await authRes.json();
     assert.ok(Array.isArray(data));
   });
 

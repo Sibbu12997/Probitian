@@ -250,6 +250,14 @@ export const campaignEmailService = {
       unsubscribeUrl: params.unsubscribeUrl
     });
 
+    if (process.env.NODE_ENV === 'test') {
+      return {
+        success: true,
+        message: `[TEST MODE] Test campaign email simulated for ${params.testEmail}`,
+        messageId: `test-msg-${Date.now()}`
+      };
+    }
+
     if (gmailPass) {
       try {
         const transporter = getTransporter();
@@ -294,6 +302,13 @@ export const campaignEmailService = {
       contentHtml: params.contentHtml,
       unsubscribeUrl: params.unsubscribeUrl
     });
+
+    if (process.env.NODE_ENV === 'test') {
+      return {
+        success: true,
+        messageId: `test-recipient-${Date.now()}`
+      };
+    }
 
     if (gmailPass) {
       try {
@@ -354,6 +369,14 @@ export const campaignEmailService = {
       unsubscribeUrl: params.unsubscribeUrl
     });
 
+    if (process.env.NODE_ENV === 'test') {
+      return {
+        success: true,
+        message: `[TEST MODE] Test lead outreach simulated for ${params.testEmail}`,
+        messageId: `test-lead-${Date.now()}`
+      };
+    }
+
     if (gmailPass) {
       try {
         const transporter = getTransporter();
@@ -401,6 +424,13 @@ export const campaignEmailService = {
       lead: params.lead,
       unsubscribeUrl: params.unsubscribeUrl
     });
+
+    if (process.env.NODE_ENV === 'test') {
+      return {
+        success: true,
+        messageId: `test-lead-recipient-${Date.now()}`
+      };
+    }
 
     if (gmailPass) {
       try {

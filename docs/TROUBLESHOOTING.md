@@ -94,7 +94,7 @@ Official LinkedIn: [https://www.linkedin.com/company/probitian/](https://www.lin
 ### 8. Media Upload Failure
 
 - **Problem**: Uploading an image or PDF in the Media Library returns an upload error.
-- **Cause**: File size exceeds 10MB limit, invalid mime type, or Supabase Storage bucket missing.
+- **Cause**: File size exceeds 15MB limit, invalid mime type, or Supabase Storage bucket missing.
 - **How to Verify**: Check network response for `POST /api/cms/media/upload`. Inspect Supabase Storage dashboard.
 - **Solution**: Ensure `probitian-media` bucket exists in Supabase Storage with public access enabled.
 - **Prevention**: Enforce client-side file size pre-checks before submitting uploads.

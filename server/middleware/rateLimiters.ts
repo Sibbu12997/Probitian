@@ -143,12 +143,8 @@ export function createDistributedRateLimiter(options: RateLimitOptions, store: D
 
   return async (req: express.Request, res: express.Response, next: express.NextFunction) => {
     try {
-      const clientIp = (
-        req.ip ||
-        (req.headers['x-forwarded-for'] as string)?.split(',')[0] ||
-        req.socket.remoteAddress ||
-        '127.0.0.1'
-      ).trim();
+      const rawIp = req.ip || req.socket.remoteAddress || '127.0.0.1';
+      const clientIp = rawIp.replace(/^::ffff:/, '').trim();
 
       const key = `${prefix}:${clientIp}`;
       const result = await store.increment(key, windowMs, max, sensitive);

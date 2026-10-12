@@ -48,8 +48,7 @@ router.post(['/newsletter', '/newsletter/subscribe'], newsletterLimiter, async (
         if (existing.status === 'active') {
           return res.status(200).json({
             success: true,
-            message: 'You are already subscribed to ProBitian!',
-            subscriber: existing
+            message: 'You are already subscribed to ProBitian!'
           });
         } else {
           // Reactivate unsubscribed user
@@ -102,8 +101,7 @@ router.post(['/newsletter', '/newsletter/subscribe'], newsletterLimiter, async (
       if (existingLocal.status === 'active') {
         return res.status(200).json({
           success: true,
-          message: 'You are already subscribed to ProBitian!',
-          subscriber: existingLocal
+          message: 'You are already subscribed to ProBitian!'
         });
       }
       existingLocal.status = 'active';
@@ -133,7 +131,6 @@ router.post(['/newsletter', '/newsletter/subscribe'], newsletterLimiter, async (
   return res.status(200).json({
     success: true,
     message: emailRes.message || 'Successfully subscribed to the newsletter!',
-    subscriber: subscriberRecord,
     emailSent: emailRes.success
   });
 });

@@ -1,7 +1,8 @@
 import express from 'express';
 import crypto from 'crypto';
 import path from 'path';
-import { requireAuth, requirePermission } from '../auth/rbac';
+import { requireAuth, requirePermission, hasPermission } from '../auth/rbac';
+import { getAdminSession } from '../auth/session';
 import { Permission } from '../auth/types';
 import { isValidId, isValidUuid, PROBITIAN_MEDIA_BUCKET, DEFAULT_HOME_CONFIG, DEFAULT_FOUNDER_MESSAGE } from '../config/constants';
 import { contactLimiter, uploadLimiter, mediaDeleteLimiter } from '../middleware/rateLimiters';
@@ -28,11 +29,18 @@ router.get('/cms/config/power-bi-demo', getPowerBiDemoConfig);
 
 // ==================== PROJECTS ====================
 
-// GET /api/cms/projects (Public)
+// GET /api/cms/projects (Public read for published projects; Editors/Admins see all)
 router.get('/cms/projects', async (req, res) => {
+  const session = await getAdminSession(req);
+  const canViewAll = Boolean(session && hasPermission(session.role, Permission.EDIT_CONTENT));
+
   if (serverSupabase) {
     try {
-      const { data, error } = await serverSupabase.from('projects').select('*').order('display_order', { ascending: true });
+      let query = serverSupabase.from('projects').select('*').order('display_order', { ascending: true });
+      if (!canViewAll) {
+        query = query.eq('published', true);
+      }
+      const { data, error } = await query;
       if (error) {
         return res.status(503).json({ error: 'Database service unavailable' });
       }
@@ -43,7 +51,11 @@ router.get('/cms/projects', async (req, res) => {
   }
   try {
     const data = readCmsData();
-    return res.json(data.projects || []);
+    const projects = data.projects || [];
+    if (!canViewAll) {
+      return res.json(projects.filter((p: any) => p.published !== false));
+    }
+    return res.json(projects);
   } catch {
     return res.json([]);
   }
@@ -140,11 +152,18 @@ router.delete('/cms/projects/:id', requireAuth, requirePermission(Permission.EDI
 
 // ==================== BLOGS ====================
 
-// GET /api/cms/blogs (Public)
+// GET /api/cms/blogs (Public read for published blogs; Editors/Admins see all)
 router.get('/cms/blogs', async (req, res) => {
+  const session = await getAdminSession(req);
+  const canViewAll = Boolean(session && hasPermission(session.role, Permission.EDIT_CONTENT));
+
   if (serverSupabase) {
     try {
-      const { data, error } = await serverSupabase.from('blogs').select('*').order('created_at', { ascending: false });
+      let query = serverSupabase.from('blogs').select('*').order('created_at', { ascending: false });
+      if (!canViewAll) {
+        query = query.eq('status', 'published');
+      }
+      const { data, error } = await query;
       if (error) {
         return res.status(503).json({ error: 'Database service unavailable' });
       }
@@ -155,7 +174,11 @@ router.get('/cms/blogs', async (req, res) => {
   }
   try {
     const data = readCmsData();
-    return res.json(data.blogs || []);
+    const blogs = data.blogs || [];
+    if (!canViewAll) {
+      return res.json(blogs.filter((b: any) => (b.status || 'published') === 'published'));
+    }
+    return res.json(blogs);
   } catch {
     return res.json([]);
   }
@@ -251,11 +274,18 @@ router.delete('/cms/blogs/:id', requireAuth, requirePermission(Permission.EDIT_C
 
 // ==================== COURSES ====================
 
-// GET /api/cms/courses (Public)
+// GET /api/cms/courses (Public read for published courses; Editors/Admins see all)
 router.get('/cms/courses', async (req, res) => {
+  const session = await getAdminSession(req);
+  const canViewAll = Boolean(session && hasPermission(session.role, Permission.EDIT_CONTENT));
+
   if (serverSupabase) {
     try {
-      const { data, error } = await serverSupabase.from('courses').select('*').order('created_at', { ascending: false });
+      let query = serverSupabase.from('courses').select('*').order('created_at', { ascending: false });
+      if (!canViewAll) {
+        query = query.eq('published', true);
+      }
+      const { data, error } = await query;
       if (error) {
         return res.status(503).json({ error: 'Database service unavailable' });
       }
@@ -266,7 +296,11 @@ router.get('/cms/courses', async (req, res) => {
   }
   try {
     const data = readCmsData();
-    return res.json(data.courses || []);
+    const courses = data.courses || [];
+    if (!canViewAll) {
+      return res.json(courses.filter((c: any) => c.published !== false && c.status !== 'draft'));
+    }
+    return res.json(courses);
   } catch {
     return res.json([]);
   }
@@ -287,20 +321,19 @@ router.post('/cms/courses', requireAuth, requirePermission(Permission.EDIT_CONTE
       const dbPayload: any = {
         title: course.title,
         slug,
-        level: course.level || 'Intermediate',
-        category: course.category || 'Data Analytics',
+        icon: course.icon || 'BarChart3',
+        level: course.level || 'All Levels',
         description: course.description || '',
+        category: course.category || 'Data Analytics',
         thumbnail: course.thumbnail || course.thumbnail_url || '',
-        duration: course.duration || '8 weeks',
-        lessons_count: course.lessons_count || course.lessonsCount || 10,
-        enrolled_count: course.enrolled_count || course.enrolledCount || 0,
-        rating: course.rating || 5.0,
-        instructor: course.instructor || 'Shivam Singh',
-        featured: Boolean(course.featured),
-        status: course.status || 'published',
-        tags: course.tags || [],
-        curriculum: course.curriculum || [],
-        updated_at: new Date().toISOString()
+        video_url: course.video_url || course.videoUrl || null,
+        pdf_url: course.pdf_url || course.pdfUrl || null,
+        modules_count: course.modules_count || course.modulesCount || course.lessons_count || 5,
+        duration: course.duration || '3.5 Hours',
+        key_takeaways: Array.isArray(course.key_takeaways || course.keyTakeaways) ? (course.key_takeaways || course.keyTakeaways) : [],
+        syllabus: course.syllabus || course.curriculum || [],
+        resources: course.resources || [],
+        published: course.published !== false && course.status !== 'draft'
       };
 
       if (isValidUuid(course.id)) {
@@ -396,19 +429,18 @@ router.post('/cms/videos', requireAuth, requirePermission(Permission.EDIT_CONTEN
 
   if (serverSupabase) {
     try {
+      const youtubeId = video.youtube_id || video.youtubeId || '';
       const dbPayload: any = {
         title: video.title,
-        youtube_url: video.youtube_url || video.youtubeUrl || '',
-        youtube_id: video.youtube_id || video.youtubeId || '',
         description: video.description || '',
-        category: video.category || 'General',
-        tags: video.tags || [],
+        youtube_url: video.youtube_url || video.youtubeUrl || '',
+        youtube_id: youtubeId,
+        thumbnail: video.thumbnail || video.thumbnail_url || (youtubeId ? `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg` : 'https://img.youtube.com/vi/default/hqdefault.jpg'),
         duration: video.duration || '10:00',
-        featured: Boolean(video.featured),
-        views_count: video.views_count || video.viewsCount || 0,
-        likes_count: video.likes_count || video.likesCount || 0,
-        published_at: video.published_at || video.publishedAt || new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        views: video.views || `${video.views_count || video.viewsCount || 0} views`,
+        category: video.category || 'Power BI',
+        playlist: video.playlist || null,
+        tags: Array.isArray(video.tags) ? video.tags : []
       };
 
       if (isValidUuid(video.id)) {
@@ -626,7 +658,7 @@ router.post(['/cms/messages', '/contact', '/contact/submit'], contactLimiter, as
     writeCmsData(data);
   }
 
-  return res.json({ success: true, message: savedMsg });
+  return res.json({ success: true, message: 'Your message has been sent successfully. We will get back to you shortly!' });
 });
 
 // PATCH /api/cms/messages/:id/status (Protected: Editor / Admin)
@@ -924,8 +956,8 @@ router.post('/cms/navigation', requireAuth, requirePermission(Permission.MANAGE_
 
 // ==================== MEDIA LIBRARY ====================
 
-// GET /api/cms/media (Public / Protected)
-router.get('/cms/media', async (req, res) => {
+// GET /api/cms/media (Protected: Authenticated users with CONTENT_READ permission)
+router.get('/cms/media', requireAuth, requirePermission(Permission.CONTENT_READ), async (req, res) => {
   if (serverSupabase) {
     try {
       const { data, error } = await serverSupabase.from('media').select('*').order('created_at', { ascending: false });
@@ -1679,7 +1711,9 @@ export const PUBLIC_SETTINGS_KEYS: ReadonlySet<string> = new Set([
   'legal',
   'home',
   'founder_message',
-  'founder'
+  'founder',
+  'social_links',
+  'navigation_items'
 ]);
 
 // Internal system and CRM keys that can never be modified via CMS settings

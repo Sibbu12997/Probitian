@@ -2,7 +2,7 @@ import express from 'express';
 import crypto from 'crypto';
 import { requireAuth, requirePermission } from '../auth/rbac';
 import { Permission, UserRole } from '../auth/types';
-import { isValidId, isValidUuid } from '../config/constants';
+import { isValidId, isValidUuid, constantTimeCompare } from '../config/constants';
 import { generateUnsubscribeToken, verifyUnsubscribeToken } from '../security/tokens';
 import { emailSendLimiter, emailTestLimiter, unsubscribeLimiter } from '../middleware/rateLimiters';
 import { serverSupabase, readCmsData, writeCmsData } from '../services/supabase';
@@ -1547,17 +1547,22 @@ router.post(['/admin/lead-sequences/process', '/api/admin/lead-sequences/process
 // POST /api/cron/process-sequences - Scheduled webhook endpoint for external schedulers
 router.post(['/cron/process-sequences', '/api/cron/process-sequences'], async (req, res) => {
   try {
-    const authHeader = req.headers.authorization || '';
-    const cronKey = req.headers['x-cron-key'] || req.query.key;
-    const expectedSecret = process.env.CRON_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const authHeader = (req.headers.authorization || '').trim();
+    const bearerToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : authHeader;
+    const cronKey = String(req.headers['x-cron-key'] || req.query.key || '').trim();
+    const expectedSecret = (process.env.CRON_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
 
-    // Check authorization: Bearer token, x-cron-key, or session
-    const isAuthorized =
-      (expectedSecret && (authHeader === `Bearer ${expectedSecret}` || cronKey === expectedSecret)) ||
-      Boolean((req as any).session && (req as any).session.user);
+    // Check authorization: Bearer token, x-cron-key, or authenticated admin session
+    const isSecretAuthorized = Boolean(
+      expectedSecret && (
+        (bearerToken && constantTimeCompare(bearerToken, expectedSecret)) ||
+        (cronKey && constantTimeCompare(cronKey, expectedSecret))
+      )
+    );
+    const hasAdminSession = Boolean((req as any).session && (req as any).session.user);
 
-    if (!isAuthorized) {
-      return res.status(401).json({ error: 'Unauthorized: Invalid cron key or session.' });
+    if (!isSecretAuthorized && !hasAdminSession) {
+      return res.status(401).json({ error: 'Unauthorized: Invalid cron authorization token.' });
     }
 
     const reqProtocol = (req.headers['x-forwarded-proto'] || req.protocol || 'https').toString();
@@ -1576,8 +1581,8 @@ router.post(['/cron/process-sequences', '/api/cron/process-sequences'], async (r
       details: result.details
     });
   } catch (err: any) {
-    console.error('[POST /api/cron/process-sequences Error]', err);
-    return res.status(500).json({ error: 'Cron sequence processing error: ' + (err?.message || String(err)) });
+    console.error('[POST /api/cron/process-sequences Error]', err?.message || err);
+    return res.status(500).json({ error: 'Internal server error processing sequence cycle.' });
   }
 });
 

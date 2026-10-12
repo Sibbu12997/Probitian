@@ -31,12 +31,12 @@ const app = express();
 // Disable X-Powered-By technology disclosure
 app.disable('x-powered-by');
 
-// Trust reverse proxy for accurate client IP and protocol resolution in Cloud Run / containers
-app.set('trust proxy', true);
+// Trust reverse proxy strictly for 1 hop (Cloud Run / container front-end) to prevent X-Forwarded-For spoofing
+app.set('trust proxy', 1);
 
-// Baseline JSON & URL-encoded body parsing
-app.use(express.json({ limit: '1mb' }));
-app.use(express.urlencoded({ limit: '1mb', extended: true }));
+// Baseline JSON & URL-encoded body parsing (configured to 15mb to support documented CMS media uploads)
+app.use(express.json({ limit: '15mb' }));
+app.use(express.urlencoded({ limit: '15mb', extended: true }));
 
 // Cookie parsing middleware (populates req.cookies from raw Cookie header)
 app.use((req, res, next) => {
@@ -90,7 +90,8 @@ app.use(apiErrorHandler);
 
 // Frontend SPA & Dynamic Server-Side Prerendering Handler
 async function setupFrontend() {
-  if (process.env.NODE_ENV !== 'production' && process.env.NODE_ENV !== 'test') {
+  const isTestEnv = process.env.NODE_ENV === 'test' || process.argv.some(arg => arg.includes('--test') || arg.includes('test'));
+  if (process.env.NODE_ENV !== 'production' && !isTestEnv) {
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'custom',

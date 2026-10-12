@@ -91,8 +91,8 @@ export const emailService = {
     const user = getGmailUser();
     const pass = getGmailPass();
     const cleanEmail = email.trim().toLowerCase();
-    if (!pass) {
-      console.log(`[EMAIL INFO] Welcome email recorded for ${cleanEmail}. Set GMAIL_APP_PASSWORD in environment to enable live SMTP delivery.`);
+    if (!pass || process.env.NODE_ENV === 'test') {
+      console.log(`[EMAIL INFO] Welcome email recorded for ${cleanEmail}.${process.env.NODE_ENV === 'test' ? ' [TEST MODE: email dispatch suppressed]' : ' Set GMAIL_APP_PASSWORD in environment to enable live SMTP delivery.'}`);
       return { success: true, message: 'Welcome email queued.' };
     }
 
@@ -136,8 +136,8 @@ export const emailService = {
     const user = getGmailUser();
     const pass = getGmailPass();
     const cleanEmail = email.trim().toLowerCase();
-    if (!pass) {
-      console.log(`[EMAIL INFO] Reply recorded for ${cleanEmail}. Set GMAIL_APP_PASSWORD in environment to enable live SMTP dispatch.`);
+    if (!pass || process.env.NODE_ENV === 'test') {
+      console.log(`[EMAIL INFO] Reply recorded for ${cleanEmail}.${process.env.NODE_ENV === 'test' ? ' [TEST MODE: email dispatch suppressed]' : ' Set GMAIL_APP_PASSWORD in environment to enable live SMTP dispatch.'}`);
       return { success: true, message: 'Reply saved in database.' };
     }
 
@@ -194,8 +194,8 @@ export const emailService = {
   }): Promise<{ success: boolean; message?: string }> {
     const user = getGmailUser();
     const pass = getGmailPass();
-    if (!pass) {
-      console.log(`[EMAIL INFO] Contact enquiry recorded from ${params.email}. Set GMAIL_APP_PASSWORD in environment to enable live SMTP dispatch.`);
+    if (!pass || process.env.NODE_ENV === 'test') {
+      console.log(`[EMAIL INFO] Contact enquiry recorded from ${params.email}.${process.env.NODE_ENV === 'test' ? ' [TEST MODE: email dispatch suppressed]' : ' Set GMAIL_APP_PASSWORD in environment to enable live SMTP dispatch.'}`);
       return { success: true, message: 'Contact enquiry recorded.' };
     }
 

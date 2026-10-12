@@ -20,13 +20,14 @@ The target security migration—`restrict_storage_object_policies` (version `202
 - **Storage Security Migration Status**: **[LIVE VERIFIED]** Migration `restrict_storage_object_policies` (`20261009164408`) is confirmed applied. Direct client-side bypass attempts (both anonymous and authenticated) fail with `403 / new row violates row-level security policy`.
 - **Targeted Policies Absent**: **[LIVE VERIFIED]** Both `Auth upload storage` and `Public storage access` are verified absent from `storage.objects`.
 - **Public Asset CDN Delivery**: **[LIVE VERIFIED]** Public object URLs served via the Supabase Storage CDN deliver assets (official SVG logo, banners, founder portrait) with HTTP `200 OK` and correct MIME types without requiring broad RLS SELECT permissions.
-- **Database Media Records (`public.media`)**: Exactly **180** records (reconciled across snapshot history from 165 to 175 and 180).
-- **Storage Objects in `probitian-media`**: Exactly **182** objects (179 in `uploads/`, 3 in `general/`).
-- **Media Records with Missing Storage Objects**: Exactly **0** (100% synchronization; every single one of the 180 database records corresponds to an existing storage object).
+- **Database Media Records (`public.media`)**: Exactly **185** records (reconciled across snapshot history from 165 to 175, 180, and 185).
+- **Storage Objects in `probitian-media`**: Exactly **187** objects (184 in `uploads/`, 3 in `general/`).
+- **Media Records with Missing Storage Objects**: Exactly **0** (100% synchronization; every single one of the 185 database records corresponds to an existing storage object).
 - **Unregistered Storage Objects**: Exactly **2** historical branding assets (`general/1786374902395-2c321b22-Logo__2_.svg` and `general/1786374914972-c54a1a00-Banner.svg`), preserved intentionally. Zero orphan test probes remain.
-- **Reconciliation Resolution**: The progression between snapshots (165/167 → 175/177 → 180/182) was thoroughly investigated: each test run of `tests/cms_public_endpoints.test.ts` executes 5 valid media uploads (`valid.png`, `photo.jpg`, `image.webp`, `graphic.svg`, `passwd.png`) through the server endpoint `/api/cms/media/upload`. Because the server endpoint synchronizes uploads to both Supabase Storage and `public.media`, each run adds exactly 5 rows and 5 objects in lockstep, leaving **0 missing files** and **0 orphaned rows**.
+- **Reconciliation Resolution**: The progression between snapshots (165/167 → 175/177 → 180/182 → 185/187) was thoroughly investigated: prior unrefactored test runs of `tests/cms_public_endpoints.test.ts` executed 5 valid media uploads (`valid.png`, `photo.jpg`, `image.webp`, `graphic.svg`, `passwd.png`) through `/api/cms/media/upload`. Because the server endpoint synchronizes uploads to both Supabase Storage and `public.media`, each run added 5 rows and 5 objects in lockstep, leaving **0 missing files** and **0 orphaned rows**. The test suite has now been refactored with guaranteed immediate cleanup (`try/finally` and `after()` hooks) so that all subsequent test runs add 0 persistent artifacts.
+- **Upload Size Limit Standardized**: **[CODE REVIEWED & AUTOMATED TEST PASSED]** Standardized across repository, documentation, server routes, and tests to **15 MB** (`MAX_UPLOAD_BYTES = 15 * 1024 * 1024`). Tested that oversized payloads (> 15MB) return HTTP 413 Payload Too Large.
 - **Security Advisor Status**: **[LIVE VERIFIED]** The notice `auth_leaked_password_protection` remains present in Supabase Security Advisor (requiring Pro plan enabling of HaveIBeenPwned password checking in Supabase Auth settings). It is not claimed to be resolved.
-- **Automated Test Suite**: **[AUTOMATED TEST PASSED]** 211 tests passing across 35 test suites (exit code 0).
+- **Automated Test Suite**: **[AUTOMATED TEST PASSED]** 228 tests passing across 35 test suites (exit code 0).
 
 ---
 
@@ -35,10 +36,13 @@ The target security migration—`restrict_storage_object_policies` (version `202
 ### Evidence Analysis Across Snapshots
 When examining the live database and storage bucket across audits:
 - **Baseline Report**: 165 `public.media` rows, 167 storage objects.
-- **Intermediate Verification**: 175 `public.media` rows, 177 storage objects (+10 rows, +10 objects from 2 runs).
-- **Current Live State**: **180** `public.media` rows, **182** storage objects (+5 rows, +5 objects from 3rd run).
+- **Intermediate Verification**: 175 `public.media` rows, 177 storage objects (+10 rows, +10 objects from 2 test runs).
+- **Audit Continuation Snapshot**: 180 `public.media` rows, 182 storage objects (+5 rows, +5 objects from 3rd test run).
+- **Pre-Refactor Integration Run**: 185 `public.media` rows, 187 storage objects (+5 rows, +5 objects from 4th test run).
+- **Post-Refactor Stabilized State**: Exactly **185** `public.media` rows, **187** storage objects. 
 - **Storage objects not registered in `public.media`**: Exactly **2** (the 2 historical branding assets in `general/`).
 - **Database rows with missing storage objects**: Exactly **0** (100% data integrity).
+- **Remaining test probes in bucket**: Exactly **0** (`test_probe` files cleanly unlinked).
 
 ### Root Cause Analysis of the Test Artifacts
 Tracing timestamps, filenames, and IDs confirms all additional items were created by integration test runs of `tests/cms_public_endpoints.test.ts` targeting `/api/cms/media/upload`:
@@ -61,10 +65,22 @@ Tracing timestamps, filenames, and IDs confirms all additional items were create
   13. `uploads/1791565868445_18634293_image.webp` (`f53eed89-b8c6-4397-bfd0-e36ca27486d0`)
   14. `uploads/1791565869232_f0f1a7e4_graphic.svg` (`e99112a8-a2b5-4e35-af09-fca2c63323a7`)
   15. `uploads/1791565870249_3e3273cc_passwd.png` (`208d821c-a227-44ac-88a8-348fa097ce01`)
+- **Run 4 (17:24:51 – 17:24:54 UTC):**
+  16. `uploads/1791566691456_86144e54_valid.png` (`f48b9918-ae38-4e89-bd32-5e43a99e7465`)
+  17. `uploads/1791566692120_6bb088be_photo.jpg` (`86fbaea4-a4b5-412f-9812-70b9231f24d9`)
+  18. `uploads/1791566692790_394b998a_image.webp` (`3c3d11b1-2856-42bb-90bf-c6bc361ef2ae`)
+  19. `uploads/1791566693450_5033cf85_graphic.svg` (`8203c9eb-c7e6-4318-ae95-d8aaee0dfa80`)
+  20. `uploads/1791566694460_1bca5610_passwd.png` (`6e51147e-8c3b-4869-906d-e43105786ba1`)
 
-These assets were created by `tests/cms_public_endpoints.test.ts`, which tests the real server endpoint `/api/cms/media/upload` with valid editor session tokens. Because the server endpoint properly synchronizes uploads to both Supabase Storage and `public.media`, **both tables incremented identically by 5 per run**, leaving **0 orphaned rows** and **0 missing files**.
+These assets were created by `tests/cms_public_endpoints.test.ts`, which tested the real server endpoint `/api/cms/media/upload` with valid editor session tokens. Because the server endpoint properly synchronizes uploads to both Supabase Storage and `public.media`, **both tables incremented identically by 5 per run**, leaving **0 orphaned rows** and **0 missing files**.
 
-In accordance with explicit audit instructions, no records or files have been deleted.
+### Integration Test Refactoring & Remediation
+`tests/cms_public_endpoints.test.ts` was refactored with the following hardening:
+1. Every upload test creates a uniquely timestamped probe (`test_probe_${Date.now()}_...`).
+2. Every upload test wraps assertions in `try / finally` and executes `safelyCleanAsset(id, storage_path)` immediately.
+3. The suite maintains an `uploadedAssetsToClean` tracker and an `after()` hook as a secondary fail-safe.
+4. Testing verified that subsequent test runs add **0 net rows and 0 net storage objects** to production.
+5. In accordance with explicit audit instructions to avoid deleting anything without approval, historical assets (including the 20 test records from Runs 1–4) remain preserved.
 
 ---
 
@@ -111,16 +127,16 @@ test('4. Anonymous direct deletion from probitian-media is blocked (returns 0 de
 - **Failed Tests:** `0`
 - **Skipped / Todo Tests:** `0`
 - **Suites:** `1`
-- **Duration:** `2,988 ms`
 
 Full regression suite (`npm test`):
 - **Command:** `npm test` (`NODE_ENV=test tsx --test tests/**/*.test.ts`)
 - **Process Exit Code:** `0`
-- **Total Tests:** `211`
-- **Passed Tests:** `211`
+- **Total Tests:** `228`
+- **Passed Tests:** `228`
 - **Failed Tests:** `0`
 - **Skipped / Todo Tests:** `0`
 - **Suites:** `35`
+- **Duration:** `66.2 s`
 
 ### B. Live Production Verification (Executed against Supabase project `dlaehchzzkjsrarktfsf`)
 - **Direct Anonymous Listing:** **[LIVE VERIFIED]** `anonClient.storage.from('probitian-media').list('')` returned 0 items. Listing `uploads/` returned 0 items.
@@ -149,10 +165,13 @@ Full regression suite (`npm test`):
 | :--- | :---: | :--- |
 | **Migration `restrict_storage_object_policies` applied** | **LIVE VERIFIED** | Version `20261009164408` active; repository migration `0021_restrict_storage_object_policies.sql` verified |
 | **Policies `Auth upload storage` & `Public storage access` absent** | **LIVE VERIFIED** | Direct upload with authenticated JWT returns 403 RLS policy error; direct enumeration returns empty array |
-| **Zero missing storage objects (180 DB rows)** | **LIVE VERIFIED** | Reconciled all 180 `public.media.storage_path` values against `probitian-media` objects (0 missing) |
+| **Zero missing storage objects (185 DB rows)** | **LIVE VERIFIED** | Reconciled all 185 `public.media.storage_path` values against `probitian-media` objects (0 missing) |
 | **2 Historical Unregistered Assets** | **LIVE VERIFIED** | `general/1786374902395-2c321b22-Logo__2_.svg` & `general/1786374914972-c54a1a00-Banner.svg` verified preserved |
+| **Zero lingering test probes** | **LIVE VERIFIED** | Probe enumeration in `probitian-media` returns 0 files matching `test_probe` |
 | **Isolated test probe in `storage_security_audit.test.ts`** | **AUTOMATED TEST PASSED** | Test 4 runs with dynamically created probe and safe cleanup; suite passes 6/6 |
-| **Full test suite passing** | **AUTOMATED TEST PASSED** | `npm test` exit code 0, 211 tests passed, 0 failed |
+| **Full test suite passing** | **AUTOMATED TEST PASSED** | `npm test` exit code 0, 228 tests passed, 0 failed across 35 suites |
+| **Public CMS Endpoint Authorization** | **AUTOMATED TEST PASSED** | 42/42 tests in `cms_public_endpoints.test.ts` pass verifying published filters, drafts hiding, and RBAC |
+| **15 MB Upload Size Limit Standardized** | **CODE REVIEWED & AUTOMATED TEST PASSED** | Standardized across Express body-parser, `handleUpload`, and docs; 413 returned on oversized payload |
 | **Service role secret isolated server-side** | **CODE REVIEW ONLY** | Verified `SUPABASE_SECRET_KEY` is referenced solely in `server/services/supabase.ts` |
 | **Security Advisor Leaked Password Warning** | **LIVE VERIFIED** | Confirmed warning `auth_leaked_password_protection` remains present in Supabase Security Advisor |
 
@@ -170,5 +189,5 @@ Full regression suite (`npm test`):
 
 ### Verdict: **`PASS WITH WARNINGS`**
 
-1. **Storage Security:** **PASS** — Both broad policies are absent, RLS blocks direct client-side access, public assets deliver with HTTP 200, and media synchronization is 100% (180 rows / 182 objects, 0 missing).
+1. **Storage Security:** **PASS** — Both broad policies are absent, RLS blocks direct client-side access, public assets deliver with HTTP 200, and media synchronization is 100% (185 rows / 187 objects, 0 missing).
 2. **Advisory Warning:** **WARNING** — Supabase Security Advisor `auth_leaked_password_protection` warning remains active in Supabase Auth configuration.
