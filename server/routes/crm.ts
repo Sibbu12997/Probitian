@@ -4,7 +4,7 @@ import crypto from 'crypto';
 import { requireAuth, requirePermission, hasPermission } from '../auth/rbac';
 import { getAdminSession } from '../auth/session';
 import { Permission } from '../auth/types';
-import { isValidId, isValidUuid, constantTimeCompare } from '../config/constants';
+import { getCanonicalAppUrl, isValidId, isValidUuid, constantTimeCompare } from '../config/constants';
 import { generateUnsubscribeToken, verifyUnsubscribeToken } from '../security/tokens';
 import { emailSendLimiter, emailTestLimiter, unsubscribeLimiter } from '../middleware/rateLimiters';
 import { serverSupabase, readCmsData, writeCmsData } from '../services/supabase';
@@ -883,9 +883,7 @@ router.post('/admin/lead-campaigns/:id/send', requireAuth, requirePermission(Per
         .replace(/{{powerbi_use_case}}/gi, lead.powerbi_use_case || 'analytics reporting');
 
       const unsubToken = generateUnsubscribeToken(lead.email);
-      const reqProtocol = req.headers['x-forwarded-proto'] || req.protocol;
-      const reqHost = req.headers['x-forwarded-host'] || req.headers.host;
-      const unsubUrl = `${reqProtocol}://${reqHost}/api/crm/unsubscribe?token=${unsubToken}`;
+      const unsubUrl = `${getCanonicalAppUrl()}/api/crm/unsubscribe?token=${unsubToken}`;
 
       const sendRes = await campaignEmailService.sendLeadSingleRecipient({
         toEmail: lead.email,
@@ -1502,9 +1500,7 @@ router.post(['/admin/lead-sequences/:id/test', '/api/admin/lead-sequences/:id/te
     };
 
     const unsubToken = generateUnsubscribeToken(testEmail);
-    const reqProtocol = req.headers['x-forwarded-proto'] || req.protocol;
-    const reqHost = req.headers['x-forwarded-host'] || req.headers.host;
-    const unsubUrl = `${reqProtocol}://${reqHost}/api/crm/unsubscribe?token=${unsubToken}`;
+    const unsubUrl = `${getCanonicalAppUrl()}/api/crm/unsubscribe?token=${unsubToken}`;
 
     const sendRes = await campaignEmailService.sendLeadTestEmail({
       testEmail: testEmail,
@@ -1533,12 +1529,11 @@ router.post(['/admin/lead-sequences/:id/test', '/api/admin/lead-sequences/:id/te
 router.post(['/admin/lead-sequences/process', '/api/admin/lead-sequences/process'], requireAuth, requirePermission(Permission.MANAGE_CRM), async (req, res) => {
   try {
     const { targetEmail, targetLeadId, forceProductionSend, batchLimit } = req.body || {};
-    const reqProtocol = (req.headers['x-forwarded-proto'] || req.protocol || 'https').toString();
-    const reqHost = (req.headers['x-forwarded-host'] || req.headers.host || 'probitian.ai.studio').toString();
+    const canonicalUrl = new URL(getCanonicalAppUrl());
 
     const result = await executeSequenceProcessingCycle({
-      reqProtocol,
-      reqHost,
+      reqProtocol: canonicalUrl.protocol.replace(':', ''),
+      reqHost: canonicalUrl.host,
       batchLimit: typeof batchLimit === 'number' ? batchLimit : 25,
       targetEmail,
       targetLeadId,
@@ -1579,12 +1574,11 @@ router.post(['/cron/process-sequences', '/api/cron/process-sequences'], async (r
       return res.status(401).json({ error: 'Unauthorized: Invalid cron authorization token.' });
     }
 
-    const reqProtocol = (req.headers['x-forwarded-proto'] || req.protocol || 'https').toString();
-    const reqHost = (req.headers['x-forwarded-host'] || req.headers.host || 'probitian.ai.studio').toString();
+    const canonicalUrl = new URL(getCanonicalAppUrl());
 
     const result = await executeSequenceProcessingCycle({
-      reqProtocol,
-      reqHost,
+      reqProtocol: canonicalUrl.protocol.replace(':', ''),
+      reqHost: canonicalUrl.host,
       batchLimit: 30
     });
 
