@@ -28,7 +28,7 @@
     "nodemailer": "^10.0.15",
     "pg": "^8.23.0",
     "react": "^19.0.1",
-    "react-dom": "^19.0.1",
+    "react-dom": "^19.3.0",
     "express-rate-limit": "^7.5.0"
   },
   "devDependencies": {
