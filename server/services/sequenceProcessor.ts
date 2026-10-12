@@ -125,6 +125,7 @@ export async function executeSequenceProcessingCycle(options?: {
 
   isLocalProcessingActive = true;
   const claimedStepLocks: Array<{ key: string; ownerToken: string }> = [];
+  let cycleLockLost = false;
   const startTime = Date.now();
 
   try {
@@ -206,6 +207,7 @@ export async function executeSequenceProcessingCycle(options?: {
     for (const sl of toProcess) {
       const leaseRenewed = await acquireDistributedLock(CYCLE_LOCK_KEY, cycleLockToken);
       if (!leaseRenewed) {
+        cycleLockLost = true;
         stats.skipped++;
         details.push({
           sequenceId: sl.sequence_id,
@@ -602,6 +604,17 @@ export async function executeSequenceProcessingCycle(options?: {
 
       // Safety throttle delay between sends (250ms) to respect SMTP rate limits
       await new Promise(r => setTimeout(r, 250));
+    }
+
+    // Never persist a stale whole-table snapshot after losing the distributed lease;
+    // another worker may already own the cycle. Leave step leases to expire as a duplicate-send guard.
+    if (cycleLockLost) {
+      return {
+        success: false,
+        message: 'Sequence processing lease was lost. State snapshot was not persisted to avoid overwriting another worker; claimed steps remain protected until their leases expire.',
+        stats,
+        details
+      };
     }
 
     // 3. Persist state changes back to Supabase
