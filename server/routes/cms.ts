@@ -616,8 +616,6 @@ router.post(['/cms/messages', '/contact', '/contact/submit'], contactLimiter, as
     return res.status(400).json({ error: 'Name, email, and message are required.' });
   }
 
-  let savedMsg: any = null;
-
   if (serverSupabase) {
     try {
       const dbPayload: any = {
@@ -636,13 +634,12 @@ router.post(['/cms/messages', '/contact', '/contact/submit'], contactLimiter, as
         console.error('[CMS] Contact message insert error:', error);
         return res.status(500).json({ error: 'Failed to send message' });
       }
-      savedMsg = data;
     } catch (err) {
       console.error('[CMS] Contact message exception:', err);
       return res.status(500).json({ error: 'Failed to send message' });
     }
   } else {
-    savedMsg = {
+    const savedMsg = {
       id: 'msg-' + Date.now(),
       name,
       email,
