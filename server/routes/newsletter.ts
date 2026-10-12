@@ -80,7 +80,6 @@ router.post(['/newsletter', '/newsletter/subscribe'], newsletterLimiter, async (
             message: 'Database service unavailable. Failed to save subscription.'
           });
         }
-        subscriberRecord = inserted;
       }
     } catch (err: any) {
       console.error(`[NEWSLETTER] Supabase exception: ${err?.message || 'Unknown error'}`);
