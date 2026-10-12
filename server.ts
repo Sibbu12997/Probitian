@@ -13,6 +13,7 @@ import { apiErrorHandler, apiNotFoundHandler } from './server/middleware/errorHa
 import { serverSupabase } from './server/services/supabase';
 import { getRouteSeo, injectSeoIntoHtml } from './server/seo/prerender';
 import { validateSessionSecretConfig, parseCookies } from './server/auth/session';
+import { validateUnsubscribeSecretConfig } from './server/security/tokens';
 
 // Route Modules
 import authRouter from './server/routes/auth';
@@ -23,8 +24,9 @@ import cmsRouter from './server/routes/cms';
 import feedbackRouter from './server/routes/feedback';
 import seoRouter from './server/routes/seo';
 
-// P0 Session Secret Validation (fails startup in production if missing/weak)
+// Fail startup before listening if required production secrets are missing or weak.
 validateSessionSecretConfig();
+validateUnsubscribeSecretConfig();
 
 const app = express();
 
