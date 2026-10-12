@@ -12,7 +12,7 @@ Official LinkedIn: [https://www.linkedin.com/company/probitian/](https://www.lin
 
 ## 1. Overview
 
-This document outlines the step-by-step production deployment workflow for ProBitian, ensuring zero downtime, safe database schema updates, and clean releases.
+This document outlines the controlled production deployment workflow for ProBitian. The steps are intended to reduce release risk; they do not guarantee zero downtime or prove that a particular deployment has been completed.
 
 ---
 
