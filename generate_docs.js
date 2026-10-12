@@ -1,201 +1,30 @@
-import fs from 'fs';
-import path from 'path';
-import { jsPDF } from 'jspdf';
-
+#!/usr/bin/env node
 /**
- * ProBitian Documentation Build & Export Engine
- * 
- * ARCHITECTURE & SOURCE OF TRUTH:
- * - Authoritative source: /docs/*.md (Developers ONLY edit Markdown files in /docs/)
- * - Generated artifacts: /public/docs/*.md and /public/docs/*.pdf
- * - Target consumers: Public website downloads and in-browser documentation viewers
- * 
- * Pipeline:
- *   /docs/*.md (Source of Truth)
- *      └──> generate_docs.js (Build Process)
- *              ├──> /public/docs/*.md (Generated markdown with explicit headers)
- *              └──> /public/docs/*.pdf (Generated branded PDF documents)
+ * Documentation maintenance check.
+ *
+ * Source documents are maintained directly in /docs. We intentionally do not
+ * generate duplicate public Markdown or PDF exports; those copies became stale
+ * and were removed. This command verifies that the core documentation entry
+ * points exist without writing generated files.
  */
+import fs from 'node:fs';
+import path from 'node:path';
 
-// Ensure public/docs directory exists
-const publicDocsDir = path.join(process.cwd(), 'public', 'docs');
-const sourceDocsDir = path.join(process.cwd(), 'docs');
+const root = process.cwd();
+const required = [
+  'docs/README.md',
+  'docs/ARCHITECTURE.md',
+  'docs/DATABASE_ARCHITECTURE.md',
+  'docs/DATABASE_MIGRATIONS.md',
+  'docs/SECURITY.md',
+  'docs/DEPLOYMENT_WORKFLOW.md',
+];
 
-if (!fs.existsSync(publicDocsDir)) {
-  fs.mkdirSync(publicDocsDir, { recursive: true });
-}
-
-// Helper to wrap and write text with simple pagination in jsPDF
-function createPdfFromMarkdown(title, subtitle, content, outputPath) {
-  const doc = new jsPDF({
-    orientation: 'portrait',
-    unit: 'pt',
-    format: 'a4'
-  });
-
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const pageHeight = doc.internal.pageSize.getHeight();
-  const margin = 40;
-  const maxLineWidth = pageWidth - (margin * 2);
-
-  let y = 50;
-
-  // Header Banner
-  doc.setFillColor(109, 40, 217); // Purple theme #6d28d9
-  doc.rect(0, 0, pageWidth, 80, 'F');
-
-  doc.setTextColor(255, 255, 255);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(20);
-  doc.text(title, margin, 40);
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(11);
-  doc.text(subtitle, margin, 60);
-
-  y = 110;
-
-  const lines = content.split('\n');
-
-  lines.forEach((line) => {
-    if (y > pageHeight - 50) {
-      doc.addPage();
-      y = 50;
-      doc.setDrawColor(226, 232, 240);
-      doc.line(margin, 35, pageWidth - margin, 35);
-      doc.setFont('helvetica', 'italic');
-      doc.setFontSize(8);
-      doc.setTextColor(100, 116, 139);
-      doc.text(`${title} — Page ${doc.internal.pages.length - 1}`, margin, 30);
-    }
-
-    const trimmed = line.trim();
-
-    if (trimmed.startsWith('# ')) {
-      y += 12;
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(16);
-      doc.setTextColor(15, 23, 42);
-      doc.text(trimmed.replace('# ', ''), margin, y);
-      y += 8;
-      doc.setDrawColor(124, 58, 237);
-      doc.setLineWidth(1.5);
-      doc.line(margin, y, margin + 120, y);
-      y += 14;
-    } else if (trimmed.startsWith('## ')) {
-      y += 10;
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(13);
-      doc.setTextColor(30, 41, 59);
-      doc.text(trimmed.replace('## ', ''), margin, y);
-      y += 12;
-    } else if (trimmed.startsWith('### ')) {
-      y += 8;
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(11);
-      doc.setTextColor(71, 85, 105);
-      doc.text(trimmed.replace('### ', ''), margin, y);
-      y += 10;
-    } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(10);
-      doc.setTextColor(51, 65, 85);
-      const bulletText = '• ' + trimmed.substring(2);
-      const wrapped = doc.splitTextToSize(bulletText, maxLineWidth - 10);
-      doc.text(wrapped, margin + 8, y);
-      y += (wrapped.length * 13) + 2;
-    } else if (/^\d+\.\s/.test(trimmed)) {
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(10);
-      doc.setTextColor(51, 65, 85);
-      const wrapped = doc.splitTextToSize(trimmed, maxLineWidth - 10);
-      doc.text(wrapped, margin + 8, y);
-      y += (wrapped.length * 13) + 2;
-    } else if (trimmed.length === 0) {
-      y += 6;
-    } else {
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(10);
-      doc.setTextColor(51, 65, 85);
-      const wrapped = doc.splitTextToSize(trimmed, maxLineWidth);
-      doc.text(wrapped, margin, y);
-      y += (wrapped.length * 13) + 2;
-    }
-  });
-
-  const totalPages = doc.internal.pages.length - 1;
-  for (let i = 1; i <= totalPages; i++) {
-    doc.setPage(i);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8);
-    doc.setTextColor(148, 163, 184);
-    doc.text(`ProBitian Platform Documentation — Official User Guide`, margin, pageHeight - 20);
-    doc.text(`Page ${i} of ${totalPages}`, pageWidth - margin - 40, pageHeight - 20);
-  }
-
-  doc.save(outputPath);
-  console.log(`[Docs Generator] Generated PDF: ${outputPath}`);
-}
-
-function generateHeader(sourceFile) {
-  return `<!-- 
-================================================================================
-GENERATED DOCUMENTATION - DO NOT EDIT DIRECTLY
-Authoritative Source: /docs/${sourceFile}
-Generated by: node generate_docs.js
-================================================================================
--->\n\n`;
-}
-
-// 1. Read Authoritative Source: PROBITIAN_USER_GUIDE.md
-const userGuideSourcePath = path.join(sourceDocsDir, 'PROBITIAN_USER_GUIDE.md');
-if (fs.existsSync(userGuideSourcePath)) {
-  const userGuideContent = fs.readFileSync(userGuideSourcePath, 'utf-8');
-  
-  // Write generated copy to public/docs
-  const publicUserGuidePath = path.join(publicDocsDir, 'ProBitian_Website_User_Guide.md');
-  fs.writeFileSync(publicUserGuidePath, generateHeader('PROBITIAN_USER_GUIDE.md') + userGuideContent);
-  console.log(`[Docs Generator] Synced: ${publicUserGuidePath}`);
-
-  // Generate PDF in public/docs
-  createPdfFromMarkdown(
-    'ProBitian Website',
-    'User & Learner Guide',
-    userGuideContent,
-    path.join(publicDocsDir, 'ProBitian_Website_User_Guide.pdf')
-  );
+const missing = required.filter((file) => !fs.existsSync(path.join(root, file)));
+if (missing.length > 0) {
+  console.error('[Docs Check] Missing required source documents:');
+  for (const file of missing) console.error(` - ${file}`);
+  process.exitCode = 1;
 } else {
-  console.warn(`[Docs Generator Warning] Source not found: ${userGuideSourcePath}`);
+  console.log('[Docs Check] Source documentation is present. No duplicate exports generated.');
 }
-
-// 2. Read Authoritative Source: PROBITIAN_ADMIN_CONTROL_CENTER_USER_GUIDE.md
-const adminGuideSourcePath = path.join(sourceDocsDir, 'PROBITIAN_ADMIN_CONTROL_CENTER_USER_GUIDE.md');
-if (fs.existsSync(adminGuideSourcePath)) {
-  const adminGuideContent = fs.readFileSync(adminGuideSourcePath, 'utf-8');
-  
-  // Write generated copy to public/docs
-  const publicAdminGuidePath = path.join(publicDocsDir, 'ProBitian_Admin_Control_Center_User_Guide.md');
-  fs.writeFileSync(publicAdminGuidePath, generateHeader('PROBITIAN_ADMIN_CONTROL_CENTER_USER_GUIDE.md') + adminGuideContent);
-  console.log(`[Docs Generator] Synced: ${publicAdminGuidePath}`);
-
-  // Generate PDF in public/docs
-  createPdfFromMarkdown(
-    'ProBitian Admin Control Center',
-    'Administrator Management Guide',
-    adminGuideContent,
-    path.join(publicDocsDir, 'ProBitian_Admin_Control_Center_User_Guide.pdf')
-  );
-} else {
-  console.warn(`[Docs Generator Warning] Source not found: ${adminGuideSourcePath}`);
-}
-
-// 3. Read Authoritative Source: DATABASE_MIGRATIONS.md
-const migrationsSourcePath = path.join(sourceDocsDir, 'DATABASE_MIGRATIONS.md');
-if (fs.existsSync(migrationsSourcePath)) {
-  const migrationsContent = fs.readFileSync(migrationsSourcePath, 'utf-8');
-  const publicMigrationsPath = path.join(publicDocsDir, 'DATABASE_MIGRATIONS.md');
-  fs.writeFileSync(publicMigrationsPath, generateHeader('DATABASE_MIGRATIONS.md') + migrationsContent);
-  console.log(`[Docs Generator] Synced: ${publicMigrationsPath}`);
-}
-
-console.log('[Docs Generator] Documentation generation complete! Source of truth: /docs/');
