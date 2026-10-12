@@ -1,47 +1,47 @@
 # ProBitian Documentation
 
-This directory contains the maintained technical and operational documentation for the current codebase. Start with [Current Architecture](ARCHITECTURE.md), then use the topic-specific references below.
+Use this index for maintained technical, developer, operator and user documentation. Keep these docs aligned with code and deployment configuration.
 
-## Source of truth
+## Start here
 
-- Application implementation: `src/` and `server/`
-- Package scripts and dependencies: `package.json` and lockfile
-- Database change history: `supabase/migrations/`
-- Automated checks: `tests/` and `.github/workflows/`
-- Production database and policies: live Supabase state, verified separately from repository files
+- [Current Architecture](ARCHITECTURE.md) — frontend, API, trust boundaries and runtime.
+- [Connection and Environment Setup](CONNECTION_SETUP.md) — local setup, Supabase, secrets, analytics, email and social URLs.
+- [Database Migration Guide](DATABASE_MIGRATIONS.md) — consolidated fresh-install baseline and production safety.
+- [Database Architecture](DATABASE_ARCHITECTURE.md) — entities, relationships and access boundaries.
+- [Security](SECURITY.md) — authentication, CSRF/CORS, RLS, grants and operational controls.
+- [Troubleshooting](TROUBLESHOOTING.md)
+- [Production Release Checklist](PRODUCTION_RELEASE_CHECKLIST.md)
 
-Documentation is explanatory; code, migration files, and the live environment must be checked when they disagree. Do not infer that a migration ran in production solely because a SQL file exists in Git.
+## Operations and integrations
 
-## Current reference documents
+- [Analytics](ANALYTICS.md)
+- [Email Configuration](EMAIL_CONFIGURATION.md)
+- [Email Campaign Workflow](EMAIL_CAMPAIGN_WORKFLOW.md)
+- [Lead Outreach and Sequences](LEAD_OUTREACH_AND_SEQUENCES_WORKFLOW.md)
+- [Media Library](MEDIA_LIBRARY.md)
+- [Newsletter Workflow](NEWSLETTER_WORKFLOW.md)
+- [SEO Architecture](SEO_ARCHITECTURE.md)
+- [SEO User Acceptance Testing](SEO_UAT.md)
+- [Deployment Workflow](DEPLOYMENT_WORKFLOW.md)
 
-| Document | Use |
-|---|---|
-| [Architecture](ARCHITECTURE.md) | Current application layout, security boundaries and directory map |
-| [Database architecture](DATABASE_ARCHITECTURE.md) | Data model and database responsibilities |
-| [Database migrations](DATABASE_MIGRATIONS.md) | Migration history, drift notes and safe migration workflow |
-| [Security](SECURITY.md) | Authentication, authorization, RLS and application security |
-| [Deployment workflow](DEPLOYMENT_WORKFLOW.md) | Build, release and post-deployment verification |
-| [Production release checklist](PRODUCTION_RELEASE_CHECKLIST.md) | Release readiness checks; verify all checked items again before relying on them |
-| [Analytics](ANALYTICS.md) | Analytics implementation and configuration |
-| [Email configuration](EMAIL_CONFIGURATION.md) | Email provider configuration |
-| [Email campaigns](EMAIL_CAMPAIGN_WORKFLOW.md) | Campaign workflow |
-| [Lead outreach and sequences](LEAD_OUTREACH_AND_SEQUENCES_WORKFLOW.md) | CRM outreach and sequence workflow |
-| [Media library](MEDIA_LIBRARY.md) | Media lifecycle and reference handling |
-| [Newsletter](NEWSLETTER_WORKFLOW.md) | Subscription workflow |
-| [SEO architecture](SEO_ARCHITECTURE.md) | Metadata, routing, sitemap and SEO implementation |
-| [Troubleshooting](TROUBLESHOOTING.md) | Diagnostic steps for known issues |
-| [Website user guide](PROBITIAN_USER_GUIDE.md) | Public learner-facing feature guide |
-| [Admin Control Center guide](PROBITIAN_ADMIN_CONTROL_CENTER_USER_GUIDE.md) | Admin portal usage |
+## Product guides
 
-## Documentation maintenance rules
+- [ProBitian User Guide](PROBITIAN_USER_GUIDE.md)
+- [Admin Control Center User Guide](PROBITIAN_ADMIN_CONTROL_CENTER_USER_GUIDE.md)
 
-1. Update the source document under `docs/`; do not maintain duplicate copies under `public/docs/`.
-2. Avoid hard-coding volatile metrics, test counts, storage object counts or claims that an audit is permanently passed.
-3. Label point-in-time audit evidence with its date and scope.
-4. Keep credentials, tokens, passkeys and secret values out of documentation.
-5. For schema changes, add a new forward-only migration and update [Database migrations](DATABASE_MIGRATIONS.md).
-6. Validate documentation links and relevant application scripts after structural changes.
+## Production audit records
 
-## Removed generated artifacts
+- [Production Schema and Migration Ledger Audit](production-schema-ledger-audit.md)
+- [Production Readiness: Secrets and Schema](production-readiness-secrets-and-schema.md)
+- [RLS and Unused Index Review](rls-and-unused-index-review-2026-10-12.md)
 
-PDF guides and duplicated Markdown exports formerly under `public/docs/` have been removed. The source guides in `docs/` remain the maintained copies.
+## Canonical ownership
+
+- Application behavior: `src/`, `server.ts`, `server/`
+- Scripts and dependencies: `package.json` and lockfile
+- Configuration names: `.env.example`
+- Fresh-install SQL baseline: `supabase/migrations/0001_probitian_baseline.sql`
+- Historical migration inventory: `supabase/legacy-migrations.md`
+- Public social destinations: live Admin Control Center settings and `public.social_links`
+
+Avoid competing schema snapshots or stale generated copies of maintained documentation.
