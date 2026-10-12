@@ -1683,3 +1683,58 @@ describe('10. Server RBAC, Authentication & Session Hardening Verification', () 
     assert.strictEqual(checkAfter.reason, 'NONE');
   });
 });
+
+
+import { DefaultStorageService, type MediaRecord } from '../server/services/storage';
+
+test('DefaultStorageService throws when media metadata upsert fails', async () => {
+  const fakeClient: any = {
+    from: () => ({
+      upsert: async () => ({ error: { message: 'simulated database failure' } })
+    })
+  };
+  const service = new DefaultStorageService(fakeClient);
+  const record = {
+    id: 'media-test',
+    filename: 'image.png',
+    original_filename: 'image.png',
+    storage_path: 'uploads/image.png',
+    public_url: 'https://example.test/image.png',
+    url: 'https://example.test/image.png',
+    size_bytes: 1,
+    file_size: 1,
+    mime_type: 'image/png',
+    alt_text: '',
+    category: 'test',
+    folder: 'uploads',
+    uploaded_at: new Date(0).toISOString(),
+    created_at: new Date(0).toISOString()
+  } satisfies MediaRecord;
+  await assert.rejects(() => service.saveMediaRecord(record), /Media metadata persistence failed: simulated database failure/);
+});
+
+test('DefaultStorageService returns media record after successful metadata upsert', async () => {
+  const fakeClient: any = {
+    from: () => ({
+      upsert: async () => ({ error: null })
+    })
+  };
+  const service = new DefaultStorageService(fakeClient);
+  const record = {
+    id: 'media-test-success',
+    filename: 'image.png',
+    original_filename: 'image.png',
+    storage_path: 'uploads/image.png',
+    public_url: 'https://example.test/image.png',
+    url: 'https://example.test/image.png',
+    size_bytes: 1,
+    file_size: 1,
+    mime_type: 'image/png',
+    alt_text: '',
+    category: 'test',
+    folder: 'uploads',
+    uploaded_at: new Date(0).toISOString(),
+    created_at: new Date(0).toISOString()
+  } satisfies MediaRecord;
+  assert.strictEqual(await service.saveMediaRecord(record), record);
+});
