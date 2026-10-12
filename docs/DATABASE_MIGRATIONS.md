@@ -38,7 +38,7 @@ These are historical records. Removing old repository files does not reset or re
 - Table-level and explicit column-level grants
 - Non-internal auth profile synchronization trigger
 
-The baseline intentionally does not seed CMS content, upload media, or recreate Supabase-managed internal event triggers. Required Supabase-managed roles, auth/storage schemas and platform extensions must exist in the target project.
+The baseline intentionally does not seed CMS content, upload media, or recreate Supabase-managed internal event triggers. It does recreate the project-owned `ensure_rls` event trigger that calls `public.rls_auto_enable()`. Required Supabase-managed roles, auth/storage schemas and platform extensions must exist in the target project.
 
 ## Security-relevant differences
 
