@@ -8,7 +8,7 @@ CREATE TABLE public.crm_sequence_locks (
   expires_at timestamptz NOT NULL,
   created_at timestamptz NOT NULL DEFAULT pg_catalog.now(),
   updated_at timestamptz NOT NULL DEFAULT pg_catalog.now(),
-  CONSTRAINT crm_sequence_locks_key_length CHECK (length(lock_key) BETWEEN 1 AND 200)
+  CONSTRAINT crm_sequence_locks_key_length CHECK (pg_catalog.length(lock_key) BETWEEN 1 AND 200)
 );
 
 ALTER TABLE public.crm_sequence_locks ENABLE ROW LEVEL SECURITY;
