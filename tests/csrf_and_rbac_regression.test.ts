@@ -18,6 +18,7 @@ test('CSRF and RBAC regression guards', async (t) => {
   app.use(corsMiddleware);
   app.use(csrfDefenseMiddleware);
   app.post('/api/admin/system/settings', requireAuth, requireRole(UserRole.ADMIN), (_req, res) => res.json({ success: true }));
+  app.post('/api/cron/process-sequences', (_req, res) => res.json({ success: true }));
 
   before(async () => {
     revocationStore = new MemorySessionRevocationStore();
@@ -49,6 +50,22 @@ test('CSRF and RBAC regression guards', async (t) => {
   await t.test('untrusted Referer without Origin is rejected', async () => {
     const res = await fetch(`${baseUrl}/api/admin/system/settings`, { method: 'POST', headers: { 'Content-Type': 'application/json', Referer: 'https://attacker.evil.com/phishing-page', Cookie: cookie(UserRole.ADMIN) }, body: JSON.stringify({ theme: 'malicious' }) });
     assert.equal(res.status, 403);
+  });
+  await t.test('session-authenticated cron endpoint rejects an untrusted Origin', async () => {
+    const res = await fetch(`${baseUrl}/api/cron/process-sequences`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Origin: 'https://evil-attacker-website.com', Cookie: cookie(UserRole.ADMIN) },
+      body: JSON.stringify({})
+    });
+    assert.equal(res.status, 403);
+  });
+  await t.test('scheduler secret headers may pass CSRF middleware for server-to-server auth', async () => {
+    const res = await fetch(`${baseUrl}/api/cron/process-sequences`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-cron-key': 'test-scheduler-secret' },
+      body: JSON.stringify({})
+    });
+    assert.equal(res.status, 200);
   });
   await t.test('missing session is rejected', async () => {
     const res = await fetch(`${baseUrl}/api/admin/system/settings`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: 'https://probitian.ai.studio' }, body: JSON.stringify({ theme: 'dark' }) });
