@@ -65,7 +65,6 @@ router.post(['/newsletter', '/newsletter/subscribe'], newsletterLimiter, async (
               message: 'Database service unavailable. Failed to reactivate subscription.'
             });
           }
-          subscriberRecord = updated;
         }
       } else {
         // Insert new subscriber
