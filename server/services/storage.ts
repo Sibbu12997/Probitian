@@ -81,7 +81,10 @@ export class DefaultStorageService implements StorageService {
 
   async saveMediaRecord(record: MediaRecord): Promise<MediaRecord> {
     if (serverSupabase) {
-      await serverSupabase.from('media').upsert(record);
+      const { error } = await serverSupabase.from('media').upsert(record);
+      if (error) {
+        throw new Error(`Media metadata persistence failed: ${error.message}`);
+      }
       return record;
     }
     return record;
