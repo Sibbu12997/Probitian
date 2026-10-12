@@ -31,7 +31,7 @@ These are historical records. Removing old repository files does not reset or re
 
 ## Forward-only production migration: sequence worker leases
 
-`supabase/migrations/20261012131500_add_crm_sequence_processing_locks.sql` creates an owner-token lease table and narrowly granted RPCs to serialize sequence cycles and claim each enrollment step. It is **not** part of the fresh-install baseline. Validate it on a disposable database, inspect its grants/functions, then apply it to production before deploying code that uses these RPCs. If it is not applied, sequence processing fails closed rather than reverting to the previous rate-limit-counter pseudo-lock.
+`supabase/migrations/20261012131500_add_crm_sequence_processing_locks.sql` creates owner-token lease and token-history tables plus narrowly granted RPCs to serialize sequence cycles and claim each enrollment step. The token history prevents a delayed worker from reviving a token after another worker takes over; entries are intentionally retained to preserve that guarantee. It is **not** part of the fresh-install baseline. Validate it on a disposable database, inspect its grants/functions, then apply it to production before deploying code that uses these RPCs. If it is not applied, sequence processing fails closed rather than reverting to the previous rate-limit-counter pseudo-lock.
 
 ## Baseline scope
 
