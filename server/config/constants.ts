@@ -7,6 +7,31 @@ export const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
 export const APP_VERSION = '1.1.0';
 
+/**
+ * Canonical public origin for links generated in emails and scheduled jobs.
+ * Never derive externally distributed links from request Host / X-Forwarded-* headers.
+ */
+export function getCanonicalAppUrl(): string {
+  const candidates = [
+    process.env.APP_URL,
+    process.env.PUBLIC_URL,
+    process.env.VITE_SITE_URL,
+    'https://probitian.ai.studio'
+  ];
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+    try {
+      const parsed = new URL(candidate.trim());
+      if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') continue;
+      if (process.env.NODE_ENV === 'production' && parsed.protocol !== 'https:') continue;
+      return parsed.origin;
+    } catch {
+      // Ignore malformed optional URL configuration and try the next candidate.
+    }
+  }
+  return 'https://probitian.ai.studio';
+}
+
 export const OFFICIAL_ADMIN_EMAIL = (process.env.ADMIN_EMAIL || process.env.VITE_CONTACT_EMAIL || 'probitianofficial@gmail.com').toLowerCase().trim();
 
 export const CONFIGURED_ADMIN_EMAILS: string[] = [

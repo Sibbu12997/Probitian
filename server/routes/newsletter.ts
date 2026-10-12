@@ -1,8 +1,10 @@
 import express from 'express';
+import { rateLimit } from 'express-rate-limit';
+import cookieParser from 'cookie-parser';
 import { requireAuth, requirePermission } from '../auth/rbac';
 import { Permission } from '../auth/types';
-import { isValidId, isValidUuid } from '../config/constants';
-import { generateUnsubscribeToken, verifyUnsubscribeToken } from '../security/tokens';
+import { getCanonicalAppUrl, isValidId, isValidUuid } from '../config/constants';
+import { generateUnsubscribeToken, getUnsubscribeSecret, verifyUnsubscribeToken } from '../security/tokens';
 import { 
   newsletterLimiter, 
   unsubscribeLimiter, 
@@ -14,6 +16,48 @@ import { emailService } from '../../src/services/emailService';
 import { campaignEmailService } from '../../src/services/campaignEmailService';
 
 const router = express.Router();
+const UNSUBSCRIBE_CONFIRMATION_COOKIE = 'newsletter_unsubscribe_confirm';
+const UNSUBSCRIBE_CONFIRMATION_COOKIE_PATH = '/api/newsletter/unsubscribe';
+
+// Keep the standard in-process limiter alongside the distributed limiter so
+// requests remain throttled when the shared rate-limit store is unavailable.
+const newsletterUnsubscribeRouteRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 20,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'Too many unsubscribe requests. Please try again later.' }
+});
+
+const newsletterAdminSubscribersRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 60,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'Too many subscriber-list requests. Please try again later.' }
+});
+
+const parseSignedUnsubscribeCookie: express.RequestHandler = (req, res, next) => {
+  try {
+    return cookieParser(getUnsubscribeSecret())(req, res, next);
+  } catch (error) {
+    return next(error);
+  }
+};
+
+function requireVerifiedUnsubscribeToken(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const signedToken = req.signedCookies?.[UNSUBSCRIBE_CONFIRMATION_COOKIE];
+  const verifiedEmail = typeof signedToken === 'string' ? verifyUnsubscribeToken(signedToken) : null;
+
+  if (verifiedEmail === null) {
+    return res.status(400).set({ 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' }).send(
+      '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Invalid unsubscribe link - ProBitian</title></head><body><main><h1>Invalid or expired unsubscribe link</h1><p>Please use the original link from your ProBitian email.</p></main></body></html>'
+    );
+  }
+
+  res.locals.verifiedUnsubscribeEmail = verifiedEmail;
+  return next();
+}
 
 // Public Newsletter Subscription
 router.post(['/newsletter', '/newsletter/subscribe'], newsletterLimiter, async (req, res) => {
@@ -115,8 +159,7 @@ router.post(['/newsletter', '/newsletter/subscribe'], newsletterLimiter, async (
   }
 
   // Generate signed unsubscribe URL
-  const reqProtocol = req.headers['x-forwarded-proto'] || req.protocol;
-  const reqHost = req.headers['x-forwarded-host'] || req.headers.host;
+  const publicOrigin = getCanonicalAppUrl();
   let unsubToken: string;
   try {
     unsubToken = generateUnsubscribeToken(cleanEmail);
@@ -124,7 +167,7 @@ router.post(['/newsletter', '/newsletter/subscribe'], newsletterLimiter, async (
     console.error('[NEWSLETTER] Unsubscribe token configuration unavailable.');
     return res.status(503).json({ success: false, message: 'Newsletter service is temporarily unavailable.' });
   }
-  const unsubUrl = `${reqProtocol}://${reqHost}/api/newsletter/unsubscribe?token=${unsubToken}`;
+  const unsubUrl = `${publicOrigin}/api/newsletter/unsubscribe?token=${unsubToken}`;
 
   // Send welcome email with signed unsubscribe token
   console.log('[NEWSLETTER] Sending welcome email.');
@@ -137,68 +180,62 @@ router.post(['/newsletter', '/newsletter/subscribe'], newsletterLimiter, async (
   });
 });
 
-// Public Unsubscribe Endpoint
-router.get('/newsletter/unsubscribe', unsubscribeLimiter, async (req, res) => {
+// GET displays a confirmation page only. Email security scanners and link previews
+// routinely follow links; unsubscribe state changes must require an explicit POST.
+router.get('/newsletter/unsubscribe', parseSignedUnsubscribeCookie, newsletterUnsubscribeRouteRateLimit, unsubscribeLimiter, (req, res) => {
   const token = (req.query.token || '').toString().trim();
-  const rawEmail = (req.query.email || '').toString().trim();
-
-  let verifiedEmail: string | null = null;
-
-  if (token) {
-    verifiedEmail = verifyUnsubscribeToken(token);
-  } else if (rawEmail) {
-    verifiedEmail = verifyUnsubscribeToken(rawEmail);
+  if (!token || !verifyUnsubscribeToken(token)) {
+    return res.status(400).set({ 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' }).send(
+      '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Invalid unsubscribe link - ProBitian</title></head><body><main><h1>Invalid or expired unsubscribe link</h1><p>Please use the original link from your ProBitian email.</p></main></body></html>'
+    );
   }
+  return res
+    .cookie(UNSUBSCRIBE_CONFIRMATION_COOKIE, token, {
+      signed: true,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 10 * 60 * 1000,
+      path: UNSUBSCRIBE_CONFIRMATION_COOKIE_PATH
+    })
+    .status(200)
+    .set({ 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' })
+    .send(
+      '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Confirm unsubscribe - ProBitian</title></head><body><main><h1>Confirm unsubscribe</h1><p>Confirm that you want to stop receiving ProBitian newsletter emails.</p><form method="post" action="/api/newsletter/unsubscribe"><button type="submit">Unsubscribe</button></form></main></body></html>'
+    );
+});
 
-  if (!verifiedEmail) {
-    return res.status(400).send(`
-      <!DOCTYPE html>
-      <html>
-        <head><title>Unsubscribe - ProBitian</title><style>body{font-family:sans-serif;text-align:center;padding:50px;background:#f8fafc;color:#1e293b;}.card{max-width:480px;margin:auto;background:white;padding:32px;border-radius:12px;border:1px solid #e2e8f0;}</style></head>
-        <body>
-          <div class="card">
-            <h2 style="color:#ef4444;">Invalid or Expired Request</h2>
-            <p>The unsubscribe request is invalid, tampered with, or expired. Please use the original unsubscribe link provided in your newsletter email.</p>
-          </div>
-        </body>
-      </html>
-    `);
-  }
-
-  // Update in Supabase
+router.post('/newsletter/unsubscribe', parseSignedUnsubscribeCookie, newsletterUnsubscribeRouteRateLimit, unsubscribeLimiter, requireVerifiedUnsubscribeToken, async (_req, res) => {
+  const verifiedEmail = res.locals.verifiedUnsubscribeEmail as string;
   if (serverSupabase) {
     try {
-      await serverSupabase.from('newsletter').update({ status: 'unsubscribed' }).eq('email', verifiedEmail);
-    } catch (e) {
-      console.error('[Unsubscribe DB Error]', e);
+      const { error } = await serverSupabase.from('newsletter').update({ status: 'unsubscribed' }).ilike('email', verifiedEmail);
+      if (error) {
+        console.error('[Unsubscribe DB Error]', { code: error.code, message: error.message });
+        return res.status(503).set('Cache-Control', 'no-store').send('Unsubscribe could not be completed right now. Please try again shortly.');
+      }
+    } catch (error: any) {
+      console.error('[Unsubscribe DB Exception]', error?.message || 'Unknown error');
+      return res.status(503).set('Cache-Control', 'no-store').send('Unsubscribe could not be completed right now. Please try again shortly.');
     }
   } else {
     const data = readCmsData();
     data.subscribers = data.subscribers || [];
-    const idx = data.subscribers.findIndex((s: any) => s.email.toLowerCase() === verifiedEmail!.toLowerCase());
-    if (idx >= 0) {
-      data.subscribers[idx].status = 'unsubscribed';
-      writeCmsData(data);
-    }
+    const idx = data.subscribers.findIndex((subscriber: any) => typeof subscriber.email === 'string' && subscriber.email.toLowerCase() === verifiedEmail);
+    if (idx >= 0) { data.subscribers[idx].status = 'unsubscribed'; writeCmsData(data); }
   }
-
-  return res.send(`
-    <!DOCTYPE html>
-    <html>
-      <head><title>Unsubscribed - ProBitian</title><style>body{font-family:sans-serif;text-align:center;padding:50px;background:#f8fafc;color:#1e293b;}.card{max-width:480px;margin:auto;background:white;padding:32px;border-radius:12px;border:1px solid #e2e8f0;}a{color:#0284c7;text-decoration:none;font-weight:bold;}</style></head>
-      <body>
-        <div class="card">
-          <h2 style="color:#10b981;">Unsubscribed Successfully</h2>
-          <p>You (${verifiedEmail}) have been successfully removed from ProBitian newsletter updates.</p>
-          <a href="/">Return to ProBitian Home</a>
-        </div>
-      </body>
-    </html>
-  `);
+  res.clearCookie(UNSUBSCRIBE_CONFIRMATION_COOKIE, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    path: UNSUBSCRIBE_CONFIRMATION_COOKIE_PATH
+  });
+  return res.status(200).set({ 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' }).send(
+    '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Unsubscribed - ProBitian</title></head><body><main><h1>Unsubscribed successfully</h1><p>This email address has been removed from ProBitian newsletter updates.</p><a href="/">Return to ProBitian Home</a></main></body></html>'
+  );
 });
-
 // Admin Subscribers List
-router.get('/admin/subscribers', requireAuth, requirePermission(Permission.VIEW_ANALYTICS), async (req, res) => {
+router.get('/admin/subscribers', requireAuth, requirePermission(Permission.VIEW_ANALYTICS), newsletterAdminSubscribersRateLimit, async (req, res) => {
   if (serverSupabase) {
     try {
       const { data, error } = await serverSupabase.from('newsletter').select('*').order('created_at', { ascending: false });
@@ -469,9 +506,7 @@ router.post('/admin/email-campaigns/:id/send', requireAuth, requirePermission(Pe
     });
   }
 
-  const reqProtocol = req.headers['x-forwarded-proto'] || req.protocol;
-  const reqHost = req.headers['x-forwarded-host'] || req.headers.host;
-  const baseUrl = `${reqProtocol}://${reqHost}`;
+  const baseUrl = getCanonicalAppUrl();
 
   let successfulCount = 0;
   let failedCount = 0;

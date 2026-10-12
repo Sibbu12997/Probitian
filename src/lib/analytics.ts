@@ -19,6 +19,24 @@ const getMeasurementId = (): string => {
 
 let isInitialized = false;
 
+/** Keep query strings and fragments out of analytics page paths; they can contain PII or tokens. */
+export function sanitizeAnalyticsPagePath(pagePath: string, baseOrigin = 'https://probitian.ai.studio'): string {
+  try {
+    return new URL(pagePath || '/', baseOrigin).pathname || '/';
+  } catch {
+    return '/';
+  }
+}
+
+/** Record only a URL origin, never query parameters, fragments, or potentially sensitive paths. */
+export function sanitizeAnalyticsLink(value: string, baseOrigin = 'https://probitian.ai.studio'): string {
+  try {
+    return new URL(value, baseOrigin).origin;
+  } catch {
+    return '';
+  }
+}
+
 // Setup reactive listener for consent updates
 if (typeof window !== 'undefined') {
   subscribeToConsentChanges((choice) => {
@@ -28,7 +46,7 @@ if (typeof window !== 'undefined') {
         window[`ga-disable-${measurementId}`] = false;
       }
       initGA();
-      trackPageView(window.location.pathname + window.location.hash);
+      trackPageView(window.location.pathname);
     } else if (choice === 'necessary') {
       if (measurementId && typeof window !== 'undefined') {
         window[`ga-disable-${measurementId}`] = true;
@@ -73,7 +91,7 @@ export const initGA = (): boolean => {
 
       window.gtag('js', new Date());
       window.gtag('config', measurementId, {
-        send_page_view: true,
+        send_page_view: false,
         anonymize_ip: true,
       });
     }
@@ -105,7 +123,10 @@ const sanitizeParams = (params?: Record<string, any>): Record<string, any> => {
     if (forbiddenKeys.some(forbidden => lowerKey.includes(forbidden))) {
       continue; // Skip PII fields entirely
     }
-    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    if (typeof value === 'string' && (lowerKey.includes('url') || lowerKey.endsWith('href'))) {
+      // Analytics only needs the destination origin; full URLs can carry emails or tokens.
+      sanitized[key] = sanitizeAnalyticsLink(value, typeof window !== 'undefined' ? window.location.origin : 'https://probitian.ai.studio');
+    } else if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
       sanitized[key] = value;
     }
   }
@@ -122,14 +143,16 @@ export const trackPageView = (pagePath: string, pageTitle?: string) => {
   const measurementId = getMeasurementId();
   if (typeof window !== 'undefined' && window.gtag) {
     const title = pageTitle || document.title;
+    const safePagePath = sanitizeAnalyticsPagePath(pagePath, window.location.origin);
+    const safePageLocation = window.location.origin + safePagePath;
     window.gtag('config', measurementId, {
-      page_path: pagePath,
+      page_path: safePagePath,
       page_title: title,
-      page_location: window.location.href,
+      page_location: safePageLocation,
     });
     window.gtag('event', 'page_view', {
-      page_path: pagePath,
-      page_location: window.location.href,
+      page_path: safePagePath,
+      page_location: safePageLocation,
       page_title: title,
     });
   }
@@ -143,8 +166,9 @@ export const trackEvent = (eventName: string, parameters?: Record<string, any>) 
   initGA();
   if (typeof window !== 'undefined' && window.gtag) {
     const safeParams = sanitizeParams({
-      page_path: window.location.pathname + window.location.hash,
       ...parameters,
+      // Never allow caller-provided values to override the safe page path.
+      page_path: sanitizeAnalyticsPagePath(window.location.pathname, window.location.origin),
     });
     window.gtag('event', eventName, safeParams);
   }
@@ -213,7 +237,7 @@ export const trackNavigationClick = (targetPage: string) => {
 export const trackExternalLinkClick = (url: string, label?: string) => {
   trackEvent('external_link_click', {
     link_url: url,
-    link_label: label || url,
+    link_label: label || 'External link',
   });
 };
 
