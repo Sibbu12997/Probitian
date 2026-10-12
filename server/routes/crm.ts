@@ -1,4 +1,5 @@
 import express from 'express';
+import { rateLimit } from 'express-rate-limit';
 import crypto from 'crypto';
 import { requireAuth, requirePermission, hasPermission } from '../auth/rbac';
 import { getAdminSession } from '../auth/session';
@@ -37,6 +38,17 @@ export {
 };
 
 const router = express.Router();
+
+// Explicit, standard Express rate limiter so static security analysis can verify
+// that both public unsubscribe endpoints are throttled. The distributed limiter
+// remains in place as a second layer across application instances.
+const unsubscribeRouteRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 20,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'Too many unsubscribe requests. Please try again later.' }
+});
 
 // Helper to query Supabase Lead Campaigns with relational source of truth
 export async function getSupabaseCrmCampaigns(): Promise<any[]> {
@@ -1616,7 +1628,7 @@ router.get('/admin/leads/:id/sequences', requireAuth, requirePermission(Permissi
 });
 
 // GET only displays a confirmation page. Link scanners must not mutate subscription state.
-router.get('/crm/unsubscribe', unsubscribeLimiter, (req, res) => {
+router.get('/crm/unsubscribe', unsubscribeRouteRateLimit, unsubscribeLimiter, (req, res) => {
   const token = (req.query.token || '').toString().trim();
   if (!token || !verifyUnsubscribeToken(token)) {
     return res.status(400).send('Invalid or expired unsubscribe link.');
@@ -1637,7 +1649,7 @@ router.get('/crm/unsubscribe', unsubscribeLimiter, (req, res) => {
   `);
 });
 
-router.post('/crm/unsubscribe', unsubscribeLimiter, async (req, res) => {
+router.post('/crm/unsubscribe', unsubscribeRouteRateLimit, unsubscribeLimiter, async (req, res) => {
   const token = (req.body?.token || req.query.token || '').toString().trim();
   let verifiedEmail: string | null = null;
   if (token) {
