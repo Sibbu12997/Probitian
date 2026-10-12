@@ -33,11 +33,9 @@ export function isAllowedOrigin(origin: string | undefined, req: express.Request
     }
 
     // Official ProBitian & Google AI Studio container domains
-    if (
-      host === 'probitian.ai.studio' ||
-      // Specific preview hosts must be configured explicitly via CORS_ALLOWED_ORIGINS.
-      // Never trust arbitrary *.ai.studio or *.run.app tenants.
-    ) {
+    // Only the exact first-party AI Studio hostname is trusted by default.
+    // Other preview hosts must be configured explicitly via CORS_ALLOWED_ORIGINS.
+    if (host === 'probitian.ai.studio') {
       return true;
     }
 
