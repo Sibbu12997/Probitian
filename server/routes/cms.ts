@@ -631,7 +631,7 @@ router.post(['/cms/messages', '/contact', '/contact/submit'], contactLimiter, as
         created_at: new Date().toISOString()
       };
 
-      const { data, error } = await serverSupabase.from('messages').insert(dbPayload).select().single();
+      const { error } = await serverSupabase.from('messages').insert(dbPayload);
       if (error) {
         console.error('[CMS] Contact message insert error:', error);
         return res.status(500).json({ error: 'Failed to send message' });
