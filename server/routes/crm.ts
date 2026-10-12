@@ -1545,7 +1545,7 @@ router.post(['/admin/lead-sequences/process', '/api/admin/lead-sequences/process
       forceProductionSend: Boolean(forceProductionSend)
     });
 
-    return res.json({
+    return res.status(result.success ? 200 : 503).json({
       success: result.success,
       message: result.message,
       stats: result.stats,
