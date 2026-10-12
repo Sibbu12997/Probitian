@@ -33,6 +33,8 @@ describe('Admin Media Library Management & Reference Protection', () => {
 
   before(async () => {
     setRevocationStore(new MemorySessionRevocationStore());
+    globalDistributedRateLimitStore.clearLocalHits();
+    globalDistributedRateLimitStore.setProvider(null);
 
     // Create admin session
     const adminSession = createAdminSession(

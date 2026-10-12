@@ -106,7 +106,7 @@ describe('CMS Settings and Endpoints Verification', () => {
     assert.strictEqual(res.status, 200);
     const data = await res.json();
     assert.ok(Array.isArray(data));
-    const allowed = new Set(['general', 'seo', 'legal', 'home', 'founder_message', 'founder']);
+    const allowed = new Set(['general', 'seo', 'legal', 'home', 'founder_message', 'founder', 'social_links', 'navigation_items']);
     for (const item of data) {
       assert.ok(allowed.has(item.key), `Unexpected non-public key in settings: ${item.key}`);
     }

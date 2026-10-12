@@ -11,6 +11,7 @@ import { sanitizeSvgString, validateFileSignature } from '../security/sanitizer'
 import { emailService } from '../../src/services/emailService';
 import { recordAuditLog } from '../services/audit';
 import { findMediaReferences, MediaReferenceCheckError } from '../services/mediaReferenceService';
+import { getStorageService } from '../services/storage';
 
 const router = express.Router();
 
@@ -53,7 +54,7 @@ router.get('/cms/projects', async (req, res) => {
     const data = readCmsData();
     const projects = data.projects || [];
     if (!canViewAll) {
-      return res.json(projects.filter((p: any) => p.published !== false));
+      return res.json(projects.filter((p: any) => p.published === true));
     }
     return res.json(projects);
   } catch {
@@ -298,7 +299,7 @@ router.get('/cms/courses', async (req, res) => {
     const data = readCmsData();
     const courses = data.courses || [];
     if (!canViewAll) {
-      return res.json(courses.filter((c: any) => c.published !== false && c.status !== 'draft'));
+      return res.json(courses.filter((c: any) => c.published === true));
     }
     return res.json(courses);
   } catch {
@@ -1197,7 +1198,7 @@ router.delete('/cms/media/:id', mediaDeleteLimiter, requireAuth, requirePermissi
   // 4. Synchronized Storage Object Removal (treat already-missing object as idempotent success)
   let storageCleaned = false;
   let isAlreadyMissing = false;
-  if (serverSupabase) {
+  if (serverSupabase && fromDatabase) {
     try {
       const { data: storageData, error: storageErr } = await serverSupabase.storage
         .from(PROBITIAN_MEDIA_BUCKET)
@@ -1544,7 +1545,7 @@ router.post('/cms/media/bulk-delete', mediaDeleteLimiter, requireAuth, requirePe
 
     // 4. Synchronized Storage Object Removal (Storage MUST succeed before DB deletion)
     let isAlreadyMissing = false;
-    if (serverSupabase) {
+    if (serverSupabase && fromDatabaseIds.has(id)) {
       try {
         const { data: storageData, error: storageErr } = await serverSupabase.storage
           .from(PROBITIAN_MEDIA_BUCKET)
@@ -1967,28 +1968,10 @@ const handleUpload = async (req: express.Request, res: express.Response) => {
 
     let publicUrl = '';
     const uniquePath = `uploads/${Date.now()}_${crypto.randomBytes(4).toString('hex')}_${cleanName}`;
+    const storageService = getStorageService();
 
-    if (serverSupabase) {
-      const { data: uploadData, error: uploadErr } = await serverSupabase.storage
-        .from(PROBITIAN_MEDIA_BUCKET)
-        .upload(uniquePath, bufferToUpload, {
-          contentType: effectiveMime,
-          cacheControl: '3600',
-          upsert: true
-        });
-
-      if (uploadErr) {
-        return res.status(500).json({ error: `Upload failed: ${uploadErr.message}` });
-      }
-
-      const { data: publicUrlData } = serverSupabase.storage
-        .from(PROBITIAN_MEDIA_BUCKET)
-        .getPublicUrl(uploadData.path);
-
-      publicUrl = publicUrlData.publicUrl;
-    } else {
-      publicUrl = `data:${effectiveMime};base64,${bufferToUpload.toString('base64')}`;
-    }
+    const uploadRes = await storageService.uploadFile(uniquePath, bufferToUpload, effectiveMime);
+    publicUrl = uploadRes.publicUrl;
 
     const mediaItem = {
       id: crypto.randomUUID(),
@@ -2007,13 +1990,9 @@ const handleUpload = async (req: express.Request, res: express.Response) => {
       created_at: new Date().toISOString()
     };
 
-    if (serverSupabase) {
-      try {
-        await serverSupabase.from('media').upsert(mediaItem);
-      } catch (e) {
-        // continue
-      }
-    } else {
+    await storageService.saveMediaRecord(mediaItem);
+
+    if (!serverSupabase) {
       const data = readCmsData();
       data.media = data.media || [];
       data.media.unshift(mediaItem);

@@ -65,12 +65,12 @@ Tracing timestamps, filenames, and IDs confirms all additional items were create
   13. `uploads/1791565868445_18634293_image.webp` (`f53eed89-b8c6-4397-bfd0-e36ca27486d0`)
   14. `uploads/1791565869232_f0f1a7e4_graphic.svg` (`e99112a8-a2b5-4e35-af09-fca2c63323a7`)
   15. `uploads/1791565870249_3e3273cc_passwd.png` (`208d821c-a227-44ac-88a8-348fa097ce01`)
-- **Run 4 (17:24:51 – 17:24:54 UTC):**
-  16. `uploads/1791566691456_86144e54_valid.png` (`f48b9918-ae38-4e89-bd32-5e43a99e7465`)
-  17. `uploads/1791566692120_6bb088be_photo.jpg` (`86fbaea4-a4b5-412f-9812-70b9231f24d9`)
-  18. `uploads/1791566692790_394b998a_image.webp` (`3c3d11b1-2856-42bb-90bf-c6bc361ef2ae`)
-  19. `uploads/1791566693450_5033cf85_graphic.svg` (`8203c9eb-c7e6-4318-ae95-d8aaee0dfa80`)
-  20. `uploads/1791566694460_1bca5610_passwd.png` (`6e51147e-8c3b-4869-906d-e43105786ba1`)
+- **Run 4 (07:24:48 – 07:24:51 UTC):**
+  16. `uploads/1791617087759_e579d3d3_valid.png` (`8eba317f-a558-4704-9445-1d5b04dfe6d0`)
+  17. `uploads/1791617088641_b56a5004_photo.jpg` (`1e3fbfec-af80-4634-9aaa-fafcae9f1cbf`)
+  18. `uploads/1791617089419_25be8cdb_image.webp` (`7a82bd96-50c9-4cab-8d8e-9e29b1cd9b15`)
+  19. `uploads/1791617090135_ab26ebc1_graphic.svg` (`9dc16ec5-e7cd-4dce-b3a4-9da66c10b196`)
+  20. `uploads/1791617091296_a16fd542_passwd.png` (`fb017cc4-33bc-4c3f-bcee-88537e5853e3`)
 
 These assets were created by `tests/cms_public_endpoints.test.ts`, which tested the real server endpoint `/api/cms/media/upload` with valid editor session tokens. Because the server endpoint properly synchronizes uploads to both Supabase Storage and `public.media`, **both tables incremented identically by 5 per run**, leaving **0 orphaned rows** and **0 missing files**.
 

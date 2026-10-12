@@ -10,7 +10,8 @@ import {
   MemorySessionRevocationStore
 } from '../server/auth/session';
 import { UserRole } from '../server/auth/types';
-import { serverSupabase, readCmsData, writeCmsData } from '../server/services/supabase';
+import { setStorageService, resetStorageService, StorageService, StorageUploadResult, MediaRecord } from '../server/services/storage';
+import { globalDistributedRateLimitStore } from '../server/middleware/rateLimiters';
 
 describe('Public CMS Endpoints Resiliency & Production Regression Tests', () => {
   const app = express();
@@ -19,37 +20,40 @@ describe('Public CMS Endpoints Resiliency & Production Regression Tests', () => 
 
   let server: http.Server;
   let baseUrl: string;
-  const uploadedAssetsToClean: Array<{ id: string; storage_path: string }> = [];
 
-  async function safelyCleanAsset(id?: string, storagePath?: string) {
-    if (!id && !storagePath) return;
-    try {
-      if (serverSupabase && storagePath) {
-        await serverSupabase.storage.from('probitian-media').remove([storagePath]);
-      }
-    } catch (e) {
-      // ignore in test cleanup
+  // In-memory isolated storage mock for safe, deterministic testing
+  const mockStorageUploads: Map<string, { buffer: Buffer; contentType: string }> = new Map();
+  const mockMediaRecords: Map<string, MediaRecord> = new Map();
+
+  const mockStorageService: StorageService = {
+    async uploadFile(storagePath: string, buffer: Buffer, contentType: string): Promise<StorageUploadResult> {
+      mockStorageUploads.set(storagePath, { buffer, contentType });
+      return {
+        path: storagePath,
+        publicUrl: `https://mock-storage.local/${storagePath}`
+      };
+    },
+    async removeFile(storagePath: string): Promise<boolean> {
+      mockStorageUploads.delete(storagePath);
+      return true;
+    },
+    async saveMediaRecord(record: MediaRecord): Promise<MediaRecord> {
+      mockMediaRecords.set(record.id, record);
+      return record;
+    },
+    async deleteMediaRecord(id: string): Promise<boolean> {
+      mockMediaRecords.delete(id);
+      return true;
     }
-    try {
-      if (serverSupabase && id) {
-        await serverSupabase.from('media').delete().eq('id', id);
-      }
-    } catch (e) {
-      // ignore in test cleanup
-    }
-    try {
-      const localData = readCmsData();
-      if (localData.media && Array.isArray(localData.media)) {
-        localData.media = localData.media.filter((m: any) => m.id !== id && m.storage_path !== storagePath);
-        writeCmsData(localData);
-      }
-    } catch (e) {
-      // ignore
-    }
-  }
+  };
 
   before(async () => {
     setRevocationStore(new MemorySessionRevocationStore());
+    setStorageService(mockStorageService);
+    // Use in-memory store for rate limiting in route testing
+    globalDistributedRateLimitStore.clearLocalHits();
+    globalDistributedRateLimitStore.setProvider(null);
+
     await new Promise<void>((resolve) => {
       server = app.listen(0, '127.0.0.1', () => {
         const port = (server.address() as any).port;
@@ -61,13 +65,9 @@ describe('Public CMS Endpoints Resiliency & Production Regression Tests', () => 
 
   after(async () => {
     resetRevocationStore();
-
-    // Secondary fail-safe cleanup of all disposable test probe files registered during this run
-    if (uploadedAssetsToClean.length > 0) {
-      for (const asset of uploadedAssetsToClean) {
-        await safelyCleanAsset(asset.id, asset.storage_path);
-      }
-    }
+    resetStorageService();
+    mockStorageUploads.clear();
+    mockMediaRecords.clear();
 
     if (server) {
       if ((server as any).closeAllConnections) (server as any).closeAllConnections();
@@ -102,7 +102,7 @@ describe('Public CMS Endpoints Resiliency & Production Regression Tests', () => 
     const data = await res.json();
     assert.ok(Array.isArray(data));
     for (const project of data) {
-      assert.strictEqual(project.published !== false, true, 'Draft/unpublished projects must not be public');
+      assert.strictEqual(project.published, true, 'Draft/unpublished projects must not be public');
     }
   });
 
@@ -124,7 +124,7 @@ describe('Public CMS Endpoints Resiliency & Production Regression Tests', () => 
     const data = await res.json();
     assert.ok(Array.isArray(data));
     for (const course of data) {
-      assert.strictEqual(course.published !== false, true, 'Draft/unpublished courses must not be public');
+      assert.strictEqual(course.published, true, 'Draft/unpublished courses must not be public');
     }
   });
 
@@ -274,24 +274,84 @@ describe('Public CMS Endpoints Resiliency & Production Regression Tests', () => 
     assert.strictEqual(res.status, 403);
   });
 
-  test('Unauthenticated POST /api/cms/settings is blocked with HTTP 401', async () => {
-    const res = await fetch(`${baseUrl}/api/cms/settings`, {
+  test('Unauthenticated POST /api/cms/blogs is blocked with HTTP 401', async () => {
+    const res = await fetch(`${baseUrl}/api/cms/blogs`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ key: 'general', value: {} })
+      body: JSON.stringify({ title: 'Unauthorized Blog' })
     });
     assert.strictEqual(res.status, 401);
   });
 
-  test('Authenticated USER is blocked from POST /api/cms/settings with HTTP 403', async () => {
+  test('Authenticated USER without EDIT_CONTENT is blocked from POST /api/cms/blogs with HTTP 403', async () => {
     const userToken = createSignedSessionToken('user@probitian.com', UserRole.USER);
-    const res = await fetch(`${baseUrl}/api/cms/settings`, {
+    const res = await fetch(`${baseUrl}/api/cms/blogs`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Cookie': `admin_session=${userToken}`
       },
-      body: JSON.stringify({ key: 'general', value: {} })
+      body: JSON.stringify({ title: 'Unauthorized Blog' })
+    });
+    assert.strictEqual(res.status, 403);
+  });
+
+  test('Unauthenticated POST /api/cms/courses is blocked with HTTP 401', async () => {
+    const res = await fetch(`${baseUrl}/api/cms/courses`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: 'Unauthorized Course' })
+    });
+    assert.strictEqual(res.status, 401);
+  });
+
+  test('Authenticated USER without EDIT_CONTENT is blocked from POST /api/cms/courses with HTTP 403', async () => {
+    const userToken = createSignedSessionToken('user@probitian.com', UserRole.USER);
+    const res = await fetch(`${baseUrl}/api/cms/courses`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Cookie': `admin_session=${userToken}`
+      },
+      body: JSON.stringify({ title: 'Unauthorized Course' })
+    });
+    assert.strictEqual(res.status, 403);
+  });
+
+  test('Unauthenticated POST /api/cms/videos is blocked with HTTP 401', async () => {
+    const res = await fetch(`${baseUrl}/api/cms/videos`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: 'Unauthorized Video' })
+    });
+    assert.strictEqual(res.status, 401);
+  });
+
+  test('Authenticated USER without EDIT_CONTENT is blocked from POST /api/cms/videos with HTTP 403', async () => {
+    const userToken = createSignedSessionToken('user@probitian.com', UserRole.USER);
+    const res = await fetch(`${baseUrl}/api/cms/videos`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Cookie': `admin_session=${userToken}`
+      },
+      body: JSON.stringify({ title: 'Unauthorized Video' })
+    });
+    assert.strictEqual(res.status, 403);
+  });
+
+  test('Unauthenticated DELETE /api/cms/media/:id is blocked with HTTP 401', async () => {
+    const res = await fetch(`${baseUrl}/api/cms/media/44682b2c-1b5c-4acd-88b3-e3c3ab7d841d`, {
+      method: 'DELETE'
+    });
+    assert.strictEqual(res.status, 401);
+  });
+
+  test('Authenticated USER without MEDIA_DELETE is blocked from DELETE /api/cms/media/:id with HTTP 403', async () => {
+    const userToken = createSignedSessionToken('user@probitian.com', UserRole.USER);
+    const res = await fetch(`${baseUrl}/api/cms/media/44682b2c-1b5c-4acd-88b3-e3c3ab7d841d`, {
+      method: 'DELETE',
+      headers: { Cookie: `admin_session=${userToken}` }
     });
     assert.strictEqual(res.status, 403);
   });
@@ -358,10 +418,10 @@ describe('Public CMS Endpoints Resiliency & Production Regression Tests', () => 
   });
 
   // =========================================================================
-  // 3. MEDIA UPLOAD VALIDATION & GUARANTEED DISPOSABLE CLEANUP
+  // 3. MEDIA UPLOAD VALIDATION & SAFE MOCKED STORAGE EXECUTION
   // =========================================================================
 
-  test('Valid PNG upload is accepted with HTTP 200 and immediately cleaned up', async () => {
+  test('Valid PNG upload is accepted with HTTP 200 and saved to isolated mock storage', async () => {
     const editorToken = createSignedSessionToken('editor@probitian.com', UserRole.EDITOR);
     const validPngBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
     const testFileName = `test_probe_${Date.now()}_valid.png`;
@@ -383,14 +443,8 @@ describe('Public CMS Endpoints Resiliency & Production Regression Tests', () => 
     assert.strictEqual(body.success, true);
     assert.strictEqual(body.media.mime_type, 'image/png');
     assert.ok(body.media.storage_path.startsWith('uploads/'));
-
-    // Register asset and guarantee immediate cleanup
-    uploadedAssetsToClean.push({ id: body.media.id, storage_path: body.media.storage_path });
-    try {
-      assert.ok(body.media.id);
-    } finally {
-      await safelyCleanAsset(body.media.id, body.media.storage_path);
-    }
+    assert.ok(mockStorageUploads.has(body.media.storage_path));
+    assert.ok(mockMediaRecords.has(body.media.id));
   });
 
   test('Non-PNG payload renamed to .png is rejected with HTTP 400', async () => {
@@ -413,7 +467,7 @@ describe('Public CMS Endpoints Resiliency & Production Regression Tests', () => 
     assert.match(body.error, /signature|validation|mismatch|unsupported/i);
   });
 
-  test('Valid JPEG upload is accepted with HTTP 200 and immediately cleaned up', async () => {
+  test('Valid JPEG upload is accepted with HTTP 200 and saved to isolated mock storage', async () => {
     const editorToken = createSignedSessionToken('editor@probitian.com', UserRole.EDITOR);
     const validJpeg = Buffer.from([0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0x01, 0x00, 0x48, 0x00, 0x48, 0x00, 0x00, 0xFF, 0xD9]);
     const testFileName = `test_probe_${Date.now()}_photo.jpg`;
@@ -434,13 +488,7 @@ describe('Public CMS Endpoints Resiliency & Production Regression Tests', () => 
     const body = await res.json();
     assert.strictEqual(body.success, true);
     assert.strictEqual(body.media.mime_type, 'image/jpeg');
-
-    uploadedAssetsToClean.push({ id: body.media.id, storage_path: body.media.storage_path });
-    try {
-      assert.ok(body.media.id);
-    } finally {
-      await safelyCleanAsset(body.media.id, body.media.storage_path);
-    }
+    assert.ok(mockStorageUploads.has(body.media.storage_path));
   });
 
   test('Non-JPEG payload renamed to .jpg is rejected with HTTP 400', async () => {
@@ -463,7 +511,7 @@ describe('Public CMS Endpoints Resiliency & Production Regression Tests', () => 
     assert.match(body.error, /signature|validation|mismatch|unsupported/i);
   });
 
-  test('Valid WebP upload is accepted with HTTP 200 and immediately cleaned up', async () => {
+  test('Valid WebP upload is accepted with HTTP 200 and saved to isolated mock storage', async () => {
     const editorToken = createSignedSessionToken('editor@probitian.com', UserRole.EDITOR);
     const validWebP = Buffer.concat([
       Buffer.from('RIFF', 'ascii'),
@@ -490,13 +538,7 @@ describe('Public CMS Endpoints Resiliency & Production Regression Tests', () => 
     const body = await res.json();
     assert.strictEqual(body.success, true);
     assert.strictEqual(body.media.mime_type, 'image/webp');
-
-    uploadedAssetsToClean.push({ id: body.media.id, storage_path: body.media.storage_path });
-    try {
-      assert.ok(body.media.id);
-    } finally {
-      await safelyCleanAsset(body.media.id, body.media.storage_path);
-    }
+    assert.ok(mockStorageUploads.has(body.media.storage_path));
   });
 
   test('Invalid payload renamed to .webp is rejected with HTTP 400', async () => {
@@ -519,7 +561,7 @@ describe('Public CMS Endpoints Resiliency & Production Regression Tests', () => 
     assert.match(body.error, /signature|validation|mismatch|unsupported/i);
   });
 
-  test('SVG containing <script> or event handlers is sanitized before storage and immediately cleaned up', async () => {
+  test('SVG containing <script> or event handlers is sanitized before storage and stored safely', async () => {
     const editorToken = createSignedSessionToken('editor@probitian.com', UserRole.EDITOR);
     const dirtySvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
       <circle cx="50" cy="50" r="40" fill="red" onload="alert('XSS')" onclick="fetch('/steal')" />
@@ -544,20 +586,14 @@ describe('Public CMS Endpoints Resiliency & Production Regression Tests', () => 
     const body = await res.json();
     assert.strictEqual(body.success, true);
 
-    uploadedAssetsToClean.push({ id: body.media.id, storage_path: body.media.storage_path });
-    try {
-      if (body.url && body.url.startsWith('data:')) {
-        const decoded = Buffer.from(body.url.split(',')[1], 'base64').toString('utf-8');
-        assert.ok(!decoded.includes('<script'));
-        assert.ok(!decoded.includes('onload='));
-        assert.ok(!decoded.includes('onclick='));
-        assert.ok(!decoded.includes('javascript:'));
-        assert.ok(decoded.includes('<svg'));
-        assert.ok(decoded.includes('<circle'));
-      }
-    } finally {
-      await safelyCleanAsset(body.media.id, body.media.storage_path);
-    }
+    const stored = mockStorageUploads.get(body.media.storage_path);
+    assert.ok(stored, 'Uploaded SVG must exist in storage mock');
+    const storedText = stored.buffer.toString('utf-8');
+    assert.ok(!storedText.includes('<script'));
+    assert.ok(!storedText.includes('onload='));
+    assert.ok(!storedText.includes('onclick='));
+    assert.ok(!storedText.includes('javascript:'));
+    assert.ok(storedText.includes('<svg'));
   });
 
   test('Executable PE MZ binary is strictly rejected with HTTP 400', async () => {
@@ -640,7 +676,7 @@ describe('Public CMS Endpoints Resiliency & Production Regression Tests', () => 
     assert.match(body.error, /prohibited|forbidden|invalid|signature/i);
   });
 
-  test('Path traversal in fileName (../../../etc/passwd.png) is sanitized to safe path and immediately cleaned up', async () => {
+  test('Path traversal in fileName (../../../etc/passwd.png) is sanitized to safe path in storage mock', async () => {
     const editorToken = createSignedSessionToken('editor@probitian.com', UserRole.EDITOR);
     const validPng = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
     const testFileName = `../../../../etc/test_probe_${Date.now()}_passwd.png`;
@@ -664,13 +700,7 @@ describe('Public CMS Endpoints Resiliency & Production Regression Tests', () => 
     assert.ok(!body.media.storage_path.includes('/etc/'));
     assert.ok(body.media.storage_path.startsWith('uploads/'));
     assert.ok(body.media.filename.endsWith('passwd.png'));
-
-    uploadedAssetsToClean.push({ id: body.media.id, storage_path: body.media.storage_path });
-    try {
-      assert.ok(body.media.id);
-    } finally {
-      await safelyCleanAsset(body.media.id, body.media.storage_path);
-    }
+    assert.ok(mockStorageUploads.has(body.media.storage_path));
   });
 
   test('Upload exceeding MAX_UPLOAD_BYTES (15MB) is rejected with HTTP 413 Payload Too Large', async () => {
@@ -691,7 +721,6 @@ describe('Public CMS Endpoints Resiliency & Production Regression Tests', () => 
         fileData: `data:image/png;base64,${sixteenMbBase64}`
       })
     });
-    // Can be 413 Payload Too Large (from express body-parser limit of 15mb or from handleUpload check)
     assert.ok(res.status === 413 || res.status === 400, `Expected 413 or 400 for oversized payload, got ${res.status}`);
   });
 });

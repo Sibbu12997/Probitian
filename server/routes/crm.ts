@@ -1,6 +1,7 @@
 import express from 'express';
 import crypto from 'crypto';
-import { requireAuth, requirePermission } from '../auth/rbac';
+import { requireAuth, requirePermission, hasPermission } from '../auth/rbac';
+import { getAdminSession } from '../auth/session';
 import { Permission, UserRole } from '../auth/types';
 import { isValidId, isValidUuid, constantTimeCompare } from '../config/constants';
 import { generateUnsubscribeToken, verifyUnsubscribeToken } from '../security/tokens';
@@ -1559,7 +1560,8 @@ router.post(['/cron/process-sequences', '/api/cron/process-sequences'], async (r
         (cronKey && constantTimeCompare(cronKey, expectedSecret))
       )
     );
-    const hasAdminSession = Boolean((req as any).session && (req as any).session.user);
+    const adminSession = await getAdminSession(req);
+    const hasAdminSession = Boolean(adminSession && hasPermission(adminSession.role, Permission.MANAGE_CRM));
 
     if (!isSecretAuthorized && !hasAdminSession) {
       return res.status(401).json({ error: 'Unauthorized: Invalid cron authorization token.' });

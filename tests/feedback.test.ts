@@ -11,6 +11,8 @@ import {
 } from '../server/auth/session';
 import { UserRole } from '../server/auth/types';
 
+import { globalDistributedRateLimitStore } from '../server/middleware/rateLimiters';
+
 describe('Feedback and Testimonials API Tests', () => {
   const app = express();
   app.use(express.json());
@@ -21,6 +23,8 @@ describe('Feedback and Testimonials API Tests', () => {
 
   before(async () => {
     setRevocationStore(new MemorySessionRevocationStore());
+    globalDistributedRateLimitStore.clearLocalHits();
+    globalDistributedRateLimitStore.setProvider(null);
     await new Promise<void>((resolve) => {
       server = app.listen(0, '127.0.0.1', () => {
         const port = (server.address() as any).port;
