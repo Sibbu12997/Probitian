@@ -14,7 +14,7 @@
     "test": "NODE_ENV=test tsx --test \"tests/*.test.ts\" \"tests/**/*.test.ts\""
   },
   "dependencies": {
-    "@google/genai": "^2.4.0",
+    "@google/genai": "^2.31.0",
     "@supabase/supabase-js": "^2.117.3",
     "@tailwindcss/vite": "^4.1.14",
     "@types/pg": "^8.23.1",
