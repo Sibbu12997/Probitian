@@ -1,0 +1,67 @@
+name: Repair dependency lockfile (PR branch only)
+
+on:
+  push:
+    branches:
+      - fix/ci-npm-audit-vulnerabilities
+
+permissions:
+  contents: write
+
+jobs:
+  repair-and-validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: "!startsWith(github.event.head_commit.message, 'chore(deps): persist npm audit fixes')"
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/ci-npm-audit-vulnerabilities
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install current dependencies
+        run: npm ci
+
+      - name: Apply compatible security fixes
+        run: npm audit fix
+
+      - name: Persist updated dependency manifests
+        run: |
+          if ! git diff --quiet -- package.json package-lock.json; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add package.json package-lock.json
+            git commit -m "chore(deps): persist npm audit fixes"
+            git push origin HEAD:fix/ci-npm-audit-vulnerabilities
+          else
+            echo "npm audit fix made no manifest changes."
+          fi
+
+      - name: Clean install from updated lockfile
+        run: npm ci
+
+      - name: Verify security audit
+        run: npm audit --audit-level=high
+
+      - name: Typecheck
+        run: npm run lint
+
+      - name: Tests
+        env:
+          CI_ADMIN_PASSKEY: ${{ secrets.CI_ADMIN_PASSKEY || 'ci-test-dedicated-admin-passkey-never-used-in-production' }}
+          CI_SESSION_SECRET: ${{ secrets.CI_SESSION_SECRET || 'ci-test-session-secret-at-least-32-chars-long' }}
+          ADMIN_PASSKEY: ${{ secrets.CI_ADMIN_PASSKEY || 'ci-test-dedicated-admin-passkey-never-used-in-production' }}
+          SESSION_SECRET: ${{ secrets.CI_SESSION_SECRET || 'ci-test-session-secret-at-least-32-chars-long' }}
+          UNSUBSCRIBE_SECRET: ci-only-unsubscribe-secret-32-bytes-long-never-production
+          NODE_ENV: test
+        run: npm test
+
+      - name: Production build
+        run: npm run build
